@@ -1,3 +1,8 @@
+# Repositorio vacio creado por error con "Create a New Repository" en GitHub
+# Desktop. Se excluye para que git no lo trate como repo anidado; se puede
+# borrar a mano cuando GitHub Desktop no lo tenga abierto.
+ondaamp/
+
 # Nada de dependencias ni temporales: este proyecto no las usa
 node_modules/
 *.log
