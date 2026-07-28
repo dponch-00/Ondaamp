@@ -4,7 +4,7 @@ Reproductor de música local con ecualizador, restauración de audio y auto-más
 
 Esta es la versión **PWA**, instalable en Android desde el navegador.
 
-👉 **[Abrir OndaAmp](https://dponch-00.github.io/ondaamp/)** · en Chrome para Android verás la opción de instalarla.
+👉 **[Abrir OndaAmp](https://dponch-00.github.io/Ondaamp/)** · en Chrome para Android verás la opción de instalarla.
 
 ## Qué hace
 
