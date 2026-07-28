@@ -1,0 +1,6 @@
+# Nada de dependencias ni temporales: este proyecto no las usa
+node_modules/
+*.log
+Thumbs.db
+desktop.ini
+.DS_Store

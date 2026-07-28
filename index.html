@@ -1,0 +1,4502 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>OndaAmp — Reproductor local Hi-Fi</title>
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#0f1216">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎧</text></svg>">
+<style>
+:root{
+  --bg:#0f1216; --panel:#171c23; --panel2:#1d242e; --line:#2a3340;
+  --txt:#e6edf5; --mut:#8fa0b3; --acc:#38e08c; --acc-dim:#1f7a4f;
+  --amber:#ffc857; --lcd:#9dffb0; --lcd-dim:#3f7a4c; --lcdbg:#06120a;
+  --danger:#ff6b6b; --radius:12px;
+  --deck-h:84px; --eq-h:150px;
+}
+*{box-sizing:border-box; margin:0; padding:0;}
+html{height:100%;}
+/* Diseño de aplicación, no de documento: la ventana nunca hace scroll completo,
+   los controles quedan siempre a la vista y solo la biblioteca se desplaza. */
+body{
+  height:100vh; height:100dvh; overflow:hidden;
+  background: radial-gradient(1100px 600px at 50% -150px, #1b2432, var(--bg));
+  background-attachment:fixed;
+  color:var(--txt);
+  font:14px/1.45 "Segoe UI", system-ui, sans-serif;
+  display:flex; justify-content:center;
+  padding:14px 12px 10px;
+  -webkit-font-smoothing:antialiased;
+}
+.app{
+  width:min(1180px,100%); height:100%;
+  display:flex; flex-direction:column; gap:11px;
+  position:relative; min-width:0;
+  overflow-y:auto; overflow-x:hidden;   /* válvula de escape si la ventana es diminuta */
+  scrollbar-width:thin;
+}
+/* En ventanas anchas el espacio libre es horizontal: ecualizador y biblioteca
+   van lado a lado en vez de apilarse, para que todo quepa sin maximizar. */
+@media (min-width:800px){
+  .app{
+    display:grid;
+    grid-template-columns:minmax(330px,372px) minmax(0,1fr);
+    grid-template-rows:auto auto auto minmax(0,1fr) auto;
+  }
+  #deckPanel{grid-column:1 / -1;}
+  #eqPanel{grid-column:1; grid-row:2; align-self:start;}
+  #fxPanel{grid-column:1; grid-row:3; align-self:start;}
+  #amPanel{grid-column:1; grid-row:4; align-self:start;}
+  #plPanel{grid-column:2; grid-row:2 / 5; min-height:0;}
+  footer{grid-column:1 / -1;}
+  #amPanel .am-fila .lbl{min-width:62px;}
+  /* La columna del EQ es estrecha: compacta las bandas para que quepan las 11 */
+  #eqPanel .eq-sliders{gap:2px;}
+  #eqPanel .vwrap{width:24px;}
+  #eqPanel .vwrap input{height:24px;}
+  #eqPanel .eq-divider{margin:0 1px;}
+  #eqPanel .eq-extra{gap:9px; padding-top:9px;}
+  #eqPanel .eq-extra input[type=range]{width:88px; flex:0 0 88px;}
+  #eqPanel .eq-extra .lbl{font-size:11px;}
+  #eqPanel .eq-extra .limnote{display:none;}  /* informativo: sobra en columna estrecha */
+  #eqPanel .eq-top{gap:7px;}
+  /* Cada fila del EQ debe caber en UNA línea: si envuelve, el panel crece 40 px */
+  #eqPanel .lbl-preset,
+  #eqPanel .lbl-wide,
+  #eqPanel .lbl-night,
+  #eqPanel .hide-narrow{display:none;}
+  #eqPanel #preset{flex:1 1 auto; min-width:0; max-width:170px;}
+}
+/* Ventanas de altura media: encoge el deck antes que la biblioteca */
+@media (max-height:780px){
+  :root{--deck-h:72px;}
+  canvas#vis{height:40px;}
+  .deck-body{gap:10px;}
+}
+.app::-webkit-scrollbar{width:8px;}
+.app::-webkit-scrollbar-thumb{background:#2c3542; border-radius:4px;}
+/* El deck y el EQ conservan su tamaño; la biblioteca absorbe el espacio sobrante */
+.app > .panel{flex:0 0 auto;}
+#plPanel{flex:1 1 auto; min-height:216px; display:flex; flex-direction:column;}
+#plPanel > .section-body{flex:1; min-height:0; display:flex; flex-direction:column;}
+#plPanel.closed{flex:0 0 auto; min-height:0;}
+.app.drag::before{
+  content:"⬇ Suelta tu música aquí";
+  position:fixed; inset:0; z-index:50;
+  display:flex; align-items:center; justify-content:center;
+  font-size:clamp(16px,4vw,26px); font-weight:600; color:var(--acc); text-align:center;
+  background:rgba(10,14,18,.82); backdrop-filter:blur(3px);
+  border:3px dashed var(--acc); border-radius:16px;
+  pointer-events:none;
+}
+.panel{
+  background:linear-gradient(180deg, var(--panel2), var(--panel));
+  border:1px solid var(--line); border-radius:var(--radius);
+  box-shadow:0 12px 30px rgba(0,0,0,.45), inset 0 1px 0 rgba(255,255,255,.04);
+  overflow:hidden; min-width:0;
+}
+.titlebar{
+  display:flex; align-items:center; gap:8px;
+  padding:7px 12px;
+  background:linear-gradient(90deg,#232c38,#1a212b 60%,#232c38);
+  border-bottom:1px solid var(--line);
+  font-size:12px; letter-spacing:.14em; color:var(--mut);
+  user-select:none; flex-wrap:wrap;
+}
+.titlebar .dots{display:flex; gap:5px; flex-shrink:0;}
+.titlebar .dots i{width:9px;height:9px;border-radius:50%;background:#33404f;display:block;}
+.titlebar .dots i:first-child{background:var(--acc);box-shadow:0 0 6px var(--acc);}
+.titlebar b{color:var(--txt); letter-spacing:.22em; font-weight:600;}
+.titlebar .spacer{flex:1;}
+.titlebar .tag{font-size:10px; border:1px solid var(--line); border-radius:20px; padding:1px 8px; white-space:nowrap;}
+
+/* ---------- DECK ---------- */
+.deck-body{padding:14px; display:flex; flex-direction:column; gap:12px; min-width:0;}
+.display{
+  display:grid; grid-template-columns:var(--deck-h) minmax(0,1fr); gap:12px;
+  background:var(--lcdbg);
+  border:1px solid #16311f; border-radius:10px;
+  padding:12px; position:relative; overflow:hidden;
+  box-shadow:inset 0 0 24px rgba(0,0,0,.7), inset 0 0 60px rgba(40,255,120,.05);
+}
+.display::after{ /* scanlines CRT */
+  content:""; position:absolute; inset:0; pointer-events:none;
+  background:repeating-linear-gradient(0deg, rgba(0,0,0,.16) 0 1px, transparent 1px 3px);
+  mix-blend-mode:multiply;
+}
+.cover{
+  width:var(--deck-h); height:var(--deck-h); border-radius:8px; overflow:hidden;
+  background:#0a1c10; border:1px solid #1c3b26;
+  display:flex;align-items:center;justify-content:center;
+  color:var(--lcd-dim); font-size:34px; flex-shrink:0;
+}
+.cover img{width:100%;height:100%;object-fit:cover;}
+.lcd{display:flex; flex-direction:column; gap:6px; min-width:0;}
+.lcd-title-box{overflow:hidden; white-space:nowrap; height:22px; position:relative;}
+.lcd-title{
+  display:inline-block; font-size:clamp(14px,2.4vw,16px); font-weight:600; color:var(--lcd);
+  text-shadow:0 0 8px rgba(120,255,160,.5); will-change:transform;
+}
+.lcd-row{display:flex; align-items:baseline; gap:14px; flex-wrap:wrap;}
+.lcd-time{
+  font:700 clamp(22px,5vw,30px)/1 Consolas, "Cascadia Mono", monospace;
+  color:var(--lcd); text-shadow:0 0 10px rgba(120,255,160,.45);
+  letter-spacing:2px; cursor:pointer; user-select:none;
+}
+.lcd-info{font:12px Consolas, monospace; color:var(--lcd-dim); letter-spacing:1px;}
+.lcd-info b{color:var(--lcd); font-weight:600;}
+canvas#vis{
+  width:100%; height:56px; display:block; border-radius:6px; cursor:pointer;
+  background:rgba(0,0,0,.25);
+}
+.grid-vis{grid-column:1 / -1; min-width:0;}
+
+/* ---------- Seek ---------- */
+.seek-row{display:flex; align-items:center; gap:10px; min-width:0;}
+.seek-row .t{font:12px Consolas,monospace; color:var(--mut); min-width:44px; text-align:center; flex-shrink:0;}
+input[type=range]{
+  -webkit-appearance:none; appearance:none; background:transparent;
+  height:26px; cursor:pointer; flex:1; min-width:0;
+}
+input[type=range]::-webkit-slider-runnable-track{
+  height:8px; border-radius:5px;
+  background:var(--range-bg, #2a3340);
+  border:1px solid #1c232d;
+}
+input[type=range]::-webkit-slider-thumb{
+  -webkit-appearance:none; width:16px; height:16px; margin-top:-5px;
+  border-radius:50%; background:#dfe7ef;
+  border:2px solid #0d1117;
+  box-shadow:0 0 0 2px rgba(255,255,255,.08), 0 2px 6px rgba(0,0,0,.6);
+}
+input[type=range]:hover::-webkit-slider-thumb{background:#fff;}
+input[type=range]::-moz-range-track{height:8px;border-radius:5px;background:#2a3340;border:1px solid #1c232d;}
+input[type=range]::-moz-range-progress{height:8px;border-radius:5px;background:var(--acc);}
+input[type=range]::-moz-range-thumb{width:14px;height:14px;border-radius:50%;background:#dfe7ef;border:2px solid #0d1117;}
+
+/* ---------- Transport ---------- */
+.transport{display:flex; align-items:center; gap:10px; flex-wrap:wrap; min-width:0;}
+.tbtns{display:flex; gap:6px; flex-shrink:0;}
+.btn{
+  background:linear-gradient(180deg,#242d39,#1a212b);
+  color:var(--txt); border:1px solid var(--line); border-radius:9px;
+  padding:8px 12px; font-size:13px; cursor:pointer; user-select:none;
+  display:inline-flex; align-items:center; gap:6px; white-space:nowrap;
+  transition:border-color .15s, box-shadow .15s, color .15s;
+}
+.btn:hover{border-color:#3d4a5c;}
+.btn:active{transform:translateY(1px);}
+.btn.on{color:var(--acc); border-color:var(--acc-dim); box-shadow:0 0 10px rgba(56,224,140,.18), inset 0 0 8px rgba(56,224,140,.08);}
+.btn.icon{padding:8px 11px;}
+.btn svg{width:15px;height:15px;fill:currentColor;display:block;}
+.btn.play-main{padding:10px 18px;}
+.btn.play-main svg{width:19px;height:19px;}
+.btn.danger:hover{color:var(--danger); border-color:#6b3340;}
+.btn.sm{padding:5px 9px; font-size:12px;}
+.vol-group{display:flex; align-items:center; gap:8px; flex:1 1 190px; min-width:150px;}
+.vol-group .lbl{font-size:11px; color:var(--mut); letter-spacing:.08em; width:30px; text-align:right; flex-shrink:0;}
+.vol-group output{font:12px Consolas,monospace; color:var(--mut); width:40px; flex-shrink:0;}
+.mode-group{display:flex; gap:6px; flex-shrink:0;}
+
+/* ---------- Secciones ---------- */
+.section-head{
+  display:flex; align-items:center; gap:10px; padding:10px 14px;
+  border-bottom:1px solid var(--line); cursor:pointer; user-select:none;
+  flex-wrap:wrap;
+}
+.section-head h2{font-size:12px; letter-spacing:.18em; color:var(--mut); font-weight:600; flex:1; min-width:120px;}
+.section-head .chev{color:var(--mut); transition:transform .2s;}
+.panel.closed .chev{transform:rotate(-90deg);}
+.panel.closed .section-body{display:none;}
+
+/* ---------- EQ ---------- */
+.eq-body{padding:14px; display:flex; flex-direction:column; gap:14px; min-width:0;}
+.eq-top{display:flex; align-items:center; gap:10px; flex-wrap:wrap;}
+select{
+  background:#141a21; color:var(--txt); border:1px solid var(--line);
+  border-radius:8px; padding:7px 10px; font-size:13px; cursor:pointer; outline:none;
+  max-width:100%;
+}
+select:focus{border-color:var(--acc-dim);}
+.eq-sliders{
+  display:flex; gap:3px; justify-content:space-between; align-items:flex-end;
+  padding:6px 2px 0; min-width:0;
+}
+.band{display:flex; flex-direction:column; align-items:center; gap:6px; min-width:0; flex:1 1 0;}
+.band .db{font:10px Consolas,monospace; color:var(--mut); height:13px;}
+.vwrap{height:var(--eq-h); width:30px; position:relative;}
+.vwrap input{
+  position:absolute; left:50%; top:50%;
+  width:var(--eq-h); height:30px;
+  transform:translate(-50%,-50%) rotate(-90deg);
+}
+.band .hz{font-size:clamp(9px,1.6vw,11px); color:var(--mut); white-space:nowrap;}
+.band.pre .hz{color:var(--amber); font-weight:600;}
+.band.pre input::-webkit-slider-thumb{background:var(--amber);}
+.eq-divider{width:1px; background:var(--line); align-self:stretch; margin:0 3px; flex:0 0 1px;}
+.eq-extra{display:flex; align-items:center; gap:14px; flex-wrap:wrap; border-top:1px dashed var(--line); padding-top:12px;}
+.eq-extra .xitem{display:flex; align-items:center; gap:8px; flex-wrap:wrap;}
+.eq-extra .lbl{font-size:12px; color:var(--mut);}
+.eq-extra input[type=range]{width:120px; flex:0 0 120px;}
+.eq-extra output{font:12px Consolas,monospace; color:var(--mut); min-width:40px;}
+
+/* ---------- Restauración y realce ---------- */
+.fx-body{padding:12px 14px 13px; display:flex; flex-direction:column; gap:9px; min-width:0;}
+.fx-row{
+  display:grid; grid-template-columns:26px minmax(0,1fr) 92px 40px;
+  gap:9px; align-items:center;
+}
+/* Colores tomados del tema para que el panel siga a cualquier skin importado. */
+.fx-tog{
+  width:26px; height:26px; border-radius:50%; cursor:pointer;
+  background:var(--panel); border:1px solid var(--line); color:var(--mut);
+  font-size:12px; line-height:1; display:flex; align-items:center; justify-content:center;
+  opacity:.75;
+  transition:color .15s, border-color .15s, box-shadow .15s, background .15s, opacity .15s;
+}
+.fx-tog:hover{border-color:var(--acc-dim); opacity:1;}
+.fx-row.on .fx-tog{
+  color:var(--bg); background:var(--acc); border-color:var(--acc); opacity:1;
+  box-shadow:0 0 10px color-mix(in srgb, var(--acc) 40%, transparent);
+}
+.fx-txt{min-width:0;}
+.fx-t1{font-size:12.5px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+.fx-t2{font-size:10.5px; color:var(--mut); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+.fx-row.on .fx-t1{color:var(--acc);}
+.fx-tag{
+  font:9px Consolas,monospace; letter-spacing:.06em; color:var(--mut);
+  border:1px solid var(--line); border-radius:20px; padding:0 5px; margin-left:3px;
+  text-transform:uppercase; font-weight:400;
+}
+.fx-row input[type=range]{flex:none; width:92px; height:22px;}
+.fx-row output{font:11px Consolas,monospace; color:var(--mut); text-align:right;}
+.fx-row .fx-nopar{color:var(--mut); opacity:.5; font-size:11px; text-align:center; grid-column:3 / -1;}
+/* Deshabilitado en gris hasta que el efecto se enciende */
+.fx-row:not(.on) input[type=range]{opacity:.4;}
+.fx-sep{height:1px; background:var(--line); margin:2px 0;}
+.fx-note{font-size:10.5px; color:var(--mut); opacity:.8; line-height:1.5; margin-top:2px;}
+.fx-note.warn{color:var(--amber);}
+
+/* ---------- Auto-máster ---------- */
+.am-body{padding:12px 14px 13px; display:flex; flex-direction:column; gap:9px; min-width:0;}
+.am-estado{
+  font-size:11.5px; color:var(--mut); line-height:1.45;
+  background:var(--panel); border:1px solid var(--line); border-radius:8px;
+  padding:7px 10px; min-height:32px;
+}
+.am-estado b{color:var(--acc); font-weight:600;}
+/* Gráfico de la corrección: una barra por banda, hacia arriba o hacia abajo */
+.am-graf{
+  display:grid; grid-template-columns:repeat(10,1fr); gap:3px;
+  height:52px; align-items:center;
+  border-top:1px solid var(--line); border-bottom:1px solid var(--line);
+  padding:4px 0; position:relative;
+}
+.am-graf::before{  /* línea del cero */
+  content:""; position:absolute; left:0; right:0; top:50%;
+  border-top:1px dashed var(--line); pointer-events:none;
+}
+.am-b{position:relative; height:100%; display:flex; align-items:center; justify-content:center;}
+.am-b i{
+  position:absolute; left:12%; right:12%; display:block; border-radius:2px;
+  background:var(--acc); transition:height .3s, top .3s, bottom .3s;
+}
+.am-b.neg i{background:var(--amber);}
+.am-b span{
+  position:absolute; bottom:-2px; left:0; right:0; text-align:center;
+  font:8px Consolas,monospace; color:var(--mut); opacity:.7;
+}
+.am-fila{display:flex; align-items:center; gap:9px; flex-wrap:wrap;}
+.am-fila .lbl{font-size:11.5px; color:var(--mut); min-width:74px;}
+.am-fila select{flex:1; min-width:0; font-size:12px; padding:5px 8px;}
+.am-fila input[type=range]{flex:1; min-width:80px;}
+.am-fila output{font:11px Consolas,monospace; color:var(--mut); min-width:34px; text-align:right;}
+
+/* ---------- Playlist ---------- */
+.pl-tools{display:flex; gap:8px; padding:12px 14px; flex-wrap:wrap; align-items:center;}
+.views{display:flex; gap:0; border:1px solid var(--line); border-radius:9px; overflow:hidden; flex-shrink:0;}
+.views button{
+  background:#161c24; color:var(--mut); border:none; border-right:1px solid var(--line);
+  padding:7px 11px; font-size:12px; cursor:pointer; white-space:nowrap;
+}
+.views button:last-child{border-right:none;}
+.views button:hover{color:var(--txt); background:#1c242e;}
+.views button.on{background:var(--acc-dim); color:#eafff3; font-weight:600;}
+.pl-tools .find{
+  flex:1 1 130px; min-width:110px; background:#141a21; border:1px solid var(--line);
+  border-radius:8px; color:var(--txt); padding:7px 11px; font-size:13px; outline:none;
+}
+.pl-tools .find:focus{border-color:var(--acc-dim);}
+
+/* Aviso de biblioteca guardada pendiente de permiso */
+.pl-restaurar{
+  display:flex; align-items:center; gap:8px; flex-wrap:wrap;
+  padding:8px 12px; border-top:1px solid var(--line);
+  background:color-mix(in srgb, var(--amber) 12%, transparent);
+}
+.pl-restaurar .pr-txt{flex:1; min-width:150px; font-size:11.5px; color:var(--txt); line-height:1.4;}
+.pl-restaurar .pr-txt b{color:var(--amber);}
+/* Pistas guardadas que aún no tienen permiso de lectura */
+.pl-list li.pend{opacity:.55;}
+.pl-list li.pend .idx{color:var(--amber);}
+
+.pl-scroll{
+  flex:1 1 auto; min-height:132px;   /* nunca se colapsa: siempre se ven pistas */
+  overflow-y:auto; overflow-x:hidden;
+  border-top:1px solid var(--line);
+}
+.pl-scroll::-webkit-scrollbar{width:10px;}
+.pl-scroll::-webkit-scrollbar-thumb{background:#2c3542; border-radius:5px; border:2px solid var(--panel);}
+.pl-scroll::-webkit-scrollbar-track{background:transparent;}
+
+/* Cabecera de grupo (estilo explorador) */
+.grp{
+  display:grid; grid-template-columns:20px 40px minmax(0,1fr) auto auto;
+  gap:9px; align-items:center;
+  padding:8px 12px 8px 6px;
+  background:linear-gradient(180deg,#1e2630,#1a212a);
+  border-top:1px solid var(--line); border-bottom:1px solid rgba(42,51,64,.7);
+  cursor:pointer; user-select:none;
+  position:sticky; top:0; z-index:2;
+}
+.grp:hover{background:#232c38;}
+.grp .gchev{color:var(--mut); font-size:11px; text-align:center; transition:transform .18s;}
+.grp.closed .gchev{transform:rotate(-90deg);}
+.grp .gart{
+  width:40px;height:40px;border-radius:5px;overflow:hidden;background:#0f1620;
+  border:1px solid var(--line); display:flex;align-items:center;justify-content:center;
+  font-size:18px; color:var(--mut);
+}
+.grp .gart img{width:100%;height:100%;object-fit:cover;}
+.grp .gtxt{min-width:0;}
+.grp .g1{font-weight:600; font-size:13px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+.grp .g2{font-size:11px; color:var(--mut); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+.grp .gmeta{font:11px Consolas,monospace; color:var(--mut); text-align:right; white-space:nowrap;}
+.grp.playing .g1{color:var(--acc);}
+/* Botones de cabecera: invisibles hasta pasar el ratón por el grupo */
+.grp .gbtns{display:flex; gap:4px; opacity:0; transition:opacity .15s;}
+.grp:hover .gbtns{opacity:1;}
+.grp .gbtns button{
+  border:1px solid var(--line); background:var(--panel); color:var(--mut);
+  border-radius:6px; width:24px; height:24px; cursor:pointer; font-size:11px;
+  display:flex; align-items:center; justify-content:center; padding:0;
+}
+.grp .gbtns .gplay:hover{color:var(--acc); border-color:var(--acc-dim);}
+.grp .gbtns .grm:hover{color:var(--danger); border-color:#6b3340;}
+/* Resalta la fila al saltar a la canción actual (botón 🎯) */
+.pl-list li.flash{animation:flashRow 1.5s ease;}
+@keyframes flashRow{
+  0%, 60% { background:color-mix(in srgb, var(--acc) 22%, transparent); }
+  100%    { background:transparent; }
+}
+
+/* Filas de pista */
+.pl-list{list-style:none;}
+.pl-list li{
+  display:grid; grid-template-columns:34px minmax(0,1fr) auto 28px;
+  gap:8px; align-items:center;
+  padding:6px 10px 6px 6px; cursor:pointer;
+  border-bottom:1px solid rgba(42,51,64,.35);
+  font-size:13px;
+}
+.pl-list li.ingrp{padding-left:30px; grid-template-columns:26px minmax(0,1fr) auto 28px;}
+.pl-list li:hover{background:rgba(255,255,255,.035);}
+.pl-list li.cur{background:rgba(56,224,140,.09);}
+.pl-list li.cur .t1{color:var(--acc);}
+.pl-list li.bad{opacity:.45;}
+.pl-list li .idx{color:var(--mut); font:11px Consolas,monospace; text-align:right;}
+.pl-list li.cur .idx{color:var(--acc);}
+.pl-list li .tt{min-width:0;}
+.pl-list li .t1{white-space:nowrap; overflow:hidden; text-overflow:ellipsis; font-weight:500;}
+.pl-list li .t2{white-space:nowrap; overflow:hidden; text-overflow:ellipsis; color:var(--mut); font-size:11px;}
+.pl-list li .dur{font:11px Consolas,monospace; color:var(--mut);}
+.pl-list li .rm{
+  border:none; background:none; color:var(--mut); cursor:pointer; font-size:14px;
+  opacity:0; border-radius:6px; padding:2px 6px;
+}
+.pl-list li:hover .rm{opacity:.8;}
+.pl-list li .rm:hover{color:var(--danger); background:rgba(255,107,107,.1);}
+.pl-empty{
+  padding:34px 20px; text-align:center; color:var(--mut);
+  display:flex; flex-direction:column; gap:8px; align-items:center;
+}
+.pl-empty .big{font-size:36px; opacity:.7;}
+.pl-empty b{color:var(--txt); font-weight:600;}
+.pl-stats{padding:8px 14px; font-size:11px; color:var(--mut); border-top:1px solid var(--line); display:flex; gap:14px; flex-wrap:wrap;}
+
+footer{
+  text-align:center; color:#5c6b7d; font-size:11px; line-height:1.9; user-select:none;
+}
+footer kbd{
+  background:#1a212b; border:1px solid var(--line); border-bottom-width:2px;
+  border-radius:4px; padding:0 5px; font:11px Consolas,monospace; color:var(--mut);
+}
+.hide-narrow{display:inline;}
+
+/* Toast */
+#toasts{position:fixed; bottom:18px; left:50%; transform:translateX(-50%); z-index:100; display:flex; flex-direction:column; gap:8px; align-items:center; max-width:92vw;}
+.toast{
+  background:#1c2430ee; border:1px solid var(--line); border-left:3px solid var(--acc);
+  color:var(--txt); padding:9px 16px; border-radius:9px; font-size:13px; text-align:center;
+  box-shadow:0 8px 24px rgba(0,0,0,.5); animation:tin .2s ease;
+}
+.toast.err{border-left-color:var(--danger);}
+@keyframes tin{from{opacity:0; transform:translateY(8px);} to{opacity:1;}}
+@keyframes marquee{from{transform:translateX(0);} to{transform:translateX(-50%);}}
+
+/* ---------- Adaptación a ventanas pequeñas ---------- */
+@media (max-width:780px){
+  :root{--eq-h:130px;}
+  .eq-extra input[type=range]{width:100px; flex:0 0 100px;}
+}
+@media (max-width:620px){
+  :root{--deck-h:64px; --eq-h:118px;}
+  body{padding:10px 8px 20px;}
+  .deck-body,.eq-body{padding:11px; gap:10px;}
+  .pl-tools{padding:10px;}
+  .vwrap{width:26px;}
+  .vwrap input{height:26px;}
+  .eq-divider{margin:0 1px;}
+  .band{gap:4px;}
+  .btn{padding:7px 10px; font-size:12.5px;}
+  .btn.play-main{padding:9px 15px;}
+  .hide-narrow{display:none;}
+  .grp{grid-template-columns:18px 32px minmax(0,1fr) auto auto; gap:7px;}
+  .grp .gbtns{opacity:1;}   /* sin ratón (táctil) siempre visibles */
+  .lbl-fold{display:none;}
+  .grp .gart{width:32px;height:32px;}
+  .pl-list li.ingrp{padding-left:22px;}
+  footer{font-size:10px;}
+}
+@media (max-width:430px){
+  :root{--eq-h:104px;}
+  .display{grid-template-columns:minmax(0,1fr);}
+  .cover{width:56px;height:56px;font-size:24px;}
+  .eq-sliders{gap:1px;}
+  .vwrap{width:22px;}
+  .vwrap input{height:22px;}
+  .band .db{display:none;}
+  .vol-group{flex:1 1 100%;}
+  .pl-list li .dur{display:none;}
+}
+/* Ventanas bajas: se encoge lo prescindible, en cascada, para que el
+   reproductor completo quepa sin scroll el mayor tiempo posible. */
+@media (max-height:780px){
+  :root{--deck-h:72px; --eq-h:112px;}
+  canvas#vis{height:42px;}
+  .deck-body{gap:10px;}
+  footer br{display:none;}
+}
+@media (max-height:680px){
+  :root{--deck-h:64px; --eq-h:96px;}
+  canvas#vis{height:36px;}
+  .deck-body,.eq-body{gap:9px;}
+  .eq-body{padding:11px;}
+  footer{display:none;}
+}
+@media (max-height:560px){
+  :root{--deck-h:58px; --eq-h:80px;}
+  canvas#vis{height:30px;}
+  .deck-body,.eq-body{padding:9px; gap:7px;}
+  .eq-extra{padding-top:8px;}
+  .section-head{padding:7px 12px;}
+}
+
+/* ================= SKINS =================
+   Los controles y el motor de audio son comunes; cada skin solo cambia la
+   presentación. Los bitmaps de Zelda Amp III proceden del .wsz original. */
+.skin-picker{
+  display:flex; align-items:center; gap:6px; min-width:0;
+  font-size:10px; letter-spacing:.12em; color:var(--mut);
+}
+.skin-picker select{
+  width:auto; max-width:160px; padding:3px 26px 3px 8px;
+  border-radius:5px; font-size:11px; letter-spacing:0;
+}
+.skin-action{
+  width:25px; height:25px; padding:0;
+  justify-content:center; flex:0 0 auto;
+  font:700 15px/1 Consolas,monospace;
+}
+.skin-action[hidden]{display:none;}
+
+body[data-skin="zelda"]{
+  --bg:#06170d; --panel:#0d2618; --panel2:#153c25; --line:#5c8f55;
+  --txt:#f4f2ff; --mut:#c6b6e7; --acc:#69fff2; --acc-dim:#147d66;
+  --amber:#ffe86b; --lcd:#b7ffff; --lcd-dim:#65aaa0; --lcdbg:#00140d;
+  --danger:#ff867d; --radius:0px;
+  background:
+    linear-gradient(rgba(0,20,10,.66),rgba(0,12,7,.84)),
+    url("assets/skins/zelda-amp-3/eqmain.bmp") center 15% / 720px auto repeat;
+  image-rendering:pixelated;
+  font-family:Consolas, "Cascadia Mono", monospace;
+}
+body[data-skin="zelda"] .app{
+  gap:8px;
+  scrollbar-color:#3d7c4b #071b10;
+}
+body[data-skin="zelda"] .panel{
+  position:relative;
+  border:3px ridge #78a66f;
+  border-radius:0;
+  background:linear-gradient(180deg,rgba(7,42,23,.96),rgba(1,18,11,.97));
+  box-shadow:
+    0 0 0 2px #102d1a,
+    0 10px 0 rgba(0,0,0,.32),
+    inset 0 0 0 1px #0b100b;
+}
+body[data-skin="zelda"] .titlebar{
+  min-height:38px;
+  padding:4px 9px;
+  color:#d7caf7;
+  border-bottom:3px ridge #78a66f;
+  background:
+    linear-gradient(90deg,rgba(0,31,14,.10),rgba(0,23,12,.65)),
+    url("assets/skins/zelda-amp-3/titlebar.bmp") left top / auto 87px repeat-x;
+  text-shadow:2px 2px #071108;
+}
+body[data-skin="zelda"] .titlebar .dots{display:none;}
+body[data-skin="zelda"] .titlebar b{font-size:0;}
+body[data-skin="zelda"] .titlebar b::after{
+  content:"ZELDAAMP III";
+  font:900 18px/1 Georgia,serif;
+  letter-spacing:-1px; color:#f4f2e5;
+  -webkit-text-stroke:1px #102615;
+  text-shadow:2px 2px #020902, -1px -1px #b52d25;
+}
+body[data-skin="zelda"] .titlebar .tag{
+  color:#b7ffff; background:#00170e;
+  border:1px solid #72a46a; border-radius:0;
+}
+body[data-skin="zelda"] .skin-picker{color:#ffe86b;}
+body[data-skin="zelda"] .skin-picker select{
+  color:#b7ffff; background:#00170e;
+  border:2px inset #6b9165; border-radius:0;
+}
+
+body[data-skin="zelda"] #deckPanel{
+  background:
+    linear-gradient(rgba(0,15,7,.18),rgba(0,15,7,.34)),
+    url("assets/skins/zelda-amp-3/main.bmp") center / cover no-repeat;
+}
+body[data-skin="zelda"] .deck-body{
+  padding:12px;
+  background:linear-gradient(90deg,rgba(0,18,8,.16),rgba(0,18,8,.48));
+}
+body[data-skin="zelda"] .display{
+  border:3px ridge #7aa274; border-radius:0;
+  background:rgba(0,16,10,.90);
+  box-shadow:inset 0 0 0 2px #00110a, 3px 3px 0 rgba(0,0,0,.45);
+}
+body[data-skin="zelda"] .display::after{
+  background:repeating-linear-gradient(0deg,rgba(0,0,0,.2) 0 1px,transparent 1px 3px);
+}
+body[data-skin="zelda"] .cover{
+  border:3px ridge #789a72; border-radius:0;
+  background:#00361a url("assets/skins/zelda-amp-3/zeldaamp.bmp") center / cover;
+  color:#ffe86b;
+}
+body[data-skin="zelda"] .cover img{image-rendering:auto;}
+body[data-skin="zelda"] .lcd-title,
+body[data-skin="zelda"] .lcd-time{
+  color:#fff; text-shadow:2px 2px #172817,0 0 5px #8affd8;
+  font-family:Consolas,"Cascadia Mono",monospace;
+}
+body[data-skin="zelda"] canvas#vis{
+  border:1px solid #3f7051; border-radius:0; background:rgba(0,9,5,.7);
+}
+
+/* Los cuatro controles principales usan directamente el sprite cbuttons.bmp. */
+body[data-skin="zelda"] .tbtns{gap:4px;}
+body[data-skin="zelda"] .tbtns .btn{
+  width:46px; height:36px; padding:0;
+  border:0; border-radius:0;
+  background-color:transparent;
+  background-image:url("assets/skins/zelda-amp-3/cbuttons.bmp");
+  background-repeat:no-repeat;
+  background-size:272px 72px;
+  box-shadow:none;
+  image-rendering:pixelated;
+}
+body[data-skin="zelda"] .tbtns .btn svg{display:none;}
+body[data-skin="zelda"] #bPrev{background-position:0 0;}
+body[data-skin="zelda"] #bPlay{background-position:-46px 0;}
+body[data-skin="zelda"] #bPlay.is-playing{background-position:-92px 0;}
+body[data-skin="zelda"] #bStop{background-position:-138px 0;}
+body[data-skin="zelda"] #bNext{background-position:-184px 0;}
+body[data-skin="zelda"] #bPrev:active{background-position:0 -36px;}
+body[data-skin="zelda"] #bPlay:active{background-position:-46px -36px;}
+body[data-skin="zelda"] #bPlay.is-playing:active{background-position:-92px -36px;}
+body[data-skin="zelda"] #bStop:active{background-position:-138px -36px;}
+body[data-skin="zelda"] #bNext:active{background-position:-184px -36px;}
+
+body[data-skin="zelda"] .btn{
+  color:#f6eaff; border:2px outset #73946b; border-radius:0;
+  background:linear-gradient(#285232,#102d1b);
+  box-shadow:2px 2px 0 rgba(0,0,0,.55);
+  font-family:Consolas,"Cascadia Mono",monospace;
+}
+body[data-skin="zelda"] .btn:hover{
+  color:#b7ffff; border-color:#a6d29c; box-shadow:0 0 0 1px #07140b,2px 2px 0 #000;
+}
+body[data-skin="zelda"] .btn:active{border-style:inset; transform:translate(1px,1px);}
+body[data-skin="zelda"] .btn.on{color:#ffe86b; background:#164d2b;}
+body[data-skin="zelda"] select,
+body[data-skin="zelda"] .pl-tools .find{
+  color:#b7ffff; background:#00140c; border:2px inset #63895e; border-radius:0;
+  font-family:Consolas,"Cascadia Mono",monospace;
+}
+body[data-skin="zelda"] input[type=range]::-webkit-slider-runnable-track{
+  height:9px; border-radius:0; border:2px inset #558054;
+  background:var(--range-bg,#052a17);
+}
+body[data-skin="zelda"] input[type=range]::-webkit-slider-thumb{
+  width:13px; height:18px; margin-top:-6px; border-radius:0;
+  border:2px outset #c6d7c0; background:#4b6d51;
+  box-shadow:1px 1px #001108;
+}
+
+body[data-skin="zelda"] #eqPanel{
+  background:
+    linear-gradient(rgba(0,27,12,.22),rgba(0,18,9,.78)),
+    url("assets/skins/zelda-amp-3/eqmain.bmp") center top / 100% auto no-repeat,
+    #062514;
+}
+body[data-skin="zelda"] .section-head{
+  color:#e1d5ff;
+  border-bottom:3px ridge #749b6e;
+  background:
+    linear-gradient(rgba(27,56,30,.22),rgba(5,22,10,.65)),
+    url("assets/skins/zelda-amp-3/pledit.bmp") center 13% / 100% auto no-repeat;
+  text-shadow:2px 2px #050805;
+}
+body[data-skin="zelda"] .section-head h2{
+  color:#cfc0ff; font:900 16px/1 Georgia,serif; letter-spacing:.08em;
+  text-shadow:2px 2px #111,0 0 2px #b4a3ff;
+}
+body[data-skin="zelda"] .eq-body{background:rgba(0,20,9,.58);}
+body[data-skin="zelda"] .band .db,
+body[data-skin="zelda"] .band .hz,
+body[data-skin="zelda"] .eq-extra .lbl{color:#e5d9ff;}
+body[data-skin="zelda"] .band.pre .hz{color:#ffe86b;}
+
+body[data-skin="zelda"] #plPanel{
+  border-color:#9a734f;
+  background:#020504;
+  box-shadow:0 0 0 3px #3f2617,0 10px 0 rgba(0,0,0,.35);
+}
+body[data-skin="zelda"] #plPanel .section-head{
+  border-color:#ae8054;
+  background:
+    linear-gradient(rgba(67,36,18,.15),rgba(38,18,9,.4)),
+    url("assets/skins/zelda-amp-3/pledit.bmp") center 14% / 100% auto no-repeat,
+    #6e4528;
+}
+body[data-skin="zelda"] #plPanel .section-head h2::before{content:"GAME OVER · ";}
+body[data-skin="zelda"] .pl-tools{
+  border-bottom:3px ridge #9d7148;
+  background:linear-gradient(#825836,#53331e);
+}
+body[data-skin="zelda"] .views{border:2px inset #a3734c; border-radius:0;}
+body[data-skin="zelda"] .views button{
+  color:#d7c7ff; background:#071010; border-color:#75583d;
+  font-family:Consolas,"Cascadia Mono",monospace;
+}
+body[data-skin="zelda"] .views button.on{color:#69fff2; background:#173751;}
+body[data-skin="zelda"] .pl-scroll{border-color:#8c6848;background:#000;}
+body[data-skin="zelda"] .grp{
+  background:linear-gradient(#342418,#1f150f);
+  border-color:#8f6744; color:#f2e9ff;
+}
+body[data-skin="zelda"] .grp .gart{border-radius:0;border-color:#9b754f;background:#07140d;}
+body[data-skin="zelda"] .grp .g2,
+body[data-skin="zelda"] .grp .gmeta{color:#c3b2e1;}
+body[data-skin="zelda"] .pl-list li{
+  color:#f3eaff; border-color:#233d36; font-family:Arial,sans-serif;
+}
+body[data-skin="zelda"] .pl-list li:hover{background:#16213b;}
+body[data-skin="zelda"] .pl-list li.cur{background:#433454;}
+body[data-skin="zelda"] .pl-list li.cur .t1,
+body[data-skin="zelda"] .pl-list li.cur .idx{color:#b7ffff;}
+body[data-skin="zelda"] .pl-list li .t2,
+body[data-skin="zelda"] .pl-list li .dur,
+body[data-skin="zelda"] .pl-list li .idx{color:#decaFF;}
+body[data-skin="zelda"] .pl-empty{color:#decaFF;background:#000;}
+body[data-skin="zelda"] .pl-empty b{color:#b7ffff;}
+body[data-skin="zelda"] .pl-stats{
+  color:#b7ffff; border-color:#9c714b;
+  background:linear-gradient(#745033,#442a1a);
+}
+body[data-skin="zelda"] footer{color:#b9adcf;text-shadow:1px 1px #000;}
+body[data-skin="zelda"] footer kbd{
+  color:#b7ffff; background:#071b10; border-color:#709468; border-radius:0;
+}
+body[data-skin="zelda"] .toast{
+  color:#f5eaff; background:#07180eee; border-color:#71946b; border-radius:0;
+}
+
+/* ---------- Bento Classified ---------- */
+body[data-skin="bento"]{
+  --bg:#08090a; --panel:#181b1e; --panel2:#262a2e; --line:#4e555b;
+  --txt:#d5dadd; --mut:#93afb9; --acc:#f28a20; --acc-dim:#8c4b17;
+  --amber:#f7a13e; --lcd:#c8c8c8; --lcd-dim:#768a91; --lcdbg:#08090a;
+  --danger:#f0604d; --radius:3px;
+  background:
+    radial-gradient(900px 420px at 50% -80px,rgba(91,101,108,.32),transparent 70%),
+    linear-gradient(#191c1f,#070809);
+  font-family:"Segoe UI",Arial,sans-serif;
+}
+body[data-skin="bento"] .app{gap:7px;}
+body[data-skin="bento"] .panel{
+  position:relative; border:1px solid #596066; border-radius:3px;
+  background:linear-gradient(#282c30,#111315 58%,#090a0b);
+  box-shadow:0 8px 20px rgba(0,0,0,.55),inset 0 1px #737b80;
+}
+body[data-skin="bento"] .titlebar{
+  min-height:29px; padding:4px 8px;
+  border-bottom:1px solid #0b0c0d;
+  background:
+    linear-gradient(90deg,rgba(5,6,7,.28),rgba(5,6,7,.7)),
+    url("assets/skins/bento-classified/TITLEBAR.bmp") left top / auto 87px repeat-x;
+  color:#a2c1cc; text-shadow:1px 1px #000;
+}
+body[data-skin="bento"] .titlebar .dots{display:none;}
+body[data-skin="bento"] .titlebar b{font-size:0;}
+body[data-skin="bento"] .titlebar b::after{
+  content:"BENTO CLASSIFIED";
+  font:700 12px/1 "Segoe UI",Arial,sans-serif;
+  letter-spacing:.15em; color:#d8dde0;
+}
+body[data-skin="bento"] .titlebar .tag,
+body[data-skin="bento"] .skin-picker select{
+  color:#c8c8c8; background:#08090a; border:1px solid #596067; border-radius:2px;
+}
+body[data-skin="bento"] .skin-picker{color:#f28a20;}
+
+body[data-skin="bento"] #deckPanel{
+  background:
+    linear-gradient(rgba(8,9,10,.35),rgba(8,9,10,.6)),
+    url("assets/skins/bento-classified/MAIN.bmp") center / cover no-repeat;
+}
+body[data-skin="bento"] .deck-body{padding:11px;background:rgba(5,6,7,.25);}
+body[data-skin="bento"] .display{
+  border:1px solid #41484d; border-radius:2px;
+  background:rgba(4,5,6,.94);
+  box-shadow:inset 0 0 0 1px #111416,inset 0 0 28px rgba(109,139,148,.08);
+}
+body[data-skin="bento"] .display::after{
+  background:repeating-linear-gradient(0deg,rgba(0,0,0,.22) 0 1px,transparent 1px 3px);
+}
+body[data-skin="bento"] .cover{
+  border:1px solid #555d62; border-radius:2px;
+  background:#0b0d0e url("assets/skins/bento-classified/GEN.bmp") center / cover;
+  color:#f28a20;
+}
+body[data-skin="bento"] .cover img{image-rendering:auto;}
+body[data-skin="bento"] .lcd-title,
+body[data-skin="bento"] .lcd-time{
+  color:#c8c8c8; text-shadow:0 0 6px rgba(162,193,204,.32);
+}
+body[data-skin="bento"] .lcd-info,
+body[data-skin="bento"] .lcd-info b{color:#93afb9;}
+body[data-skin="bento"] canvas#vis{
+  border:1px solid #343a3e; border-radius:1px; background:#060708;
+}
+
+body[data-skin="bento"] .tbtns{gap:2px;}
+body[data-skin="bento"] .tbtns .btn{
+  width:46px; height:36px; padding:0; border:0; border-radius:0;
+  background-color:transparent;
+  background-image:url("assets/skins/bento-classified/CBUTTONS.bmp");
+  background-repeat:no-repeat; background-size:272px 72px;
+  box-shadow:none; image-rendering:pixelated;
+}
+body[data-skin="bento"] .tbtns .btn svg{display:none;}
+body[data-skin="bento"] #bPrev{background-position:0 0;}
+body[data-skin="bento"] #bPlay{background-position:-46px 0;}
+body[data-skin="bento"] #bPlay.is-playing{background-position:-92px 0;}
+body[data-skin="bento"] #bStop{background-position:-138px 0;}
+body[data-skin="bento"] #bNext{background-position:-184px 0;}
+body[data-skin="bento"] #bPrev:active{background-position:0 -36px;}
+body[data-skin="bento"] #bPlay:active{background-position:-46px -36px;}
+body[data-skin="bento"] #bPlay.is-playing:active{background-position:-92px -36px;}
+body[data-skin="bento"] #bStop:active{background-position:-138px -36px;}
+body[data-skin="bento"] #bNext:active{background-position:-184px -36px;}
+
+body[data-skin="bento"] .btn{
+  color:#d3d8db; border:1px solid #5b6267; border-radius:2px;
+  background:linear-gradient(#4a5054,#25292c 48%,#17191b);
+  box-shadow:inset 0 1px #737b80,0 1px 2px #000;
+}
+body[data-skin="bento"] .btn:hover{color:#fff;border-color:#7b858b;}
+body[data-skin="bento"] .btn:active{background:linear-gradient(#17191b,#34393c);}
+body[data-skin="bento"] .btn.on{
+  color:#ffab50; border-color:#965820; box-shadow:inset 0 0 5px rgba(242,138,32,.25);
+}
+body[data-skin="bento"] select,
+body[data-skin="bento"] .pl-tools .find{
+  color:#c8c8c8; background:#08090a; border:1px solid #555d62; border-radius:2px;
+}
+body[data-skin="bento"] input[type=range]::-webkit-slider-runnable-track{
+  height:7px; border:1px solid #4a5054; border-radius:1px;
+  background:var(--range-bg,#171a1c);
+}
+body[data-skin="bento"] input[type=range]::-webkit-slider-thumb{
+  width:16px; height:12px; margin-top:-4px; border-radius:2px;
+  border:1px solid #747c81; background:linear-gradient(#d2d5d7,#73797d);
+  box-shadow:0 1px 2px #000;
+}
+
+body[data-skin="bento"] #eqPanel{
+  background:
+    linear-gradient(rgba(8,9,10,.28),rgba(8,9,10,.82)),
+    url("assets/skins/bento-classified/EQMAIN.bmp") center top / 100% auto no-repeat,
+    #101214;
+}
+body[data-skin="bento"] .section-head{
+  color:#a2c1cc; border-bottom:1px solid #4a5054;
+  background:
+    linear-gradient(rgba(25,28,30,.3),rgba(8,9,10,.75)),
+    url("assets/skins/bento-classified/PLEDIT.bmp") center 10% / 100% auto no-repeat,
+    #24282b;
+}
+body[data-skin="bento"] .section-head h2{
+  color:#c8c8c8; font-size:12px; letter-spacing:.14em;
+}
+body[data-skin="bento"] .eq-body{background:rgba(8,9,10,.54);}
+body[data-skin="bento"] .band .db,
+body[data-skin="bento"] .band .hz,
+body[data-skin="bento"] .eq-extra .lbl{color:#93afb9;}
+body[data-skin="bento"] .band.pre .hz{color:#f28a20;}
+
+body[data-skin="bento"] #plPanel{background:#08090a;}
+body[data-skin="bento"] #plPanel .section-head{
+  background:
+    linear-gradient(rgba(20,22,24,.15),rgba(8,9,10,.58)),
+    url("assets/skins/bento-classified/PLEDIT.bmp") center 10% / 100% auto no-repeat,
+    #24282b;
+}
+body[data-skin="bento"] #plPanel .section-head h2::before{content:"CLASSIFIED · ";}
+body[data-skin="bento"] .pl-tools{background:#202427;border-bottom:1px solid #4f565b;}
+body[data-skin="bento"] .views{border-color:#4f565b;border-radius:2px;}
+body[data-skin="bento"] .views button{color:#93afb9;background:#121416;border-color:#4f565b;}
+body[data-skin="bento"] .views button.on{color:#fff;background:#313540;}
+body[data-skin="bento"] .pl-scroll{border-color:#34393c;background:#08090a;}
+body[data-skin="bento"] .grp{background:#323637;border-color:#50575b;}
+body[data-skin="bento"] .grp .gart{border-radius:2px;border-color:#596166;background:#111416;}
+body[data-skin="bento"] .grp .g2,
+body[data-skin="bento"] .grp .gmeta{color:#93afb9;}
+body[data-skin="bento"] .pl-list li{
+  color:#93afb9; border-color:rgba(78,85,91,.35); font-family:Arial,sans-serif;
+}
+body[data-skin="bento"] .pl-list li:hover{background:#22262b;}
+body[data-skin="bento"] .pl-list li.cur{background:#313540;}
+body[data-skin="bento"] .pl-list li.cur .t1,
+body[data-skin="bento"] .pl-list li.cur .idx{color:#c8c8c8;}
+body[data-skin="bento"] .pl-list li .t2,
+body[data-skin="bento"] .pl-list li .dur,
+body[data-skin="bento"] .pl-list li .idx{color:#93afb9;}
+body[data-skin="bento"] .pl-empty{color:#93afb9;background:#08090a;}
+body[data-skin="bento"] .pl-empty b{color:#c8c8c8;}
+body[data-skin="bento"] .pl-stats{color:#a2c1cc;border-color:#4f565b;background:#202427;}
+body[data-skin="bento"] footer{color:#78858b;}
+body[data-skin="bento"] footer kbd{
+  color:#c8c8c8;background:#191c1e;border-color:#51585d;border-radius:2px;
+}
+body[data-skin="bento"] .toast{
+  color:#d8dde0;background:#171a1dee;border-color:#596166;border-left-color:#f28a20;
+  border-radius:2px;
+}
+
+/* ---------- Skins .wsz importados ----------
+   Los colores se inyectan como variables y el único bitmap empleado es el
+   sprite funcional CBUTTONS.BMP. */
+body[data-skin="imported"]{
+  background-color:var(--bg);
+  color:var(--txt);
+  font-family:"Segoe UI",Arial,sans-serif;
+}
+body[data-skin="imported"] .panel{
+  position:relative; border:1px solid var(--line); border-radius:2px;
+  box-shadow:0 8px 22px rgba(0,0,0,.48),inset 0 1px rgba(255,255,255,.08);
+}
+body[data-skin="imported"] .titlebar{
+  min-height:30px; padding:4px 8px; color:var(--mut);
+  border-bottom:1px solid var(--line); text-shadow:1px 1px rgba(0,0,0,.75);
+}
+body[data-skin="imported"] .titlebar .dots{display:none;}
+body[data-skin="imported"] .titlebar b{font-size:0;}
+body[data-skin="imported"] .titlebar b::after{
+  content:var(--skin-title,"WINAMP SKIN");
+  font:700 12px/1 "Segoe UI",Arial,sans-serif;
+  letter-spacing:.14em; color:var(--txt);
+}
+body[data-skin="imported"] .titlebar .tag,
+body[data-skin="imported"] .skin-picker select{
+  color:var(--txt); background:var(--lcdbg); border:1px solid var(--line); border-radius:2px;
+}
+body[data-skin="imported"] .skin-picker{color:var(--acc);}
+body[data-skin="imported"] .display{
+  border:1px solid var(--line); border-radius:2px;
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.03);
+}
+body[data-skin="imported"] .cover{
+  border:1px solid var(--line); border-radius:2px; color:var(--acc);
+}
+body[data-skin="imported"] .lcd-title,
+body[data-skin="imported"] .lcd-time{color:var(--txt);text-shadow:0 0 6px color-mix(in srgb,var(--acc) 35%,transparent);}
+body[data-skin="imported"] .lcd-info,
+body[data-skin="imported"] .lcd-info b{color:var(--mut);}
+body[data-skin="imported"] canvas#vis{border:1px solid var(--line);border-radius:1px;background:var(--lcdbg);}
+
+body[data-skin="imported"] .tbtns{gap:2px;}
+body[data-skin="imported"] .tbtns .btn{
+  width:46px; height:36px; padding:0; border:0; border-radius:0;
+  background-color:transparent !important;
+  background-image:var(--skin-buttons) !important;
+  background-repeat:no-repeat; background-size:272px 72px;
+  box-shadow:none; image-rendering:pixelated;
+}
+body[data-skin="imported"] .tbtns .btn svg{display:none;}
+body[data-skin="imported"] #bPrev{background-position:0 0;}
+body[data-skin="imported"] #bPlay{background-position:-46px 0;}
+body[data-skin="imported"] #bPlay.is-playing{background-position:-92px 0;}
+body[data-skin="imported"] #bStop{background-position:-138px 0;}
+body[data-skin="imported"] #bNext{background-position:-184px 0;}
+body[data-skin="imported"] #bPrev:active{background-position:0 -36px;}
+body[data-skin="imported"] #bPlay:active{background-position:-46px -36px;}
+body[data-skin="imported"] #bPlay.is-playing:active{background-position:-92px -36px;}
+body[data-skin="imported"] #bStop:active{background-position:-138px -36px;}
+body[data-skin="imported"] #bNext:active{background-position:-184px -36px;}
+body[data-skin="imported"] .btn{
+  color:var(--txt); border:1px solid var(--line); border-radius:2px;
+  background:var(--panel2); box-shadow:inset 0 1px rgba(255,255,255,.08),0 1px 2px #000;
+}
+body[data-skin="imported"] .btn:hover{color:var(--acc);border-color:var(--acc);}
+body[data-skin="imported"] .btn.on{color:var(--acc);}
+body[data-skin="imported"] select,
+body[data-skin="imported"] .pl-tools .find{
+  color:var(--txt); background:var(--lcdbg); border:1px solid var(--line); border-radius:2px;
+}
+body[data-skin="imported"] .section-head{color:var(--txt);border-color:var(--line);}
+body[data-skin="imported"] .section-head h2{color:var(--txt);font-size:12px;letter-spacing:.14em;}
+body[data-skin="imported"] .band .db,
+body[data-skin="imported"] .band .hz,
+body[data-skin="imported"] .eq-extra .lbl{color:var(--mut);}
+body[data-skin="imported"] .band.pre .hz{color:var(--acc);}
+body[data-skin="imported"] .views{border-color:var(--line);border-radius:2px;}
+body[data-skin="imported"] .views button{color:var(--mut);border-color:var(--line);}
+body[data-skin="imported"] .views button.on{color:var(--txt);}
+body[data-skin="imported"] .grp{border-color:var(--line);}
+body[data-skin="imported"] .grp .gart{border-radius:2px;border-color:var(--line);}
+body[data-skin="imported"] .grp .g2,
+body[data-skin="imported"] .grp .gmeta,
+body[data-skin="imported"] .pl-list li,
+body[data-skin="imported"] .pl-list li .t2,
+body[data-skin="imported"] .pl-list li .dur,
+body[data-skin="imported"] .pl-list li .idx{color:var(--mut);}
+body[data-skin="imported"] .pl-list li.cur{background:var(--selected-bg);}
+body[data-skin="imported"] .pl-list li.cur .t1,
+body[data-skin="imported"] .pl-list li.cur .idx{color:var(--txt);}
+body[data-skin="imported"] .pl-empty{color:var(--mut);}
+body[data-skin="imported"] .pl-empty b{color:var(--txt);}
+body[data-skin="imported"] .pl-stats{color:var(--mut);border-color:var(--line);}
+body[data-skin="imported"] footer{color:var(--mut);}
+
+@media (max-width:620px){
+  .skin-picker span{display:none;}
+  .skin-picker select{max-width:112px;}
+  body[data-skin="zelda"] .titlebar b::after{font-size:15px;}
+  body[data-skin="zelda"] .tbtns .btn{
+    width:38px; height:30px; background-size:225px 60px;
+  }
+  body[data-skin="zelda"] #bPlay{background-position:-38px 0;}
+  body[data-skin="zelda"] #bPlay.is-playing{background-position:-76px 0;}
+  body[data-skin="zelda"] #bStop{background-position:-114px 0;}
+  body[data-skin="zelda"] #bNext{background-position:-152px 0;}
+  body[data-skin="zelda"] #bPrev:active{background-position:0 -30px;}
+  body[data-skin="zelda"] #bPlay:active{background-position:-38px -30px;}
+  body[data-skin="zelda"] #bPlay.is-playing:active{background-position:-76px -30px;}
+  body[data-skin="zelda"] #bStop:active{background-position:-114px -30px;}
+  body[data-skin="zelda"] #bNext:active{background-position:-152px -30px;}
+  body[data-skin="bento"] .tbtns .btn{
+    width:38px; height:30px; background-size:225px 60px;
+  }
+  body[data-skin="bento"] #bPlay{background-position:-38px 0;}
+  body[data-skin="bento"] #bPlay.is-playing{background-position:-76px 0;}
+  body[data-skin="bento"] #bStop{background-position:-114px 0;}
+  body[data-skin="bento"] #bNext{background-position:-152px 0;}
+  body[data-skin="bento"] #bPrev:active{background-position:0 -30px;}
+  body[data-skin="bento"] #bPlay:active{background-position:-38px -30px;}
+  body[data-skin="bento"] #bPlay.is-playing:active{background-position:-76px -30px;}
+  body[data-skin="bento"] #bStop:active{background-position:-114px -30px;}
+  body[data-skin="bento"] #bNext:active{background-position:-152px -30px;}
+  body[data-skin="imported"] .tbtns .btn{
+    width:38px; height:30px; background-size:225px 60px;
+  }
+  body[data-skin="imported"] #bPlay{background-position:-38px 0;}
+  body[data-skin="imported"] #bPlay.is-playing{background-position:-76px 0;}
+  body[data-skin="imported"] #bStop{background-position:-114px 0;}
+  body[data-skin="imported"] #bNext{background-position:-152px 0;}
+  body[data-skin="imported"] #bPrev:active{background-position:0 -30px;}
+  body[data-skin="imported"] #bPlay:active{background-position:-38px -30px;}
+  body[data-skin="imported"] #bPlay.is-playing:active{background-position:-76px -30px;}
+  body[data-skin="imported"] #bStop:active{background-position:-114px -30px;}
+  body[data-skin="imported"] #bNext:active{background-position:-152px -30px;}
+}
+
+/* ---------- Regla visual común para todos los skins ----------
+   Los skins aportan color, bordes, tipografía y sprites de controles, pero
+   nunca imágenes o degradados como fondo de una sección. Mantener este bloque
+   después de las definiciones de skins futuras. Las carátulas <img> y los
+   sprites funcionales de transporte no se consideran fondos decorativos. */
+body{
+  background-image:none !important;
+  background-color:var(--bg) !important;
+}
+.panel,
+#deckPanel,
+#eqPanel{
+  background-image:none !important;
+  background-color:var(--panel) !important;
+}
+.titlebar,
+.section-head,
+.pl-tools,
+.grp,
+.pl-stats{
+  background-image:none !important;
+  background-color:var(--panel2) !important;
+}
+.deck-body,
+.eq-body{
+  background-image:none !important;
+  background-color:transparent !important;
+}
+.display,
+.cover,
+#plPanel,
+.pl-scroll,
+.pl-empty{
+  background-image:none !important;
+  background-color:var(--lcdbg) !important;
+}
+.views button{
+  background-image:none !important;
+  background-color:var(--panel) !important;
+}
+.views button.on{
+  background-image:none !important;
+  background-color:color-mix(in srgb,var(--acc) 18%,var(--panel)) !important;
+}
+.mode-group .btn,
+.section-head .btn,
+.eq-top .btn,
+.pl-tools .btn{
+  background-image:none !important;
+  background-color:var(--panel2) !important;
+}
+</style>
+</head>
+<body data-skin="ondaamp">
+<div class="app" id="app">
+
+  <!-- ============ DECK ============ -->
+  <div class="panel" id="deckPanel">
+    <div class="titlebar">
+      <span class="dots"><i></i><i></i><i></i></span>
+      <b>ONDAAMP</b><span class="hide-narrow" style="opacity:.6">· reproductor local hi-fi</span>
+      <span class="spacer"></span>
+      <label class="skin-picker" title="Cambiar la apariencia del reproductor">
+        <span>SKIN</span>
+        <select id="skinSelect" aria-label="Skin visual">
+          <option value="ondaamp">OndaAmp</option>
+        </select>
+      </label>
+      <button class="btn skin-action" id="bImportSkin" title="Importar uno o varios skins .wsz" aria-label="Importar skins">＋</button>
+      <button class="btn skin-action danger" id="bRemoveSkin" title="Eliminar el skin importado seleccionado" aria-label="Eliminar skin" hidden>×</button>
+      <button class="btn sm" id="bInstalar" style="display:none" title="Instalar OndaAmp como app en tu teléfono">⬇ Instalar</button>
+      <span class="tag" id="ctxInfo">motor: —</span>
+    </div>
+    <div class="deck-body">
+      <div class="display">
+        <div class="cover" id="cover">♫</div>
+        <div class="lcd">
+          <div class="lcd-title-box"><span class="lcd-title" id="lcdTitle">Bienvenido a OndaAmp · agrega música para empezar</span></div>
+          <div class="lcd-row">
+            <span class="lcd-time" id="lcdTime" title="Clic: tiempo restante / transcurrido">0:00</span>
+            <span class="lcd-info" id="lcdInfo">— kbps · — kHz</span>
+          </div>
+          <div class="lcd-info" id="lcdState">■ DETENIDO</div>
+        </div>
+        <div class="grid-vis"><canvas id="vis" title="Clic para cambiar: barras / onda"></canvas></div>
+      </div>
+
+      <div class="seek-row">
+        <span class="t" id="tCur">0:00</span>
+        <input type="range" id="seek" min="0" max="1000" value="0" step="1">
+        <span class="t" id="tTot">0:00</span>
+      </div>
+
+      <div class="transport">
+        <div class="tbtns">
+          <button class="btn icon" id="bPrev" title="Anterior (P)"><svg viewBox="0 0 24 24"><path d="M6 5h3v14H6zM20 5v14L9.5 12z"/></svg></button>
+          <button class="btn icon play-main" id="bPlay" title="Reproducir / Pausa (Espacio)"><svg viewBox="0 0 24 24" id="playIco"><path d="M7 4l13 8-13 8z"/></svg></button>
+          <button class="btn icon" id="bStop" title="Detener"><svg viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12"/></svg></button>
+          <button class="btn icon" id="bNext" title="Siguiente (N)"><svg viewBox="0 0 24 24"><path d="M15 5h3v14h-3zM4 5v14l10.5-7z"/></svg></button>
+        </div>
+        <div class="mode-group">
+          <button class="btn icon" id="bShuf" title="Aleatorio desactivado" aria-label="Aleatorio" aria-pressed="false">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M16.6 3H21v4.4l-1.8-1.8-3.5 3.5-1.4-1.4 3.5-3.5L16.6 3zM3 6h3.2c1.9 0 3.3.8 4.5 2.5l4.7 6.7c.8 1.2 1.7 1.8 3 1.8h.4L17 15.2l1.4-1.4L22 17.4 18.4 21 17 19.6l1.1-1.1c-1.7-.1-3-.9-4.1-2.4L9.3 9.4C8.4 8.1 7.5 7.5 6.2 7.5H3V6zm0 11h3.2c1.3 0 2.2-.6 3.1-1.9l1.2-1.7 1.2 1.7-1 1.4c-1.1 1.6-2.6 2.5-4.5 2.5H3v-2z"/></svg>
+          </button>
+          <button class="btn" id="bRep" title="Repetir: no / lista / una">🔁</button>
+          <button class="btn" id="bDemo" title="Groove de demostración para probar el ecualizador sin archivos">DEMO</button>
+          <button class="btn" id="bMejora"
+                  title="ON: mejora inteligente (auto-máster adaptado a cada canción). OFF: sonido fiel, sin ningún procesamiento.">✨<span class="hide-narrow"> Mejora</span></button>
+        </div>
+        <div class="vol-group">
+          <span class="lbl">VOL</span>
+          <input type="range" id="vol" min="0" max="100" value="80">
+          <output id="volOut">80%</output>
+        </div>
+        <div class="vol-group" style="max-width:230px;">
+          <span class="lbl">BAL</span>
+          <input type="range" id="bal" min="-100" max="100" value="0" title="Balance izquierda/derecha (doble clic: centro)">
+          <output id="balOut">C</output>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ EQ ============ -->
+  <!-- Plegado por omisión: el control diario es el botón ✨ Mejora del deck;
+       estos paneles son el "modo avanzado" y se abren solo a propósito. -->
+  <div class="panel closed" id="eqPanel">
+    <div class="section-head" data-toggle="eqPanel">
+      <h2>ECUALIZADOR · 10 BANDAS</h2>
+      <button class="btn sm" id="bNight" onclick="event.stopPropagation()"
+              title="Modo noche: comprime la dinámica para escuchar bajito con volumen parejo">🌙<span class="lbl-night"> Noche</span></button>
+      <button class="btn sm" id="bEqOn" onclick="event.stopPropagation()">EQ: ON</button>
+      <span class="chev">▾</span>
+    </div>
+    <div class="section-body eq-body">
+      <div class="eq-top">
+        <label class="lbl lbl-preset" style="font-size:12px;color:var(--mut)">Preset:</label>
+        <select id="preset"></select>
+        <button class="btn" id="bSavePre" title="Guardar la curva actual como preset propio">💾 <span class="hide-narrow">Guardar</span></button>
+        <button class="btn" id="bDelPre" title="Borrar preset propio" style="display:none">🗑</button>
+        <span style="flex:1"></span>
+        <button class="btn" id="bFlat">Reiniciar</button>
+      </div>
+      <div class="eq-sliders" id="eqSliders"></div>
+      <div class="eq-extra">
+        <div class="xitem">
+          <span class="lbl"><span class="lbl-wide">Amplitud </span>estéreo</span>
+          <input type="range" id="width" min="0" max="200" value="100">
+          <output id="widthOut">100%</output>
+        </div>
+        <div class="xitem limnote" style="color:var(--mut);font-size:11px;">
+          Limitador anti-distorsión: <b style="color:var(--acc)">siempre activo</b>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ RESTAURACIÓN Y REALCE ============ -->
+  <!-- Empieza plegado: son ajustes que se buscan a propósito, y desplegado
+       ocuparía toda la columna izquierda en pantallas de altura normal. -->
+  <div class="panel closed" id="fxPanel">
+    <div class="section-head" data-toggle="fxPanel">
+      <h2>RESTAURACIÓN Y REALCE</h2>
+      <button class="btn sm" id="bFxOld" onclick="event.stopPropagation()"
+              title="Activa de golpe la combinación recomendada para discos y cintas antiguas">🕰<span class="lbl-old"> Grabación antigua</span></button>
+      <span class="chev">▾</span>
+    </div>
+    <div class="section-body fx-body">
+
+      <div class="fx-row" id="fxNr">
+        <button class="fx-tog" title="Activar / desactivar">◯</button>
+        <div class="fx-txt">
+          <div class="fx-t1">Reductor de ruido <span class="fx-tag">hiss</span></div>
+          <div class="fx-t2">Analiza el espectro y baja solo lo que es ruido constante</div>
+        </div>
+        <input type="range" id="nrAmt" min="0" max="100" value="55" title="Intensidad">
+        <output id="nrOut">55%</output>
+      </div>
+
+      <div class="fx-row" id="fxDc">
+        <button class="fx-tog" title="Activar / desactivar">◯</button>
+        <div class="fx-txt">
+          <div class="fx-t1">Quita-clics <span class="fx-tag">vinilo</span></div>
+          <div class="fx-t2">Detecta chasquidos y los rellena sin tocar la música</div>
+        </div>
+        <input type="range" id="dcAmt" min="0" max="100" value="50" title="Sensibilidad">
+        <output id="dcOut">50%</output>
+      </div>
+
+      <div class="fx-row" id="fxRb">
+        <button class="fx-tog" title="Activar / desactivar">◯</button>
+        <div class="fx-txt">
+          <div class="fx-t1">Filtro de rumble <span class="fx-tag">30 Hz</span></div>
+          <div class="fx-t2">Corta el retumbe inaudible del plato y libera headroom</div>
+        </div>
+        <span class="fx-nopar">—</span>
+      </div>
+
+      <div class="fx-sep"></div>
+
+      <div class="fx-row" id="fxBe">
+        <button class="fx-tog" title="Activar / desactivar">◯</button>
+        <div class="fx-txt">
+          <div class="fx-t1">Refuerzo de graves <span class="fx-tag">psicoacústico</span></div>
+          <div class="fx-t2">Genera armónicos: se oye el bajo aunque el altavoz no lo dé</div>
+        </div>
+        <input type="range" id="beAmt" min="0" max="100" value="45" title="Cantidad">
+        <output id="beOut">45%</output>
+      </div>
+
+      <div class="fx-row" id="fxEx">
+        <button class="fx-tog" title="Activar / desactivar">◯</button>
+        <div class="fx-txt">
+          <div class="fx-t1">Aire y brillo <span class="fx-tag">exciter</span></div>
+          <div class="fx-t2">Devuelve detalle a grabaciones apagadas, sin subir el hiss</div>
+        </div>
+        <input type="range" id="exAmt" min="0" max="100" value="40" title="Cantidad">
+        <output id="exOut">40%</output>
+      </div>
+
+      <div class="fx-row" id="fxXf">
+        <button class="fx-tog" title="Activar / desactivar">◯</button>
+        <div class="fx-txt">
+          <div class="fx-t1">Crossfeed <span class="fx-tag">auriculares</span></div>
+          <div class="fx-t2">Suaviza el estéreo exagerado y cansa menos en sesiones largas</div>
+        </div>
+        <input type="range" id="xfAmt" min="0" max="100" value="50" title="Cantidad">
+        <output id="xfOut">50%</output>
+      </div>
+
+      <div class="fx-note" id="fxNote">Los efectos se aplican solo a lo que reproduce OndaAmp.</div>
+    </div>
+  </div>
+
+  <!-- ============ AUTO-MÁSTER ============ -->
+  <div class="panel closed" id="amPanel">
+    <div class="section-head" data-toggle="amPanel">
+      <h2>AUTO-MÁSTER</h2>
+      <button class="btn sm" id="bAmOn" onclick="event.stopPropagation()">OFF</button>
+      <span class="chev">▾</span>
+    </div>
+    <div class="section-body am-body">
+      <div class="am-estado" id="amEstado">Pulsa ON y reproduce algo: analizará la pista.</div>
+      <div class="am-graf" id="amGraf"></div>
+      <div class="am-fila">
+        <span class="lbl">Referencia</span>
+        <select id="amObj">
+          <option value="auto">Automática (detectar)</option>
+          <option value="referencia">Referencia general</option>
+          <option value="clasica">Clásica / acústica</option>
+          <option value="electronica">Electrónica / hip-hop</option>
+          <option value="rock">Rock / pop</option>
+          <option value="voz">Voz / jazz íntimo</option>
+          <option value="antigua">Grabación antigua</option>
+        </select>
+      </div>
+      <div class="am-fila">
+        <span class="lbl">Intensidad</span>
+        <input type="range" id="amFuerza" min="0" max="100" value="60">
+        <output id="amFuerzaOut">60%</output>
+      </div>
+      <div class="am-fila">
+        <span class="lbl">Auriculares</span>
+        <select id="amPhones">
+          <option value="none">Sin compensación</option>
+          <option value="bassy">Con graves realzados (Bluetooth)</option>
+          <option value="inear">In-ear / intraurales</option>
+          <option value="laptop">Altavoces de portátil</option>
+        </select>
+      </div>
+      <div class="am-fila">
+        <button class="btn sm" id="bAmLoud" title="A volumen bajo el oído pierde graves y agudos; esto lo compensa">🔉 Compensar volumen bajo</button>
+        <button class="btn sm" id="bAmReset" title="Olvida lo analizado y vuelve a medir desde cero">↺ Reanalizar</button>
+      </div>
+      <div class="fx-note">
+        Mide el balance tonal real y lo acerca a un máster de referencia. Con la
+        intensidad a 0 solo actúan la compensación de auriculares y la de volumen.
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ BIBLIOTECA ============ -->
+  <div class="panel" id="plPanel">
+    <div class="section-head" data-toggle="plPanel">
+      <h2>BIBLIOTECA</h2>
+      <span class="chev">▾</span>
+    </div>
+    <div class="section-body">
+      <div class="pl-tools">
+        <button class="btn" id="bAddFiles">➕ <span class="hide-narrow">Archivos</span></button>
+        <button class="btn" id="bAddDir">📁 <span class="hide-narrow">Carpeta</span></button>
+        <div class="views" id="views">
+          <button data-v="lista" title="Lista simple, en orden">☰ Lista</button>
+          <button data-v="album" title="Agrupar por álbum">💿 Álbum</button>
+          <button data-v="artista" title="Agrupar por artista">👤 Artista</button>
+          <button data-v="carpeta" title="Agrupar por carpeta de origen, como el Explorador">📂 Carpeta</button>
+        </div>
+        <input class="find" id="find" type="text" placeholder="Buscar artista, álbum, canción…  ( / )">
+        <button class="btn sm" id="bFold" title="Plegar o desplegar todos los grupos">⇕<span class="lbl-fold"> Plegar</span></button>
+        <button class="btn sm" id="bIrActual" title="Ir a la canción que está sonando">🎯</button>
+        <button class="btn danger sm" id="bClear" title="Vaciar la biblioteca">🗑</button>
+      </div>
+      <div class="pl-restaurar" id="plRestaurar" style="display:none">
+        <span class="pr-txt" id="prTxt"></span>
+        <button class="btn sm" id="bAdoptar" title="Elige la carpeta donde está tu música: un solo permiso sirve para todas">📁 Dar permiso a la carpeta</button>
+        <button class="btn sm" id="bRestaurar" title="Pide permiso archivo por archivo">🔓 Uno a uno</button>
+        <button class="btn sm" id="bOlvidar" title="Borrar la biblioteca guardada">✕</button>
+      </div>
+      <div class="pl-scroll" id="plScroll">
+        <ul class="pl-list" id="plList"></ul>
+      </div>
+      <div class="pl-empty" id="plEmpty">
+        <div class="big">🎵</div>
+        <div><b>Arrastra aquí tu música</b> (archivos o carpetas completas)</div>
+        <div>o usa los botones <b>➕</b> / <b>📁</b> · MP3, FLAC, WAV, OGG, M4A, OPUS…</div>
+      </div>
+      <div class="pl-stats" id="plStats" style="display:none"></div>
+    </div>
+  </div>
+
+  <footer>
+    <kbd>Espacio</kbd> reproducir/pausa · <kbd>←</kbd><kbd>→</kbd> saltar 5 s · <kbd>↑</kbd><kbd>↓</kbd> volumen · <kbd>N</kbd> siguiente · <kbd>P</kbd> anterior · <kbd>M</kbd> silencio<br>
+    OndaAmp v2.0 · procesamiento float32 · funciona 100 % local, tu música nunca sale de tu PC
+  </footer>
+
+  <input type="file" id="fileIn" accept="audio/*,.flac,.opus,.m4a,.aac,.wma,.ogg,.oga" multiple hidden>
+  <input type="file" id="dirIn" webkitdirectory multiple hidden>
+  <input type="file" id="skinIn" accept=".wsz,.zip,application/zip" multiple hidden>
+</div>
+<div id="toasts"></div>
+
+<script>
+"use strict";
+/* ================= Estado ================= */
+const $ = id => document.getElementById(id);
+const state = {
+  list: [],           // pistas
+  cur: -1,
+  shuffle: false,
+  repeat: "off",      // off | all | one
+  history: [],
+  shufflePlayed: [],  // ids ya recorridos en el ciclo aleatorio actual
+  vis: "bars",
+  eqOn: true,
+  eq: new Array(10).fill(0),
+  pre: 0,
+  width: 100,
+  night: false,
+  vol: 80, bal: 0,
+  remaining: false,
+  customPresets: {},
+  view: "album",      // lista | album | carpeta
+  closedGroups: {},   // clave de grupo -> true si está plegado
+  skin: "ondaamp",    // esta versión solo trae el tema propio (ver SKINS)
+  fx: {               // restauración y realce (0-100 en las cantidades)
+    nr:false, nrAmt:55,   // reductor de ruido / hiss
+    dc:false, dcAmt:50,   // quita-clics
+    rb:false,             // filtro de rumble
+    be:false, beAmt:45,   // refuerzo de graves psicoacústico
+    ex:false, exAmt:40,   // aire / exciter
+    xf:false, xfAmt:50,   // crossfeed para auriculares
+  },
+  am: {                 // auto-máster: igualación espectral adaptativa
+    on:false,
+    fuerza:60,          // 0-100: cuánto de la corrección se aplica
+    objetivo:"auto",    // auto | referencia | clasica | electronica | rock | voz | antigua
+    loud:false,         // compensación de sonoridad a volumen bajo
+    phones:"none",      // none | bassy | inear | laptop
+  },
+};
+let nextId = 1;
+
+/* Catálogo central: añadir un skin nuevo requiere registrarlo aquí, incluirlo
+   en el selector y definir su bloque body[data-skin="..."] en el CSS. */
+/* La versión publicada solo incluye el tema propio: los skins Zelda/Bento son
+   artwork de Winamp de terceros y no deben redistribuirse en un repositorio
+   público. Se pueden añadir en el propio teléfono con el importador de .wsz,
+   que los guarda localmente en IndexedDB sin publicarlos. */
+const SKINS = {
+  ondaamp: "OndaAmp",
+};
+
+const EQ_FREQS = [31, 62, 125, 250, 500, 1000, 2000, 4000, 8000, 16000];
+const EQ_LABELS = ["31","62","125","250","500","1K","2K","4K","8K","16K"];
+const PRESETS = {
+  "Plano":            [0,0,0,0,0,0,0,0,0,0],
+  "Rock":             [5,4,3,1,-1,-1,1,3,4,4],
+  "Pop":              [-1,1,3,4,3,0,-1,-1,1,2],
+  "Jazz":             [3,2,1,2,-1,-1,0,1,2,3],
+  "Clásica":          [4,3,2,0,0,0,-1,1,2,3],
+  "Electrónica":      [6,5,2,0,-1,-2,0,2,4,5],
+  "Dance":            [6,5,2,0,0,-2,-1,0,4,5],
+  "Refuerzo graves":  [7,6,5,3,1,0,0,0,0,0],
+  "Refuerzo agudos":  [0,0,0,0,0,1,3,5,6,7],
+  "Voz":              [-2,-1,0,2,4,4,3,1,0,-1],
+  "Auriculares":      [4,3,1,0,-1,0,1,3,4,4],
+  "Fiesta":           [6,5,0,0,0,0,0,0,5,6],
+};
+
+/* ================= Importador de skins Winamp =================
+   Lector ZIP mínimo para .wsz clásicos. Usa APIs nativas del navegador, sin
+   CDN ni subida de archivos: todo se procesa y guarda localmente. */
+const importedSkins = new Map();
+const SKIN_DB = "ondaamp.skins.v1";
+const SKIN_STORE = "skins";
+let pendingSkin = null;
+
+function openSkinDB(){
+  return new Promise((resolve,reject)=>{
+    const req = indexedDB.open(SKIN_DB,1);
+    req.onupgradeneeded = ()=> req.result.createObjectStore(SKIN_STORE,{keyPath:"id"});
+    req.onsuccess = ()=> resolve(req.result);
+    req.onerror = ()=> reject(req.error || new Error("No se pudo abrir el almacén de skins"));
+  });
+}
+async function skinDbGetAll(){
+  const db = await openSkinDB();
+  try{
+    return await new Promise((resolve,reject)=>{
+      const req = db.transaction(SKIN_STORE,"readonly").objectStore(SKIN_STORE).getAll();
+      req.onsuccess = ()=> resolve(req.result || []);
+      req.onerror = ()=> reject(req.error);
+    });
+  } finally { db.close(); }
+}
+async function skinDbPut(record){
+  const db = await openSkinDB();
+  try{
+    await new Promise((resolve,reject)=>{
+      const req = db.transaction(SKIN_STORE,"readwrite").objectStore(SKIN_STORE).put(record);
+      req.onsuccess = ()=> resolve();
+      req.onerror = ()=> reject(req.error);
+    });
+  } finally { db.close(); }
+}
+async function skinDbDelete(id){
+  const db = await openSkinDB();
+  try{
+    await new Promise((resolve,reject)=>{
+      const req = db.transaction(SKIN_STORE,"readwrite").objectStore(SKIN_STORE).delete(id);
+      req.onsuccess = ()=> resolve();
+      req.onerror = ()=> reject(req.error);
+    });
+  } finally { db.close(); }
+}
+
+function zipU16(view,off){ return view.getUint16(off,true); }
+function zipU32(view,off){ return view.getUint32(off,true); }
+function decodeZipName(bytes,utf8){
+  try{ return new TextDecoder(utf8 ? "utf-8" : "windows-1252").decode(bytes); }
+  catch(e){ return new TextDecoder().decode(bytes); }
+}
+function readZipDirectory(buffer){
+  const view = new DataView(buffer);
+  const bytes = new Uint8Array(buffer);
+  if (buffer.byteLength < 22) throw new Error("El archivo no es un ZIP/WSZ válido");
+  let eocd = -1;
+  for (let i=buffer.byteLength-22, min=Math.max(0,buffer.byteLength-65557); i>=min; i--){
+    if (zipU32(view,i)===0x06054b50){ eocd=i; break; }
+  }
+  if (eocd<0) throw new Error("No encontré el directorio del archivo .wsz");
+  const count = zipU16(view,eocd+10);
+  let pos = zipU32(view,eocd+16);
+  if (count>1000) throw new Error("El skin contiene demasiados archivos");
+  const entries = [];
+  for (let i=0;i<count;i++){
+    if (pos+46>buffer.byteLength || zipU32(view,pos)!==0x02014b50)
+      throw new Error("El directorio ZIP está dañado");
+    const flags=zipU16(view,pos+8), method=zipU16(view,pos+10);
+    const compressedSize=zipU32(view,pos+20), size=zipU32(view,pos+24);
+    const nameLen=zipU16(view,pos+28), extraLen=zipU16(view,pos+30), commentLen=zipU16(view,pos+32);
+    const localOffset=zipU32(view,pos+42);
+    const name=decodeZipName(bytes.subarray(pos+46,pos+46+nameLen),!!(flags&0x800)).replaceAll("\\","/");
+    entries.push({name,base:name.split("/").pop().toLowerCase(),flags,method,compressedSize,size,localOffset});
+    pos += 46+nameLen+extraLen+commentLen;
+  }
+  return {buffer,view,entries};
+}
+async function extractZipEntry(zip,entry){
+  if (!entry) return null;
+  if (entry.flags&1) throw new Error(`“${entry.name}” está cifrado`);
+  if (entry.size>8*1024*1024) throw new Error(`“${entry.name}” es demasiado grande`);
+  const {view,buffer}=zip, off=entry.localOffset;
+  if (off+30>buffer.byteLength || zipU32(view,off)!==0x04034b50)
+    throw new Error(`No pude leer “${entry.name}”`);
+  const start=off+30+zipU16(view,off+26)+zipU16(view,off+28);
+  const end=start+entry.compressedSize;
+  if (end>buffer.byteLength) throw new Error(`“${entry.name}” está incompleto`);
+  const packed=buffer.slice(start,end);
+  let out;
+  if (entry.method===0) out=packed;
+  else if (entry.method===8){
+    if (!("DecompressionStream" in window))
+      throw new Error("Este navegador no puede descomprimir skins .wsz");
+    const stream=new Blob([packed]).stream().pipeThrough(new DecompressionStream("deflate-raw"));
+    out=await new Response(stream).arrayBuffer();
+  } else throw new Error(`Compresión no compatible en “${entry.name}”`);
+  if (entry.size && out.byteLength!==entry.size)
+    throw new Error(`“${entry.name}” no se descomprimió completo`);
+  return out;
+}
+function zipEntry(zip,name){ return zip.entries.find(e=>e.base===name.toLowerCase()); }
+function textFromBuffer(buffer){ return buffer ? new TextDecoder("utf-8").decode(buffer).replace(/^\uFEFF/,"") : ""; }
+function cleanSkinName(value,fallback="Skin importado"){
+  const name=String(value||"").replace(/\s+/g," ").trim();
+  return (name || fallback).slice(0,80);
+}
+function parseSkinMeta(xmlText,fileName){
+  let name=fileName.replace(/\.(wsz|zip)$/i,"").replace(/[_-]+/g," "), author="";
+  if (xmlText){
+    const doc=new DOMParser().parseFromString(xmlText,"application/xml");
+    if (!doc.querySelector("parsererror")){
+      name=doc.querySelector("name")?.textContent || name;
+      author=doc.querySelector("author")?.textContent || "";
+    }
+  }
+  return {name:cleanSkinName(name),author:cleanSkinName(author,"")};
+}
+function parsePledit(text){
+  const defaults={normal:"#9fb4bc",current:"#e6edf0",normalbg:"#08090a",selectedbg:"#313540",mbfg:"#c6d7dc",mbbg:"#23282b"};
+  for (const key of Object.keys(defaults)){
+    const match=text.match(new RegExp(`^\\s*${key}\\s*=\\s*(#[0-9a-f]{6})\\s*$`,"im"));
+    if (match) defaults[key]=match[1].toLowerCase();
+  }
+  return defaults;
+}
+function rgbFromHex(hex){ return [1,3,5].map(i=>parseInt(hex.slice(i,i+2),16)); }
+function hexFromRgb(rgb){ return "#"+rgb.map(v=>Math.round(Math.max(0,Math.min(255,v))).toString(16).padStart(2,"0")).join(""); }
+function mixHex(a,b,t){
+  const ar=rgbFromHex(a),br=rgbFromHex(b);
+  return hexFromRgb(ar.map((v,i)=>v+(br[i]-v)*t));
+}
+function colorLum(hex){
+  const c=rgbFromHex(hex).map(v=>{v/=255;return v<=.03928?v/12.92:Math.pow((v+.055)/1.055,2.4);});
+  return .2126*c[0]+.7152*c[1]+.0722*c[2];
+}
+function colorContrast(a,b){
+  const x=colorLum(a),y=colorLum(b);
+  return (Math.max(x,y)+.05)/(Math.min(x,y)+.05);
+}
+function readableColor(color,bg,min=4.5){
+  if (colorContrast(color,bg)>=min) return color;
+  const target=colorContrast("#f5f7f8",bg)>=colorContrast("#08090a",bg)?"#f5f7f8":"#08090a";
+  for (const t of [.25,.45,.65,.85,1]){
+    const candidate=mixHex(color,target,t);
+    if (colorContrast(candidate,bg)>=min) return candidate;
+  }
+  return target;
+}
+function buildImportedPalette(p){
+  const bg=p.normalbg;
+  const panel=mixHex(bg,p.mbbg,.66);
+  const panel2=mixHex(panel,p.selectedbg,.62);
+  const txt=readableColor(p.current,bg,4.5);
+  const mut=readableColor(p.normal,bg,3);
+  const acc=readableColor(p.mbfg,bg,3);
+  return {
+    bg,panel,panel2,txt,mut,acc,
+    accDim:mixHex(acc,bg,.55), amber:acc, lcd:txt,
+    lcdDim:mut,lcdbg:bg,line:readableColor(mixHex(panel2,txt,.35),panel,3),
+    selectedBg:p.selectedbg
+  };
+}
+function bmpSize(buffer){
+  if (!buffer || buffer.byteLength<26) return null;
+  const view=new DataView(buffer);
+  if (view.getUint16(0,true)!==0x4d42) return null;
+  return {width:view.getInt32(18,true),height:Math.abs(view.getInt32(22,true))};
+}
+async function stableSkinId(buffer){
+  try{
+    const hash=await crypto.subtle.digest("SHA-256",buffer);
+    return "imported-"+[...new Uint8Array(hash).slice(0,8)].map(v=>v.toString(16).padStart(2,"0")).join("");
+  }catch(e){
+    let h=2166136261;
+    for (const b of new Uint8Array(buffer)){h^=b;h=Math.imul(h,16777619);}
+    return "imported-"+(h>>>0).toString(16).padStart(8,"0")+"-"+buffer.byteLength;
+  }
+}
+async function parseWsz(file){
+  if (file.size>25*1024*1024) throw new Error("El archivo supera el límite de 25 MB");
+  const buffer=await file.arrayBuffer();
+  const zip=readZipDirectory(buffer);
+  const buttons=await extractZipEntry(zip,zipEntry(zip,"cbuttons.bmp"));
+  if (!buttons) throw new Error("No contiene CBUTTONS.BMP; no parece un skin clásico");
+  const size=bmpSize(buttons);
+  if (!size || size.width!==136 || size.height!==36)
+    throw new Error("CBUTTONS.BMP no tiene el formato clásico 136×36");
+  const pledit=textFromBuffer(await extractZipEntry(zip,zipEntry(zip,"pledit.txt")));
+  const info=textFromBuffer(await extractZipEntry(zip,zipEntry(zip,"skininfo.xml")));
+  const meta=parseSkinMeta(info,file.name);
+  return {
+    id:await stableSkinId(buffer),name:meta.name,author:meta.author,
+    sourceName:file.name,colors:buildImportedPalette(parsePledit(pledit)),
+    buttons,importedAt:Date.now()
+  };
+}
+function registerImportedSkin(record){
+  const old=importedSkins.get(record.id);
+  if (old?.buttonUrl) URL.revokeObjectURL(old.buttonUrl);
+  const buttonUrl=URL.createObjectURL(new Blob([record.buttons],{type:"image/bmp"}));
+  importedSkins.set(record.id,{...record,buttonUrl});
+}
+function refreshImportedSkinOptions(){
+  const select=$("skinSelect");
+  select.querySelector("#importedSkinOptions")?.remove();
+  if (!importedSkins.size) return;
+  const group=document.createElement("optgroup");
+  group.id="importedSkinOptions";
+  group.label="Importados";
+  [...importedSkins.values()].sort((a,b)=>a.name.localeCompare(b.name)).forEach(rec=>{
+    const option=document.createElement("option");
+    option.value=rec.id;
+    option.textContent=rec.author ? `${rec.name} · ${rec.author}` : rec.name;
+    group.appendChild(option);
+  });
+  select.appendChild(group);
+}
+async function loadImportedSkins(){
+  try{
+    const records=await skinDbGetAll();
+    records.forEach(registerImportedSkin);
+    refreshImportedSkinOptions();
+    if (pendingSkin && importedSkins.has(pendingSkin)) applySkin(pendingSkin);
+    pendingSkin=null;
+  }catch(e){
+    console.warn("No se pudieron restaurar los skins importados",e);
+    toast("No pude abrir el almacén local de skins",true);
+  }
+}
+async function importSkinFiles(files){
+  const candidates=files.filter(f=>/\.(wsz|zip)$/i.test(f.name));
+  if (!candidates.length){ toast("Selecciona archivos .wsz o .zip",true); return; }
+  let ok=0, failed=[];
+  for (const file of candidates){
+    try{
+      const record=await parseWsz(file);
+      await skinDbPut(record);
+      registerImportedSkin(record);
+      ok++;
+    }catch(e){ failed.push(`${file.name}: ${e.message}`); }
+  }
+  refreshImportedSkinOptions();
+  if (ok){
+    const latest=[...importedSkins.values()].sort((a,b)=>b.importedAt-a.importedAt)[0];
+    if (latest){ applySkin(latest.id); save(); }
+  }
+  const summary=`${ok} skin${ok===1?"":"s"} importado${ok===1?"":"s"}`;
+  toast(failed.length ? `${summary} · ${failed.length} con error` : summary,!!failed.length);
+  if (failed.length) console.warn("Skins omitidos:\n"+failed.join("\n"));
+}
+
+/* ================= Procesador de restauración (AudioWorklet) =================
+   Reducción de ruido por sustracción espectral (STFT 2048 con 75 % de solape) y
+   quita-clics por segunda diferencia. Corre en el hilo de audio, así que no se
+   entrecorta aunque la interfaz esté ocupada. Se carga desde un Blob para que
+   todo siga viviendo en un único archivo HTML. */
+const DSP_CODE = `
+const N = 2048, HOP = 512, HALF = N/2, LAT = N - HOP;
+const VENT = 90;    // frames por ventana de mínimos (~1 s a 48 kHz)
+const BIAS = 2.0;   // el mínimo subestima el nivel medio del ruido; se compensa
+const BLK  = 32;                             // bins por bloque de mediana
+const NBLK = Math.ceil((HALF+1)/BLK);        // bloques para el suelo espectral
+
+function fft(re, im, inv){
+  const n = re.length;
+  for (let i=1, j=0; i<n; i++){
+    let bit = n >> 1;
+    for (; j & bit; bit >>= 1) j ^= bit;
+    j ^= bit;
+    if (i < j){
+      let t = re[i]; re[i] = re[j]; re[j] = t;
+      t = im[i]; im[i] = im[j]; im[j] = t;
+    }
+  }
+  for (let len = 2; len <= n; len <<= 1){
+    const ang = (inv ? 2 : -2) * Math.PI / len;
+    const wr = Math.cos(ang), wi = Math.sin(ang), h = len >> 1;
+    for (let i = 0; i < n; i += len){
+      let cr = 1, ci = 0;
+      for (let k = 0; k < h; k++){
+        const a = i + k, b = a + h;
+        const vr = re[b]*cr - im[b]*ci;
+        const vi = re[b]*ci + im[b]*cr;
+        re[b] = re[a] - vr; im[b] = im[a] - vi;
+        re[a] += vr;        im[a] += vi;
+        const ncr = cr*wr - ci*wi;
+        ci = cr*wi + ci*wr; cr = ncr;
+      }
+    }
+  }
+  if (inv) for (let i=0;i<n;i++){ re[i] /= n; im[i] /= n; }
+}
+
+class Canal {
+  constructor(){
+    this.inF = new Float32Array(N);
+    this.outF = new Float32Array(N);
+    this.acc  = new Float32Array(N);
+    this.rover = LAT;
+    this.re = new Float32Array(N);
+    this.im = new Float32Array(N);
+    // Estadística de mínimos: el suelo de ruido es el valor más bajo visto en
+    // una ventana reciente. La música tiene huecos; el hiss no. Dos ventanas
+    // alternas garantizan que siempre haya una estimación válida.
+    this.pSm  = new Float32Array(HALF+1);
+    this.minA = new Float32Array(HALF+1).fill(1e9);
+    this.minB = new Float32Array(HALF+1).fill(1e9);
+    this.nz   = new Float32Array(HALF+1);
+    this.nzS  = new Float32Array(HALF+1);
+    this.tmp  = new Float32Array(BLK);
+    this.blk  = new Float32Array(NBLK);
+    this.cont = 0;
+    this.gPrev = new Float32Array(HALF+1).fill(1);
+    this.g     = new Float32Array(HALF+2);
+    this.x1 = 0; this.x2 = 0; this.det = 1e-5;
+  }
+}
+
+class Restaurador extends AudioWorkletProcessor {
+  constructor(){
+    super();
+    this.win = new Float32Array(N);
+    for (let i=0;i<N;i++) this.win[i] = 0.5 - 0.5*Math.cos(2*Math.PI*i/N);
+    this.norm = 2/3;                 // Hann en análisis y síntesis con salto N/4
+    this.ch = [];
+    this.nrOn = false; this.nrAmt = 0.55;
+    this.dcOn = false; this.dcAmt = 0.5;
+    this.port.onmessage = e => {
+      const d = e.data || {};
+      if ('nrOn'  in d) this.nrOn  = !!d.nrOn;
+      if ('nrAmt' in d) this.nrAmt = d.nrAmt;
+      if ('dcOn'  in d) this.dcOn  = !!d.dcOn;
+      if ('dcAmt' in d) this.dcAmt = d.dcAmt;
+    };
+  }
+
+  frame(c){
+    const re = c.re, im = c.im, w = this.win, g = c.g;
+    for (let i=0;i<N;i++){ re[i] = c.inF[i]*w[i]; im[i] = 0; }
+    fft(re, im, false);
+
+    const over  = 1.0 + this.nrAmt * 2.2;                    // sobre-sustracción
+    const suelo = Math.pow(10, (-7 - this.nrAmt*17)/20);     // deja algo de ruido:
+    const k2 = over * over * BIAS;                           // el silencio total suena peor
+    for (let k=0; k<=HALF; k++){
+      const p = re[k]*re[k] + im[k]*im[k] + 1e-20;
+      // Se suaviza la potencia antes de buscar el mínimo: reduce la varianza y
+      // hace que el mínimo se parezca de verdad al nivel medio del ruido.
+      const ps = c.pSm[k] = c.pSm[k]*0.75 + p*0.25;
+      if (ps < c.minA[k]) c.minA[k] = ps;
+      const a = c.minA[k], b = c.minB[k];
+      c.nz[k] = a < b ? a : b;
+    }
+    // Suelo de ruido A LO LARGO DE LA FRECUENCIA, por MEDIANA de bloques.
+    // Es la clave para no destrozar la música. Una media se dejaría arrastrar
+    // por los picos (una nota fuerte elevaría su propio suelo y se auto-borraría);
+    // la mediana los ignora, porque un tono ocupa unos pocos bins de cada bloque
+    // mientras que el hiss llena todos. Luego se interpola para que la curva
+    // resultante sea suave y no deje escalones audibles.
+    for (let b=0; b<NBLK; b++){
+      const ini = b*BLK, fin = Math.min(ini+BLK, HALF+1), n = fin-ini;
+      for (let i=0;i<n;i++) c.tmp[i] = c.nz[ini+i];
+      const sub = c.tmp.subarray(0,n);
+      sub.sort();
+      c.blk[b] = sub[n>>1];
+    }
+    for (let k=0; k<=HALF; k++){
+      const pos = (k - BLK/2) / BLK;
+      let b0 = Math.floor(pos), f = pos - b0;
+      if (b0 < 0){ b0 = 0; f = 0; }
+      else if (b0 >= NBLK-1){ b0 = NBLK-2; f = 1; }
+      c.nzS[k] = c.blk[b0]*(1-f) + c.blk[b0+1]*f;
+    }
+    for (let k=0; k<=HALF; k++){
+      const p = c.pSm[k] + 1e-20;
+      let v = 1 - (c.nzS[k] * k2) / p;
+      v = v > 0 ? Math.sqrt(v) : 0;
+      g[k] = v < suelo ? suelo : v;
+    }
+    if (++c.cont >= VENT){    // rota la ventana de mínimos (~1 s)
+      c.cont = 0;
+      c.minB.set(c.minA);
+      c.minA.fill(1e9);
+    }
+    // Suavizado entre bins vecinos: sin esto aparecen los "pájaros" del ruido musical.
+    let ant = g[0];
+    for (let k=1; k<HALF; k++){
+      const cur = g[k];
+      g[k] = (ant + cur + g[k+1]) / 3;
+      ant = cur;
+    }
+    for (let k=0; k<=HALF; k++){
+      const v = c.gPrev[k]*0.55 + g[k]*0.45;   // suavizado temporal
+      c.gPrev[k] = v;
+      re[k] *= v; im[k] *= v;
+      if (k > 0 && k < HALF){ const m = N - k; re[m] *= v; im[m] *= v; }
+    }
+    fft(re, im, true);
+    for (let i=0;i<N;i++) c.acc[i] += re[i]*w[i]*this.norm;
+  }
+
+  // Un chasquido es un impulso aislado: destaca en la segunda diferencia,
+  // mientras que la música (con pendientes suaves) apenas la mueve.
+  declick(c, x){
+    const d = Math.abs(x - 2*c.x1 + c.x2);
+    c.det = c.det*0.9995 + d*0.0005;
+    const umbral = (16 - this.dcAmt*11) * c.det + 1e-6;
+    const salida = c.x2;
+    c.x2 = d > umbral ? (c.x2 + x) * 0.5 : c.x1;
+    c.x1 = x;
+    return salida;
+  }
+
+  process(inputs, outputs){
+    const inp = inputs[0], out = outputs[0];
+    if (!out || !out.length) return true;
+    if (!inp || !inp.length){ for (const o of out) o.fill(0); return true; }
+    for (let ch=0; ch<out.length; ch++){
+      const src = inp[ch] || inp[0], dst = out[ch];
+      if (!src){ dst.fill(0); continue; }
+      if (!this.nrOn && !this.dcOn){ dst.set(src); continue; }
+      const c = this.ch[ch] || (this.ch[ch] = new Canal());
+      for (let i=0, n=dst.length; i<n; i++){
+        let x = this.dcOn ? this.declick(c, src[i]) : src[i];
+        if (!this.nrOn){ dst[i] = x; continue; }
+        c.inF[c.rover] = x;
+        dst[i] = c.outF[c.rover - LAT];
+        if (++c.rover >= N){
+          c.rover = LAT;
+          this.frame(c);
+          for (let k=0;k<HOP;k++) c.outF[k] = c.acc[k];
+          c.acc.copyWithin(0, HOP, N);
+          c.acc.fill(0, N-HOP, N);
+          c.inF.copyWithin(0, HOP, N);
+        }
+      }
+    }
+    return true;
+  }
+}
+registerProcessor('oa-restaurador', Restaurador);
+`;
+
+/* ================= Audio ================= */
+const AC = window.AudioContext || window.webkitAudioContext;
+const audioEl = new Audio();
+audioEl.preload = "auto";
+let ctx=null, srcNode=null, preamp=null, filters=[], sBus=null, compIn=null,
+    compWet=null, compDry=null, pan=null, master=null, analyser=null, noiseBuf=null;
+// Etapas de restauración y realce
+let fxRumble=null, fxBass=null, fxAir=null, xfCrossL=null, xfCrossR=null, xfOut=null,
+    dspIn=null, dspOut=null, dspWet=null, dspDry=null, dspNode=null, dspEstado="no";
+// Auto-máster: cadena de corrección propia + analizador de medida
+let autoFilters=[], amAnalyser=null;
+
+/* Envuelve una cadena con mezcla húmedo/seco para poder puentearla sin
+   desconectar nodos (desconectar en caliente produce chasquidos). */
+function wetDry(chainIn, chainOut){
+  const input = ctx.createGain(), output = ctx.createGain();
+  const wet = ctx.createGain(), dry = ctx.createGain();
+  wet.gain.value = 0; dry.gain.value = 1;
+  input.connect(chainIn); chainOut.connect(wet); wet.connect(output);
+  input.connect(dry); dry.connect(output);
+  return {input, output, wet, dry};
+}
+/* Curva de saturación suave: genera armónicos sin sonar a distorsión. */
+function curvaSaturacion(drive){
+  const n = 1024, c = new Float32Array(n), d = Math.tanh(drive);
+  for (let i=0;i<n;i++){
+    const x = i/(n-1)*2 - 1;
+    c[i] = Math.tanh(x*drive)/d;
+  }
+  return c;
+}
+async function cargarDsp(){
+  if (!ctx.audioWorklet){ dspEstado = "sin-soporte"; return; }
+  try{
+    const url = URL.createObjectURL(new Blob([DSP_CODE], {type:"text/javascript"}));
+    await ctx.audioWorklet.addModule(url);
+    URL.revokeObjectURL(url);
+    dspNode = new AudioWorkletNode(ctx, "oa-restaurador", {
+      numberOfInputs:1, numberOfOutputs:1, outputChannelCount:[2],
+      channelCount:2, channelCountMode:"explicit",
+    });
+    dspIn.connect(dspNode); dspNode.connect(dspWet);
+    // El propio procesador deja pasar la señal intacta cuando está apagado, así
+    // que enrutamos siempre por él: evita el peine al mezclar dos latencias.
+    dspWet.gain.value = 1; dspDry.gain.value = 0;
+    dspEstado = "listo";
+    applyAllAudio(true);
+  }catch(e){
+    dspEstado = "error";
+  }
+  actualizarNotaFx();
+}
+
+function ensureCtx(){
+  if (ctx) return;
+  ctx = new AC({ latencyHint: "playback" });
+  srcNode = ctx.createMediaElementSource(audioEl);
+
+  // --- Limpieza previa: rumble subsónico y luego restaurador ---
+  // Dos biquads en cascada (4.º orden): con uno solo la pendiente es tan suave
+  // que a 25 Hz apenas atenúa 2 dB y el retumbe sigue comiéndose el headroom.
+  const rb1 = ctx.createBiquadFilter();
+  rb1.type = "highpass"; rb1.frequency.value = 34; rb1.Q.value = 0.54;
+  const rb2 = ctx.createBiquadFilter();
+  rb2.type = "highpass"; rb2.frequency.value = 34; rb2.Q.value = 1.31;
+  rb1.connect(rb2);
+  fxRumble = wetDry(rb1, rb2);
+  srcNode.connect(fxRumble.input);
+
+  dspIn = ctx.createGain(); dspOut = ctx.createGain();
+  dspWet = ctx.createGain(); dspDry = ctx.createGain();
+  dspWet.gain.value = 0; dspDry.gain.value = 1;
+  fxRumble.output.connect(dspIn);
+  dspIn.connect(dspDry); dspDry.connect(dspOut);
+  dspWet.connect(dspOut);
+  cargarDsp();
+
+  preamp = ctx.createGain();
+  dspOut.connect(preamp);
+
+  // Cadena EQ: shelf en extremos, peaking en medias
+  let node = preamp;
+  filters = EQ_FREQS.map((f,i)=>{
+    const bq = ctx.createBiquadFilter();
+    bq.type = i===0 ? "lowshelf" : i===9 ? "highshelf" : "peaking";
+    bq.frequency.value = f;
+    if (bq.type==="peaking") bq.Q.value = 1.1;
+    bq.gain.value = 0;
+    node.connect(bq); node = bq;
+    return bq;
+  });
+
+  // Analizador de medida: pinchado ANTES del ecualizador. Si midiera después,
+  // leería su propia corrección y se realimentaría hasta descontrolarse.
+  amAnalyser = ctx.createAnalyser();
+  amAnalyser.fftSize = 4096;
+  amAnalyser.smoothingTimeConstant = 0.6;
+  dspOut.connect(amAnalyser);
+
+  // Segunda cadena de 10 bandas, independiente de la del usuario: el auto-máster
+  // escribe aquí y así nunca pisa los deslizadores que el usuario haya movido.
+  autoFilters = EQ_FREQS.map((f,i)=>{
+    const bq = ctx.createBiquadFilter();
+    bq.type = i===0 ? "lowshelf" : i===9 ? "highshelf" : "peaking";
+    bq.frequency.value = f;
+    if (bq.type==="peaking") bq.Q.value = 1.1;
+    bq.gain.value = 0;
+    node.connect(bq); node = bq;
+    return bq;
+  });
+
+  // --- Realce en paralelo: armónicos de graves y de aire ---
+  // Se suman a la señal original (el seco se queda en 1) en vez de sustituirla.
+  const beLow = ctx.createBiquadFilter();
+  beLow.type = "lowpass"; beLow.frequency.value = 110; beLow.Q.value = 0.7;
+  const beSat = ctx.createWaveShaper();
+  beSat.curve = curvaSaturacion(2.6); beSat.oversample = "2x";
+  const beHi = ctx.createBiquadFilter();
+  beHi.type = "highpass"; beHi.frequency.value = 110; beHi.Q.value = 0.7;
+  beLow.connect(beSat); beSat.connect(beHi);
+  fxBass = wetDry(beLow, beHi);
+  node.connect(fxBass.input);
+
+  const exHi = ctx.createBiquadFilter();
+  exHi.type = "highpass"; exHi.frequency.value = 3800; exHi.Q.value = 0.7;
+  const exSat = ctx.createWaveShaper();
+  exSat.curve = curvaSaturacion(1.7); exSat.oversample = "2x";
+  exHi.connect(exSat);
+  fxAir = wetDry(exHi, exSat);
+  fxBass.output.connect(fxAir.input);
+
+  // Matriz M/S para amplitud estéreo (forzamos upmix a 2 canales antes)
+  const up = ctx.createGain();
+  up.channelCount = 2; up.channelCountMode = "explicit"; up.channelInterpretation = "speakers";
+  fxAir.output.connect(up);
+  const split = ctx.createChannelSplitter(2);
+  up.connect(split);
+  const mBus = ctx.createGain(); sBus = ctx.createGain();
+  const gLM = ctx.createGain(), gRM = ctx.createGain(), gLS = ctx.createGain(), gRS = ctx.createGain();
+  gLM.gain.value = .5; gRM.gain.value = .5; gLS.gain.value = .5; gRS.gain.value = -.5;
+  split.connect(gLM,0); split.connect(gRM,1); gLM.connect(mBus); gRM.connect(mBus);
+  split.connect(gLS,0); split.connect(gRS,1); gLS.connect(sBus); gRS.connect(sBus);
+  const merger = ctx.createChannelMerger(2);
+  const mToL = ctx.createGain(), mToR = ctx.createGain(), sToL = ctx.createGain(), sToR = ctx.createGain();
+  sToR.gain.value = -1;
+  mBus.connect(mToL); mToL.connect(merger,0,0);
+  sBus.connect(sToL); sToL.connect(merger,0,0);
+  mBus.connect(mToR); mToR.connect(merger,0,1);
+  sBus.connect(sToR); sToR.connect(merger,0,1);
+
+  // --- Crossfeed: cada oído recibe algo del canal opuesto, con retardo y
+  // filtrado, como ocurre de forma natural al escuchar por altavoces. ---
+  const xfIn = ctx.createGain(); xfOut = ctx.createGain();
+  const xsp = ctx.createChannelSplitter(2), xmg = ctx.createChannelMerger(2);
+  merger.connect(xfIn); xfIn.connect(xsp);
+  xsp.connect(xmg, 0, 0); xsp.connect(xmg, 1, 1);        // señal directa
+  const dLy = ctx.createDelay(0.01), dRy = ctx.createDelay(0.01);
+  dLy.delayTime.value = dRy.delayTime.value = 0.00027;   // ~27 cm de recorrido
+  const lpL = ctx.createBiquadFilter(), lpR = ctx.createBiquadFilter();
+  lpL.type = "lowpass"; lpR.type = "lowpass";
+  lpL.frequency.value = 750; lpR.frequency.value = 750;
+  xfCrossL = ctx.createGain(); xfCrossR = ctx.createGain();
+  xfCrossL.gain.value = 0; xfCrossR.gain.value = 0;
+  xsp.connect(dLy, 0); dLy.connect(lpL); lpL.connect(xfCrossL); xfCrossL.connect(xmg, 0, 1);
+  xsp.connect(dRy, 1); dRy.connect(lpR); lpR.connect(xfCrossR); xfCrossR.connect(xmg, 0, 0);
+  xmg.connect(xfOut);
+
+  // Compresor "modo noche" con bypass por ganancias
+  compIn = ctx.createGain();
+  xfOut.connect(compIn);
+  const comp = ctx.createDynamicsCompressor();
+  comp.threshold.value = -30; comp.knee.value = 24; comp.ratio.value = 5;
+  comp.attack.value = .004; comp.release.value = .3;
+  compWet = ctx.createGain(); compDry = ctx.createGain();
+  compIn.connect(comp); comp.connect(compWet);
+  compIn.connect(compDry);
+  const post = ctx.createGain();
+  compWet.connect(post); compDry.connect(post);
+
+  pan = ctx.createStereoPanner();
+  master = ctx.createGain();
+  // Limitador de seguridad: evita clipping digital si el EQ suma mucha ganancia
+  const limiter = ctx.createDynamicsCompressor();
+  limiter.threshold.value = -1; limiter.knee.value = 0; limiter.ratio.value = 20;
+  limiter.attack.value = .001; limiter.release.value = .1;
+  analyser = ctx.createAnalyser();
+  analyser.fftSize = 2048; analyser.smoothingTimeConstant = .8;
+
+  post.connect(pan); pan.connect(master); master.connect(limiter);
+  limiter.connect(analyser); analyser.connect(ctx.destination);
+
+  applyAllAudio(true);
+  $("ctxInfo").textContent = `motor: ${ctx.sampleRate/1000} kHz float32`;
+  initVisBands();
+}
+
+function applyAllAudio(instant){
+  if (!ctx) return;
+  const t = ctx.currentTime, k = instant ? .001 : .03;
+  filters.forEach((f,i)=> f.gain.setTargetAtTime(state.eqOn ? state.eq[i] : 0, t, k));
+  preamp.gain.setTargetAtTime(state.eqOn ? Math.pow(10, state.pre/20) : 1, t, k);
+  sBus.gain.setTargetAtTime(state.width/100, t, k);
+  compWet.gain.setTargetAtTime(state.night ? 1 : 0, t, k);
+  compDry.gain.setTargetAtTime(state.night ? 0 : 1, t, k);
+  pan.pan.setTargetAtTime(state.bal/100, t, k);
+  master.gain.setTargetAtTime(Math.pow(state.vol/100, 2), t, k);
+
+  // --- Restauración y realce ---
+  const fx = state.fx;
+  fxRumble.wet.gain.setTargetAtTime(fx.rb ? 1 : 0, t, k);
+  fxRumble.dry.gain.setTargetAtTime(fx.rb ? 0 : 1, t, k);
+  // Estos dos suman armónicos, por eso el seco se mantiene siempre a 1.
+  fxBass.wet.gain.setTargetAtTime(fx.be ? fx.beAmt/100 * 0.85 : 0, t, k);
+  fxAir.wet.gain.setTargetAtTime(fx.ex ? fx.exAmt/100 * 0.45 : 0, t, k);
+  const xf = fx.xf ? fx.xfAmt/100 * 0.5 : 0;
+  xfCrossL.gain.setTargetAtTime(xf, t, k);
+  xfCrossR.gain.setTargetAtTime(xf, t, k);
+  if (dspNode) dspNode.port.postMessage({
+    nrOn: fx.nr, nrAmt: fx.nrAmt/100,
+    dcOn: fx.dc, dcAmt: fx.dcAmt/100,
+  });
+}
+
+/* ================= Utilidades ================= */
+function fmtTime(s){
+  if (!isFinite(s) || s < 0) return "0:00";
+  s = Math.round(s);
+  const h = Math.floor(s/3600), m = Math.floor(s%3600/60), ss = String(s%60).padStart(2,"0");
+  return h ? `${h}:${String(m).padStart(2,"0")}:${ss}` : `${m}:${ss}`;
+}
+function fmtLong(s){
+  if (!isFinite(s) || s <= 0) return "";
+  const h = Math.floor(s/3600), m = Math.round(s%3600/60);
+  return h ? `${h} h ${m} min` : `${m} min`;
+}
+function toast(msg, err){
+  const d = document.createElement("div");
+  d.className = "toast" + (err ? " err" : "");
+  d.textContent = msg;
+  $("toasts").appendChild(d);
+  setTimeout(()=>{ d.style.opacity = "0"; d.style.transition = "opacity .3s"; setTimeout(()=>d.remove(), 350); }, 2600);
+}
+function paintRange(inp){
+  const min = +inp.min, max = +inp.max, v = +inp.value;
+  const pct = (v-min)/(max-min)*100;
+  inp.style.setProperty("--range-bg", `linear-gradient(90deg, var(--acc) ${pct}%, #2a3340 ${pct}%)`);
+}
+document.querySelectorAll("input[type=range]").forEach(paintRange);
+
+/* ================= Metadatos (ID3 / FLAC / WAV) ================= */
+function syncsafe(b){ return (b[0]<<21)|(b[1]<<14)|(b[2]<<7)|b[3]; }
+function deunsync(u){
+  const o = new Uint8Array(u.length); let j = 0;
+  for (let i=0;i<u.length;i++){ o[j++] = u[i]; if (u[i]===0xFF && u[i+1]===0x00) i++; }
+  return o.subarray(0,j);
+}
+function decodeTxt(enc, bytes){
+  try{
+    if (enc===0) return new TextDecoder("windows-1252").decode(bytes);
+    if (enc===3) return new TextDecoder("utf-8").decode(bytes);
+    if (enc===1){
+      if (bytes[0]===0xFF && bytes[1]===0xFE) return new TextDecoder("utf-16le").decode(bytes.subarray(2));
+      if (bytes[0]===0xFE && bytes[1]===0xFF) bytes = bytes.subarray(2);
+      enc = 2;
+    }
+    if (enc===2){
+      try { return new TextDecoder("utf-16be").decode(bytes); }
+      catch(e){
+        const sw = new Uint8Array(bytes.length);
+        for (let i=0;i+1<bytes.length;i+=2){ sw[i]=bytes[i+1]; sw[i+1]=bytes[i]; }
+        return new TextDecoder("utf-16le").decode(sw);
+      }
+    }
+  }catch(e){}
+  return "";
+}
+function readTxtFrame(data){
+  const s = decodeTxt(data[0], data.subarray(1));
+  return s.split("\0")[0].trim();
+}
+function readApic(data){
+  const enc = data[0];
+  let i = 1;
+  while (i<data.length && data[i]!==0) i++;
+  const mime = new TextDecoder("windows-1252").decode(data.subarray(1,i)) || "image/jpeg";
+  i += 2; // salta null + picture type
+  if (enc===1 || enc===2){
+    while (i+1<data.length && !(data[i]===0 && data[i+1]===0)) i+=2;
+    i += 2;
+  } else {
+    while (i<data.length && data[i]!==0) i++;
+    i += 1;
+  }
+  if (i>=data.length) return null;
+  return new Blob([data.slice(i)], {type:mime});
+}
+async function parseID3(file){
+  const head = new Uint8Array(await file.slice(0,10).arrayBuffer());
+  if (head.length<10 || head[0]!==0x49 || head[1]!==0x44 || head[2]!==0x33) return null;
+  const ver = head[3], flags = head[5];
+  const size = Math.min(syncsafe(head.subarray(6,10)), 16*1024*1024);
+  let buf = new Uint8Array(await file.slice(10, 10+size).arrayBuffer());
+  if (flags & 0x80) buf = deunsync(buf);
+  let off = 0;
+  if (flags & 0x40){
+    const eh = ver===4 ? syncsafe(buf.subarray(0,4)) : (((buf[0]<<24)|(buf[1]<<16)|(buf[2]<<8)|buf[3])>>>0) + 4;
+    off += eh;
+  }
+  const out = {};
+  while (off + 10 <= buf.length){
+    const id = String.fromCharCode(buf[off],buf[off+1],buf[off+2],buf[off+3]);
+    if (!/^[A-Z0-9]{4}$/.test(id)) break;
+    let fsize = ver===4 ? syncsafe(buf.subarray(off+4,off+8))
+                        : (((buf[off+4]<<24)|(buf[off+5]<<16)|(buf[off+6]<<8)|buf[off+7])>>>0);
+    const fflags = (buf[off+8]<<8)|buf[off+9];
+    off += 10;
+    if (fsize<=0) break;
+    if (off+fsize > buf.length) fsize = buf.length - off;
+    let data = buf.subarray(off, off+fsize);
+    if (ver===4 && (fflags & 0x02)) data = deunsync(data);
+    if (ver===4 && (fflags & 0x01)) data = data.subarray(4);
+    try{
+      if (id==="TIT2") out.title = readTxtFrame(data);
+      else if (id==="TPE1") out.artist = readTxtFrame(data);
+      else if (id==="TPE2") out.albumArtist = readTxtFrame(data);
+      else if (id==="TALB") out.album = readTxtFrame(data);
+      else if (id==="TDRC" || id==="TYER") out.year = (readTxtFrame(data).match(/\d{4}/)||[""])[0];
+      else if (id==="TRCK") out.track = parseInt(readTxtFrame(data),10) || 0;
+      else if (id==="TPOS") out.disc = parseInt(readTxtFrame(data),10) || 0;
+      else if (id==="APIC" && !out.pic) out.pic = readApic(data);
+    }catch(e){}
+    off += fsize;
+  }
+  return out;
+}
+async function parseFLAC(file){
+  const h4 = new Uint8Array(await file.slice(0,4).arrayBuffer());
+  if (String.fromCharCode(...h4) !== "fLaC") return null;
+  let pos = 4; const out = {};
+  for (let i=0;i<64;i++){
+    const bh = new Uint8Array(await file.slice(pos,pos+4).arrayBuffer());
+    if (bh.length < 4) break;
+    const last = !!(bh[0]&0x80), type = bh[0]&0x7F;
+    const len = (bh[1]<<16)|(bh[2]<<8)|bh[3];
+    pos += 4;
+    try{
+      if (type===0 && len>=18){
+        const b = new Uint8Array(await file.slice(pos,pos+18).arrayBuffer());
+        const sr = (b[10]<<12)|(b[11]<<4)|(b[12]>>4);
+        out.sr = sr;
+        out.bits = (((b[12]&1)<<4)|(b[13]>>4)) + 1;
+        const tot = ((b[13]&0x0F)*4294967296) + (((b[14]<<24)|(b[15]<<16)|(b[16]<<8)|b[17])>>>0);
+        if (sr && tot) out.dur = tot/sr;
+      } else if (type===4 && len < (1<<22)){
+        const ab = await file.slice(pos,pos+len).arrayBuffer();
+        const dv = new DataView(ab); const dec = new TextDecoder();
+        let o = 0;
+        const vlen = dv.getUint32(0,true); o = 4 + vlen;
+        const n = dv.getUint32(o,true); o += 4;
+        for (let k=0;k<n && o+4<=ab.byteLength;k++){
+          const l = dv.getUint32(o,true); o += 4;
+          if (o+l > ab.byteLength) break;
+          const s = dec.decode(new Uint8Array(ab,o,l)); o += l;
+          const eq = s.indexOf("=");
+          if (eq>0){
+            const key = s.slice(0,eq).toUpperCase(), val = s.slice(eq+1);
+            if (key==="TITLE" && !out.title) out.title = val;
+            else if (key==="ARTIST" && !out.artist) out.artist = val;
+            else if (key==="ALBUMARTIST" && !out.albumArtist) out.albumArtist = val;
+            else if (key==="ALBUM" && !out.album) out.album = val;
+            else if (key==="DATE" && !out.year) out.year = (val.match(/\d{4}/)||[""])[0];
+            else if (key==="TRACKNUMBER" && !out.track) out.track = parseInt(val,10)||0;
+            else if (key==="DISCNUMBER" && !out.disc) out.disc = parseInt(val,10)||0;
+          }
+        }
+      } else if (type===6 && len < 20*1024*1024 && !out.pic){
+        const ab = await file.slice(pos,pos+len).arrayBuffer();
+        const dv = new DataView(ab);
+        let o = 4;
+        const ml = dv.getUint32(o); o += 4;
+        const mime = new TextDecoder().decode(new Uint8Array(ab,o,ml)); o += ml;
+        const dl = dv.getUint32(o); o += 4 + dl;
+        o += 16;
+        const pl = dv.getUint32(o); o += 4;
+        if (o+pl <= ab.byteLength) out.pic = new Blob([new Uint8Array(ab,o,pl)], {type:mime||"image/jpeg"});
+      }
+    }catch(e){}
+    pos += len;
+    if (last) break;
+  }
+  return out;
+}
+async function parseWAV(file){
+  const ab = await file.slice(0, 256*1024).arrayBuffer();
+  if (ab.byteLength < 44) return null;
+  const dv = new DataView(ab);
+  if (dv.getUint32(0)!==0x52494646 || dv.getUint32(8)!==0x57415645) return null;
+  let o = 12; const out = {};
+  while (o+8 <= dv.byteLength){
+    const id = dv.getUint32(o), sz = dv.getUint32(o+4,true);
+    if (id===0x666D7420){
+      out.ch = dv.getUint16(o+10,true);
+      out.sr = dv.getUint32(o+12,true);
+      out.byteRate = dv.getUint32(o+16,true);
+      out.bits = dv.getUint16(o+22,true);
+    } else if (id===0x64617461){
+      if (out.byteRate) out.dur = sz/out.byteRate;
+      break;
+    }
+    o += 8 + sz + (sz&1);
+  }
+  return out.sr ? out : null;
+}
+async function readMeta(item){
+  const ext = item.name.split(".").pop().toLowerCase();
+  let m = null;
+  try{
+    if (ext==="mp3") m = await parseID3(item.file);
+    else if (ext==="flac") m = await parseFLAC(item.file);
+    else if (ext==="wav") m = await parseWAV(item.file);
+  }catch(e){}
+  if (m){
+    if (m.title) item.title = m.title;
+    if (m.artist) item.artist = m.artist;
+    if (m.albumArtist) item.albumArtist = m.albumArtist;
+    if (m.album) item.album = m.album;
+    if (m.year) item.year = m.year;
+    if (m.track) item.track = m.track;
+    if (m.disc) item.disc = m.disc;
+    if (m.sr) item.sr = m.sr;
+    if (m.bits) item.bits = m.bits;
+    if (m.dur) item.dur = m.dur;
+    if (m.pic){
+      try{ item.picUrl = URL.createObjectURL(m.pic); }catch(e){}
+      item.pic = m.pic;   // se conserva el Blob para poder guardarlo entre sesiones
+    }
+  }
+  item.artKey = ((item.album || item.folder || item.name) + "|" +
+                 (item.albumArtist || item.artist || "")).toLowerCase();
+  if (!item.title){
+    const base = item.name.replace(/\.[^.]+$/,"");
+    // "01 - Artista - Título" o "Artista - Título"
+    const mNum = base.match(/^\s*(\d{1,3})[\s._-]+(.*)$/);
+    let rest = base;
+    if (mNum && !item.track){ item.track = parseInt(mNum[1],10); rest = mNum[2]; }
+    const parts = rest.split(" - ");
+    if (parts.length>=2 && !item.artist){ item.artist = parts[0].trim(); item.title = parts.slice(1).join(" - ").trim(); }
+    else item.title = rest.trim() || base;
+  }
+  item.metaReady = true;
+}
+
+/* Duraciones en segundo plano con un <audio> oculto secuencial */
+const durQueue = [];
+let durBusy = false;
+function queueDur(item){
+  if (item.dur || item.pendiente || !item.url) return;
+  durQueue.push(item);
+  pumpDur();
+}
+async function pumpDur(){
+  if (durBusy) return;
+  durBusy = true;
+  const probe = new Audio(); probe.preload = "metadata";
+  while (durQueue.length){
+    const it = durQueue.shift();
+    if (!state.list.includes(it) || it.dur) continue;
+    await new Promise(res=>{
+      let done = false;
+      const fin = ()=>{ if (done) return; done = true; probe.onloadedmetadata = probe.onerror = null; res(); };
+      probe.onloadedmetadata = ()=>{ it.dur = probe.duration; fin(); };
+      probe.onerror = ()=>{ it.bad = true; fin(); };
+      setTimeout(fin, 8000);
+      probe.src = it.url;
+    });
+    touchRow(it);
+  }
+  probe.removeAttribute("src");
+  durBusy = false;
+  refreshGroupStats();
+  updateStats();
+}
+
+/* ================= Agrupación ================= */
+/* La clave lleva un prefijo de vista ("c|", "a|", "r|"): asi el estado de
+   plegado de cada vista es independiente y no hay colisiones entre nombres. */
+function artistaDe(it){ return it.albumArtist || it.artist || "Artista desconocido"; }
+function groupKeyOf(it){
+  if (state.view === "carpeta") return "c|" + (it.folder || "(sueltos)");
+  if (state.view === "artista") return "r|" + artistaDe(it).toLowerCase();
+  return "a|" + (it.album || "(sin álbum)") + "\u0000" + (it.albumArtist || it.artist || "");
+}
+function groupLabel(key, items){
+  const cuerpo = key.slice(2);
+  if (state.view === "carpeta"){
+    const parts = cuerpo.split("/").filter(Boolean);
+    return { l1: parts[parts.length-1] || cuerpo, l2: parts.slice(0,-1).join(" › ") || "raíz" };
+  }
+  if (state.view === "artista"){
+    const albums = new Set(items.map(i=> i.album || "(sin álbum)")).size;
+    return { l1: artistaDe(items[0]), l2: albums + (albums===1 ? " álbum" : " álbumes") };
+  }
+  const [alb, art] = cuerpo.split("\u0000");
+  const year = items.find(i=>i.year)?.year;
+  return { l1: alb, l2: (art || "Varios artistas") + (year ? " · " + year : "") };
+}
+function trackCmp(a,b){
+  if ((a.disc||0) !== (b.disc||0)) return (a.disc||0) - (b.disc||0);
+  if ((a.track||0) !== (b.track||0)){
+    if (!a.track) return 1;
+    if (!b.track) return -1;
+    return a.track - b.track;
+  }
+  return a.name.localeCompare(b.name, "es", {numeric:true});
+}
+/* Dentro de un artista: primero por álbum, dentro por número de pista. */
+function artistaCmp(a,b){
+  const al = (a.album||"").localeCompare(b.album||"", "es", {numeric:true});
+  if (al) return al;
+  return trackCmp(a,b);
+}
+/* Devuelve [{key, label, items}] ya ordenado, respetando el filtro activo */
+function buildGroups(){
+  const q = $("find").value.trim().toLowerCase();
+  const match = it => !q || (it.title+" "+it.artist+" "+(it.albumArtist||"")+" "+it.album+" "+it.name+" "+(it.folder||"")).toLowerCase().includes(q);
+  const visibles = state.list.filter(match);
+  if (state.view === "lista") return [{key:"__all", label:null, items:visibles}];
+  const map = new Map();
+  visibles.forEach(it=>{
+    const k = groupKeyOf(it);
+    if (!map.has(k)) map.set(k, []);
+    map.get(k).push(it);
+  });
+  const arr = [...map.entries()].map(([key,items])=>{
+    items.sort(state.view === "artista" ? artistaCmp : trackCmp);
+    return {key, label: groupLabel(key, items), items};
+  });
+  // Por carpeta se ordena por la ruta completa: las subcarpetas de un mismo
+  // padre quedan juntas en vez de mezclarse alfabéticamente por su nombre.
+  arr.sort((a,b)=> state.view === "carpeta"
+    ? a.key.localeCompare(b.key, "es", {numeric:true})
+    : a.label.l1.localeCompare(b.label.l1, "es", {numeric:true}));
+  return arr;
+}
+/* Orden de reproducción tal y como se ve en pantalla */
+function playOrder(){
+  const out = [];
+  buildGroups().forEach(g=> g.items.forEach(it=> out.push(it)));
+  return out;
+}
+
+/* ================= Playlist ================= */
+const AUDIO_RE = /\.(mp3|flac|wav|ogg|oga|opus|m4a|aac|weba|webm|mp4|wma)$/i;
+function folderOf(f){
+  const rel = f._relPath || f.webkitRelativePath || "";
+  const i = rel.lastIndexOf("/");
+  return i > 0 ? rel.slice(0,i) : "";
+}
+async function addFiles(files){
+  const good = [...files].filter(f => AUDIO_RE.test(f.name) || (f.type && f.type.startsWith("audio")));
+  if (!good.length){ toast("No encontré archivos de audio compatibles", true); return; }
+  good.sort((a,b)=> a.name.localeCompare(b.name, "es", {numeric:true}));
+  const startEmpty = state.list.length === 0;
+  const nuevos = [];
+  for (const f of good){
+    const item = { id:nextId++, file:f, url:URL.createObjectURL(f), name:f.name,
+                   title:"", artist:"", albumArtist:"", album:"", year:"", track:0, disc:0,
+                   folder:folderOf(f), dur:0, sr:0, bits:0, picUrl:"", bad:false, metaReady:false,
+                   // Datos para poder recuperar el archivo en la próxima sesión
+                   relPath: f._relPath || f.webkitRelativePath || f.name,
+                   rootIdx: f._rootIdx ?? -1, pendiente:false, pic:null, artKey:"",
+                   opfsName: f._opfsName || "" };   // nombre de la copia en el móvil
+    state.list.push(item);
+    nuevos.push(item);
+  }
+  renderList();
+  toast(`${good.length} pista${good.length>1?"s":""} agregada${good.length>1?"s":""}`);
+  // Metadatos en segundo plano; refresco por lotes para no repintar mil veces
+  let n = 0;
+  for (const it of nuevos){
+    await readMeta(it);
+    queueDur(it);
+    if (++n % 25 === 0) renderList();
+  }
+  renderList();
+  updateStats();
+  guardarBiblioteca();
+  if (startEmpty && state.list.length) playIndex(0);
+}
+function removeItem(it){
+  const i = state.list.indexOf(it);
+  if (i < 0) return;
+  if (i === state.cur){ stop(); state.cur = -1; }
+  else if (i < state.cur) state.cur--;
+  URL.revokeObjectURL(it.url);
+  if (it.picUrl) URL.revokeObjectURL(it.picUrl);
+  if (it.opfsName) opfsBorrar(it.opfsName);
+  state.list.splice(i,1);
+  renderList();
+  updateStats();
+  actualizarRestaurar();
+  guardarBiblioteca();
+}
+/* Quita varias pistas de una vez (cabeceras de grupo): una sola pasada,
+   un solo repintado y un solo guardado. */
+function removeItems(arr){
+  const ids = new Set(arr.map(i=> i.id));
+  const actual = state.list[state.cur];
+  if (actual && ids.has(actual.id)){ stop(); state.cur = -1; }
+  state.list = state.list.filter(it=>{
+    if (!ids.has(it.id)) return true;
+    if (it.url) URL.revokeObjectURL(it.url);
+    if (it.picUrl) URL.revokeObjectURL(it.picUrl);
+    return false;
+  });
+  if (actual && !ids.has(actual.id)) state.cur = state.list.indexOf(actual);
+  compactarOrigenes();
+  opfsPodar();                 // libera el espacio de las copias que sobran
+  renderList(); updateStats(); actualizarRestaurar(); guardarBiblioteca();
+  toast(`${ids.size} pista${ids.size>1?"s quitadas":" quitada"} de la biblioteca`);
+}
+function clearList(){
+  stop();
+  state.list.forEach(it=>{ if (it.url) URL.revokeObjectURL(it.url); if (it.picUrl) URL.revokeObjectURL(it.picUrl); });
+  state.list = []; state.cur = -1; state.history = []; state.shufflePlayed = []; state.closedGroups = {};
+  borrarBiblioteca();          // vaciar significa vaciar también lo guardado
+  opfsPodar();                 // y liberar las copias del teléfono
+  renderList(); updateStats(); actualizarRestaurar();
+  setDisplay(null);
+}
+function rowFor(it){ return document.querySelector(`li[data-id="${it.id}"]`); }
+function touchRow(it){
+  const li = rowFor(it);
+  if (!li) return;
+  const d = li.querySelector(".dur");
+  if (d) d.textContent = it.dur ? fmtTime(it.dur) : "…";
+  li.classList.toggle("bad", !!it.bad);
+}
+function buildRow(it, num, inGroup){
+  const li = document.createElement("li");
+  li.dataset.id = it.id;
+  if (inGroup) li.classList.add("ingrp");
+  if (it === state.list[state.cur]) li.classList.add("cur");
+  if (it.bad) li.classList.add("bad");
+  if (it.pendiente) li.classList.add("pend");
+  li.innerHTML = `
+    <span class="idx"></span>
+    <span class="tt"><div class="t1"></div><div class="t2"></div></span>
+    <span class="dur">${it.dur ? fmtTime(it.dur) : "…"}</span>
+    <button class="rm" title="Quitar">✕</button>`;
+  li.querySelector(".idx").textContent = it === state.list[state.cur] ? "▶" : num;
+  li.querySelector(".t1").textContent = it.title || it.name;
+  const sub = it.bad ? "⚠ formato no soportado"
+            : it.pendiente ? "🔒 pendiente de permiso"
+            : state.view === "lista" ? [it.artist, it.album].filter(Boolean).join(" · ") || it.name
+            : state.view === "artista" ? (it.album || "")   // el artista ya es la cabecera
+            : (it.artist || "");
+  li.querySelector(".t2").textContent = sub;
+  if (!sub) li.querySelector(".t2").remove();
+  li.addEventListener("click", e=>{
+    if (e.target.classList.contains("rm")){ removeItem(it); return; }
+    playItem(it);
+  });
+  return li;
+}
+let renderBuscando = false;   // con búsqueda activa se ignora el plegado
+function buildGroupHeader(g){
+  const div = document.createElement("div");
+  const cerrado = !renderBuscando && state.closedGroups[g.key];
+  div.className = "grp" + (cerrado ? " closed" : "");
+  div.dataset.key = g.key;
+  const dur = g.items.reduce((a,b)=> a+(b.dur||0), 0);
+  const art = g.items.find(i=>i.picUrl);
+  const icon = state.view === "carpeta" ? "📁" : state.view === "artista" ? "👤" : "💿";
+  div.innerHTML = `
+    <span class="gchev">▾</span>
+    <span class="gart">${art ? `<img src="${art.picUrl}" alt="">` : icon}</span>
+    <span class="gtxt"><div class="g1"></div><div class="g2"></div></span>
+    <span class="gbtns">
+      <button class="gplay" title="Reproducir desde aquí">▶</button>
+      <button class="grm" title="Quitar de la biblioteca">✕</button>
+    </span>
+    <span class="gmeta">${g.items.length} · ${dur ? fmtTime(dur) : "…"}</span>`;
+  div.querySelector(".g1").textContent = g.label.l1;
+  div.querySelector(".g2").textContent = g.label.l2;
+  if (g.items.includes(state.list[state.cur])) div.classList.add("playing");
+  div.addEventListener("click", ()=>{
+    state.closedGroups[g.key] = !state.closedGroups[g.key];
+    renderList(); save();
+  });
+  div.querySelector(".gplay").addEventListener("click", e=>{
+    e.stopPropagation();
+    if (g.items.length) playItem(g.items[0]);
+  });
+  div.querySelector(".grm").addEventListener("click", e=>{
+    e.stopPropagation();
+    const n = g.items.length;
+    if (confirm(`¿Quitar ${n} pista${n>1?"s":""} de «${g.label.l1}» de la biblioteca?`))
+      removeItems(g.items);
+  });
+  return div;
+}
+function renderList(){
+  const ul = $("plList");
+  const scrollTop = $("plScroll").scrollTop;
+  ul.innerHTML = "";
+  const q = $("find").value.trim();
+  renderBuscando = !!q;
+  const groups = buildGroups();
+  const frag = document.createDocumentFragment();
+  let totalVis = 0, algunoAbierto = false;
+  groups.forEach(g=>{
+    if (g.label){
+      const h = buildGroupHeader(g);
+      const wrap = document.createElement("li");
+      wrap.style.cssText = "display:block;padding:0;border:none;cursor:default;";
+      wrap.appendChild(h);
+      frag.appendChild(wrap);
+      // Buscando, los resultados se muestran aunque su grupo esté plegado:
+      // nadie quiere abrir carpetas una a una para ver qué coincidió.
+      if (!renderBuscando && state.closedGroups[g.key]) return;
+      algunoAbierto = true;
+    }
+    g.items.forEach((it,i)=>{
+      totalVis++;
+      frag.appendChild(buildRow(it, g.label ? (it.track || i+1) : totalVis, !!g.label));
+    });
+  });
+  if (q && totalVis === 0 && state.list.length){
+    const li = document.createElement("li");
+    li.style.cssText = "display:block;padding:18px;text-align:center;color:var(--mut);cursor:default;";
+    li.textContent = `Nada coincide con «${q}»`;
+    frag.appendChild(li);
+  }
+  ul.appendChild(frag);
+  $("plEmpty").style.display = state.list.length ? "none" : "flex";
+  $("plScroll").style.display = state.list.length ? "" : "none";
+  $("plScroll").scrollTop = scrollTop;
+  // El botón ⇕ dice lo que hará: plegar si hay algo abierto, desplegar si no
+  const lf = document.querySelector("#bFold .lbl-fold");
+  if (lf) lf.textContent = algunoAbierto ? " Plegar" : " Desplegar";
+  $("bFold").title = algunoAbierto ? "Plegar todos los grupos" : "Desplegar todos los grupos";
+}
+function refreshGroupStats(){
+  buildGroups().forEach(g=>{
+    if (!g.label) return;
+    const el = document.querySelector(`.grp[data-key="${CSS.escape(g.key)}"] .gmeta`);
+    if (!el) return;
+    const dur = g.items.reduce((a,b)=> a+(b.dur||0), 0);
+    el.textContent = `${g.items.length} · ${dur ? fmtTime(dur) : "…"}`;
+  });
+}
+function updateStats(){
+  const st = $("plStats");
+  if (!state.list.length){ st.style.display = "none"; return; }
+  st.style.display = "flex";
+  const tot = state.list.reduce((a,b)=> a+(b.dur||0), 0);
+  const albums = new Set(state.list.map(i=> i.album || "?")).size;
+  const artistas = new Set(state.list.map(i=> i.albumArtist || i.artist).filter(Boolean)).size;
+  st.innerHTML = `<span>${state.list.length} pistas</span><span>${albums} álbumes</span>` +
+                 (artistas ? `<span>${artistas} artistas</span>` : "") +
+                 (tot ? `<span>${fmtLong(tot)} en total</span>` : "") +
+                 (libFallo ? `<span style="color:var(--amber)">⚠ no pude guardar la biblioteca</span>` : "") +
+                 (MODO_COPIA ? `<span id="espacioUsado"></span>` : "");
+  if (MODO_COPIA) opfsEspacio().then(e=>{
+    const el = $("espacioUsado");
+    if (el && e && e.total) el.textContent = `${fmtMB(e.usado)} de ${fmtMB(e.total)} usados`;
+  });
+}
+
+/* ================= Almacén para móvil (OPFS) =================
+   En el teléfono no existe la File System Access API, así que no se pueden
+   guardar "permisos de carpeta". La alternativa es OPFS: un almacén privado del
+   navegador donde la música se COPIA una vez y queda para siempre. Cambia el
+   modelo (copia en vez de referencia) pero a cambio no vuelve a pedir permisos.
+   En escritorio se sigue usando la vía de handles, que no duplica archivos. */
+const SOPORTA_HANDLES = typeof window.showDirectoryPicker === "function";
+const SOPORTA_OPFS = !!(navigator.storage && navigator.storage.getDirectory);
+const MODO_COPIA = !SOPORTA_HANDLES && SOPORTA_OPFS;   // el caso del móvil
+
+async function opfsDir(){
+  const raiz = await navigator.storage.getDirectory();
+  return await raiz.getDirectoryHandle("musica", {create:true});
+}
+/* Nombres planos (t0001.mp3): evita recrear árboles de carpetas en OPFS.
+   La ruta real del usuario se conserva aparte, en los metadatos. */
+let opfsContador = 0;
+async function opfsGuardar(file){
+  const dir = await opfsDir();
+  const ext = (file.name.match(/\.[^.]+$/) || [""])[0].toLowerCase();
+  const nombre = "t" + String(++opfsContador).padStart(5,"0") + "_" + Date.now().toString(36) + ext;
+  const fh = await dir.getFileHandle(nombre, {create:true});
+  const w = await fh.createWritable();
+  await w.write(file);
+  await w.close();
+  return nombre;
+}
+async function opfsObtener(nombre){
+  try{
+    const dir = await opfsDir();
+    const fh = await dir.getFileHandle(nombre);
+    return await fh.getFile();
+  }catch(e){ return null; }
+}
+async function opfsBorrar(nombre){
+  try{ (await opfsDir()).removeEntry(nombre); }catch(e){}
+}
+/* Limpia copias que ya no referencia ninguna pista (al quitar canciones). */
+async function opfsPodar(){
+  if (!MODO_COPIA) return;
+  try{
+    const dir = await opfsDir();
+    const usados = new Set(state.list.map(it=> it.opfsName).filter(Boolean));
+    for await (const [nombre] of dir.entries())
+      if (!usados.has(nombre)) await dir.removeEntry(nombre).catch(()=>{});
+  }catch(e){}
+}
+async function opfsEspacio(){
+  try{
+    const e = await navigator.storage.estimate();
+    return {usado: e.usage||0, total: e.quota||0};
+  }catch(err){ return null; }
+}
+/* Copia a OPFS los archivos elegidos y los añade a la biblioteca. */
+async function importarACopia(files){
+  const buenos = [...files].filter(f => AUDIO_RE.test(f.name) || (f.type||"").startsWith("audio"));
+  if (!buenos.length){ toast("No encontré archivos de audio compatibles", true); return; }
+  const esp = await opfsEspacio();
+  const pesoTotal = buenos.reduce((a,f)=> a+f.size, 0);
+  if (esp && esp.total && esp.usado + pesoTotal > esp.total * 0.92){
+    toast(`No cabe: necesitas ${fmtMB(pesoTotal)} y quedan ${fmtMB(esp.total-esp.usado)}`, true);
+    return;
+  }
+  const listos = [];
+  let n = 0;
+  for (const f of buenos){
+    try{
+      const nombre = await opfsGuardar(f);
+      f._opfsName = nombre;
+      listos.push(f);
+    }catch(e){
+      toast("Se llenó el almacenamiento al copiar", true);
+      break;
+    }
+    if (++n % 10 === 0 || n === buenos.length)
+      $("prTxt") && mostrarProgresoCopia(n, buenos.length);
+  }
+  ocultarProgresoCopia();
+  if (listos.length) await addFiles(listos);
+}
+function fmtMB(b){
+  if (b > 1024*1024*1024) return (b/1024/1024/1024).toFixed(1) + " GB";
+  return Math.round(b/1024/1024) + " MB";
+}
+function mostrarProgresoCopia(hechos, total){
+  const barra = $("plRestaurar");
+  barra.style.display = "flex";
+  barra.dataset.copiando = "1";
+  $("prTxt").innerHTML = `Copiando al teléfono… <b>${hechos}/${total}</b>`;
+  $("bAdoptar").style.display = "none";
+  $("bRestaurar").style.display = "none";
+  $("bOlvidar").style.display = "none";
+}
+function ocultarProgresoCopia(){
+  const barra = $("plRestaurar");
+  delete barra.dataset.copiando;
+  $("bAdoptar").style.display = "";
+  $("bRestaurar").style.display = "";
+  $("bOlvidar").style.display = "";
+  actualizarRestaurar();
+}
+
+/* ================= Biblioteca persistente =================
+   El navegador no puede recordar rutas de archivos por seguridad, pero sí puede
+   guardar "handles" (permisos de acceso concedidos) en IndexedDB. Guardamos los
+   handles y los metadatos —no los archivos, que ocuparían gigas—, de modo que al
+   abrir se ve la lista al instante y basta un clic para volver a tener acceso. */
+const LIB_DB = "ondaamp.lib.v1", LIB_STORE = "kv";
+let libRoots = [];   // orígenes: carpetas o archivos sueltos elegidos por el usuario
+
+function libOpen(){
+  return new Promise((res,rej)=>{
+    const r = indexedDB.open(LIB_DB, 1);
+    r.onupgradeneeded = ()=> r.result.createObjectStore(LIB_STORE);
+    r.onsuccess = ()=> res(r.result);
+    r.onerror = ()=> rej(r.error);
+  });
+}
+async function libSet(k,v){
+  const d = await libOpen();
+  return new Promise((res,rej)=>{
+    const t = d.transaction(LIB_STORE,"readwrite");
+    t.objectStore(LIB_STORE).put(v,k);
+    t.oncomplete = ()=>{ d.close(); res(); };
+    t.onerror = ()=>{ d.close(); rej(t.error); };
+  });
+}
+async function libGet(k){
+  const d = await libOpen();
+  return new Promise((res,rej)=>{
+    const q = d.transaction(LIB_STORE).objectStore(LIB_STORE).get(k);
+    q.onsuccess = ()=>{ d.close(); res(q.result); };
+    q.onerror = ()=>{ d.close(); rej(q.error); };
+  });
+}
+
+let libT = 0;
+function guardarBiblioteca(){
+  clearTimeout(libT);
+  libT = setTimeout(hacerGuardado, 900);
+}
+let libFallo = false;
+let libArt = {};      // espejo en memoria de las carátulas guardadas (artKey -> Blob)
+async function hacerGuardado(){
+  if (!window.indexedDB) return false;
+  try{
+    const pistas = state.list.map(it=>({
+      name:it.name, relPath:it.relPath||it.name, rootIdx:it.rootIdx ?? -1,
+      title:it.title, artist:it.artist, albumArtist:it.albumArtist, album:it.album,
+      year:it.year, track:it.track, disc:it.disc, dur:it.dur, sr:it.sr, bits:it.bits,
+      folder:it.folder, artKey:it.artKey||"", opfsName:it.opfsName||"",
+    }));
+    // Las carátulas se guardan una vez por álbum, no una por pista. Se acumulan
+    // en libArt en vez de reconstruirse desde cero: si se rehiciera cada vez,
+    // una sesión restaurada (donde it.pic viene vacío) las borraría todas.
+    state.list.forEach(it=>{ if (it.pic && it.artKey) libArt[it.artKey] = it.pic; });
+    const usadas = new Set(state.list.map(it=> it.artKey).filter(Boolean));
+    const art = {};
+    usadas.forEach(k=>{ if (libArt[k]) art[k] = libArt[k]; });   // poda las que ya no se usan
+    libArt = art;
+    // Los orígenes van primero: si fallaran, no queremos dejar pistas apuntando
+    // a permisos que ya no existen.
+    await libSet("roots", libRoots.map(r=>({kind:r.kind, handle:r.handle, nombre:r.nombre})));
+    await libSet("tracks", pistas);
+    await libSet("art", art);
+    if (libFallo){ libFallo = false; updateStats(); }
+    return true;
+  }catch(e){
+    // Cuota llena, modo incógnito o handle no clonable: sin persistencia, pero
+    // el usuario debe enterarse en vez de descubrirlo al reabrir.
+    if (!libFallo){ libFallo = true; updateStats(); }
+    return false;
+  }
+}
+async function borrarBiblioteca(){
+  libRoots = []; libArt = {};
+  try{ await libSet("roots", []); await libSet("tracks", []); await libSet("art", {}); }catch(e){}
+}
+async function cargarBiblioteca(){
+  if (!window.indexedDB) return;
+  let roots, pistas, art;
+  try{
+    roots  = (await libGet("roots"))  || [];
+    pistas = (await libGet("tracks")) || [];
+    art    = (await libGet("art"))    || {};
+  }catch(e){ return; }
+  if (!pistas.length) return;
+  libRoots = roots;
+  libArt = art || {};          // ceba el espejo para no perderlas al reguardar
+  const urls = {};
+  for (const k of Object.keys(art)){
+    try{ urls[k] = URL.createObjectURL(art[k]); }catch(e){}
+  }
+  // Se reconstruye la lista visible al momento; los archivos llegan tras el permiso.
+  state.list = pistas.map(p=>({
+    id: nextId++, file:null, url:"", pendiente:true, bad:false, metaReady:true,
+    name:p.name, relPath:p.relPath, rootIdx:p.rootIdx, folder:p.folder||"",
+    title:p.title||"", artist:p.artist||"", albumArtist:p.albumArtist||"",
+    album:p.album||"", year:p.year||"", track:p.track||0, disc:p.disc||0,
+    dur:p.dur||0, sr:p.sr||0, bits:p.bits||0,
+    // Se conserva el Blob, no solo la URL: sin él, el siguiente guardado
+    // creería que esta pista no tiene carátula y la borraría del almacén.
+    artKey:p.artKey||"", picUrl: urls[p.artKey] || "", pic: art[p.artKey] || null,
+    opfsName: p.opfsName || "",
+  }));
+  state.cur = -1;
+  renderList(); updateStats(); actualizarRestaurar();
+  // En el móvil los archivos son copias propias: se abren sin pedir permiso.
+  if (MODO_COPIA) engancharDesdeCopia();
+}
+/* Recupera los archivos desde OPFS. No hay diálogos ni permisos: la música ya
+   es nuestra, así que al abrir la app la biblioteca queda lista de inmediato. */
+async function engancharDesdeCopia(){
+  let ok = 0, perdidas = 0;
+  const maxContador = state.list.reduce((m,it)=>{
+    const n = parseInt((it.opfsName||"").slice(1,6), 10);
+    return isNaN(n) ? m : Math.max(m, n);
+  }, 0);
+  opfsContador = Math.max(opfsContador, maxContador);
+  for (const it of state.list){
+    if (!it.pendiente || !it.opfsName) continue;
+    const f = await opfsObtener(it.opfsName);
+    if (f){
+      it.file = f;
+      it.url = URL.createObjectURL(f);
+      it.pendiente = false;
+      if (!it.dur) queueDur(it);
+      ok++;
+    } else perdidas++;
+  }
+  renderList(); updateStats(); actualizarRestaurar();
+  if (ok) recuperarCaratulas();
+  if (perdidas) toast(`${perdidas} pista${perdidas>1?"s":""} sin archivo guardado`, true);
+}
+/* Relee las etiquetas de las pistas que ya tienen archivo pero se quedaron sin
+   carátula. Sirve para recuperar las que se hubieran perdido: la portada está
+   dentro del propio archivo de audio, así que siempre se puede volver a sacar. */
+let recuperando = false;
+async function recuperarCaratulas(){
+  if (recuperando) return;
+  const faltan = state.list.filter(it=> !it.pendiente && it.file && !it.picUrl);
+  if (!faltan.length) return;
+  recuperando = true;
+  let n = 0, ok = 0;
+  for (const it of faltan){
+    try{
+      await readMeta(it);
+      if (it.picUrl) ok++;
+    }catch(e){}
+    if (++n % 20 === 0) renderList();
+  }
+  recuperando = false;
+  renderList(); updateStats(); guardarBiblioteca();
+  if (ok) toast(`${ok} carátula${ok>1?"s recuperadas":" recuperada"}`);
+}
+function pendientes(){ return state.list.filter(it=> it.pendiente).length; }
+/* Cuántos diálogos de permiso haría falta aceptar con los orígenes actuales:
+   una carpeta cubre todo su contenido, pero cada archivo suelto pide el suyo. */
+function origenesPendientes(){
+  const idx = new Set(state.list.filter(it=> it.pendiente).map(it=> it.rootIdx));
+  return libRoots.filter((r,i)=> idx.has(i));
+}
+function actualizarRestaurar(){
+  const n = pendientes(), barra = $("plRestaurar");
+  if (barra.dataset.copiando) return;          // hay una importación en curso
+  if (!n){ barra.style.display = "none"; return; }
+  if (MODO_COPIA){
+    // En el móvil la música es una copia propia: si algo queda pendiente es que
+    // la copia se borró, no que falte un permiso. Pedirlo no arreglaría nada.
+    barra.style.display = "flex";
+    $("prTxt").innerHTML = `<b>${n}</b> ${n===1?"pista":"pistas"} sin archivo guardado. ` +
+      `Vuelve a añadirla${n===1?"":"s"} con ➕ o 📁, o quítala${n===1?"":"s"} de la lista.`;
+    $("bAdoptar").style.display = "none";
+    $("bRestaurar").style.display = "none";
+    $("bOlvidar").style.display = "";
+    return;
+  }
+  $("bAdoptar").style.display = "";
+  $("bRestaurar").style.display = "";
+  barra.style.display = "flex";
+  const orig = origenesPendientes();
+  const sueltos = orig.filter(r=> r.kind === "file").length;
+  let msg = `<b>${n}</b> ${n===1?"pista guardada":"pistas guardadas"} de tu sesión anterior. `;
+  if (sueltos > 3){
+    // Pedir permiso archivo por archivo sería insufrible: se guía a la carpeta.
+    msg += `Se añadieron como archivos sueltos, así que el permiso <b>iría de una en una</b>. ` +
+           `Elige la carpeta donde están y bastará <b>un solo permiso</b>.`;
+    $("bAdoptar").classList.add("on");
+    $("bRestaurar").classList.remove("on");
+  } else {
+    msg += `Hace falta confirmar el acceso otra vez (${orig.length} ${orig.length===1?"permiso":"permisos"}).`;
+    $("bRestaurar").classList.add("on");
+    $("bAdoptar").classList.remove("on");
+  }
+  $("prTxt").innerHTML = msg;
+}
+/* Quita orígenes que ya no usa ninguna pista y renumera los índices. */
+function compactarOrigenes(){
+  const usados = new Set(state.list.map(it=> it.rootIdx).filter(i=> i >= 0));
+  const mapa = new Map(), nuevos = [];
+  libRoots.forEach((r,i)=>{
+    if (!usados.has(i)) return;
+    mapa.set(i, nuevos.push(r) - 1);
+  });
+  state.list.forEach(it=>{ if (mapa.has(it.rootIdx)) it.rootIdx = mapa.get(it.rootIdx); });
+  libRoots = nuevos;
+}
+/* Adopta una carpeta como origen único: busca dentro las pistas pendientes y
+   las vuelve a enlazar. Convierte N permisos sueltos en uno solo, para siempre. */
+async function adoptarCarpeta(){
+  if (!window.showDirectoryPicker){ toast("Tu navegador no admite esto", true); return; }
+  let dir;
+  try{ dir = await showDirectoryPicker({mode:"read"}); }catch(e){ return; }
+  toast("Explorando la carpeta…");
+  const hallados = [];
+  await recorrerDir(dir, dir.name, hallados, -1);
+  if (!hallados.length){ toast("No encontré audio en esa carpeta", true); return; }
+
+  const porNombre = new Map();
+  hallados.forEach(f=>{
+    const k = f.name.toLowerCase();
+    if (!porNombre.has(k)) porNombre.set(k, []);
+    porNombre.get(k).push(f);
+  });
+  const idx = libRoots.push({kind:"directory", handle:dir, nombre:dir.name}) - 1;
+  let ok = 0;
+  state.list.forEach(it=>{
+    if (!it.pendiente) return;
+    const cand = porNombre.get((it.name||"").toLowerCase());
+    if (!cand || !cand.length) return;
+    // Si hay varios homónimos, se prefiere el que comparta también carpeta padre.
+    let f = cand[0];
+    if (cand.length > 1){
+      const cola = (it.relPath||"").split("/").slice(-2).join("/").toLowerCase();
+      f = cand.find(c=> c._relPath.toLowerCase().endsWith(cola)) || cand[0];
+    }
+    it.file = f;
+    it.url = URL.createObjectURL(f);
+    it.relPath = f._relPath;
+    it.rootIdx = idx;
+    it.pendiente = false;
+    if (!it.dur) queueDur(it);
+    ok++;
+  });
+  compactarOrigenes();
+  renderList(); updateStats(); actualizarRestaurar(); guardarBiblioteca();
+  recuperarCaratulas();
+  const quedan = pendientes();
+  if (ok) toast(`${ok} ${ok===1?"pista enlazada":"pistas enlazadas"}` +
+                (quedan ? ` · ${quedan} sin encontrar` : "") +
+                ` · desde ahora, un solo permiso`);
+  else toast("No encontré esas canciones ahí. ¿Es la carpeta correcta?", true);
+}
+/* Pide permiso sobre los orígenes guardados y vuelve a enlazar cada archivo.
+   Debe llamarse desde un clic: el navegador exige gesto del usuario. */
+async function restaurarAcceso(){
+  if (!libRoots.length){ toast("No hay orígenes guardados", true); return false; }
+  const archivos = new Map();
+  let denegados = 0;
+  for (let i=0;i<libRoots.length;i++){
+    const r = libRoots[i];
+    if (!r || !r.handle) continue;
+    try{
+      let p = await r.handle.queryPermission({mode:"read"});
+      if (p !== "granted") p = await r.handle.requestPermission({mode:"read"});
+      if (p !== "granted"){ denegados++; continue; }
+      if (r.kind === "file"){
+        const f = await r.handle.getFile();
+        archivos.set(i + "|" + (r.nombre || f.name), f);
+      } else {
+        const out = [];
+        await recorrerDir(r.handle, r.nombre, out, i);
+        out.forEach(f=> archivos.set(i + "|" + f._relPath, f));
+      }
+    }catch(e){ denegados++; }
+  }
+  let ok = 0, perdidas = 0;
+  state.list.forEach(it=>{
+    if (!it.pendiente) return;
+    const f = archivos.get(it.rootIdx + "|" + it.relPath);
+    if (f){
+      it.file = f;
+      it.url = URL.createObjectURL(f);
+      it.pendiente = false;
+      if (!it.dur) queueDur(it);
+      ok++;
+    } else perdidas++;
+  });
+  renderList(); updateStats(); actualizarRestaurar();
+  recuperarCaratulas();
+  if (ok) toast(`${ok} ${ok===1?"pista recuperada":"pistas recuperadas"}` +
+                (perdidas ? ` · ${perdidas} ya no ${perdidas===1?"está":"están"} en su sitio` : ""));
+  else if (denegados) toast("Permiso denegado: no puedo leer los archivos", true);
+  else toast("Los archivos ya no están donde estaban", true);
+  return ok > 0;
+}
+/* Recorre una carpeta concedida por el usuario y recoge los archivos de audio. */
+async function recorrerDir(dir, prefijo, out, rootIdx, prof){
+  prof = prof || 0;
+  if (prof > 8) return;                      // cortafuegos ante jerarquías absurdas
+  for await (const [nombre, h] of dir.entries()){
+    const p = prefijo ? prefijo + "/" + nombre : nombre;
+    if (h.kind === "file"){
+      if (!AUDIO_RE.test(nombre)) continue;
+      try{
+        const f = await h.getFile();
+        f._relPath = p; f._rootIdx = rootIdx;
+        out.push(f);
+      }catch(e){}
+    } else {
+      await recorrerDir(h, p, out, rootIdx, prof+1);
+    }
+  }
+}
+async function elegirArchivos(){
+  if (MODO_COPIA){ $("fileIn").click(); return; }   // móvil: se copia a OPFS
+  if (!window.showOpenFilePicker){ $("fileIn").click(); return; }
+  let handles;
+  try{
+    handles = await showOpenFilePicker({ multiple:true, types:[{
+      description:"Audio",
+      accept:{"audio/*":[".mp3",".flac",".wav",".ogg",".oga",".opus",".m4a",".aac",".weba",".webm"]},
+    }]});
+  }catch(e){ return; }                       // el usuario canceló
+  const files = [];
+  for (const h of handles){
+    const idx = libRoots.push({kind:"file", handle:h, nombre:h.name}) - 1;
+    try{
+      const f = await h.getFile();
+      f._relPath = h.name; f._rootIdx = idx;
+      files.push(f);
+    }catch(e){}
+  }
+  if (files.length) addFiles(files);
+  // Cada archivo suelto guarda su propio permiso: con muchos, reabrir sería
+  // una ráfaga de diálogos. Mejor avisar aquí que sufrirlo en la próxima sesión.
+  if (files.length > 5)
+    toast("Consejo: añade la carpeta (📁) en vez de archivos sueltos y bastará un permiso al reabrir");
+}
+async function elegirCarpeta(){
+  if (MODO_COPIA){ $("dirIn").click(); return; }    // móvil: se copia a OPFS
+  if (!window.showDirectoryPicker){ $("dirIn").click(); return; }
+  let dir;
+  try{ dir = await showDirectoryPicker(); }catch(e){ return; }
+  const idx = libRoots.push({kind:"directory", handle:dir, nombre:dir.name}) - 1;
+  const files = [];
+  toast("Explorando la carpeta…");
+  await recorrerDir(dir, dir.name, files, idx);
+  if (state.view === "lista"){ state.view = "carpeta"; reflectViews(); }
+  if (files.length) addFiles(files);
+  else toast("No encontré audio en esa carpeta", true);
+}
+
+/* Permiso para UN solo origen: el de la pista en la que se hizo clic. Evita
+   soltar una ráfaga de diálogos cuando la biblioteca son archivos sueltos. */
+async function restaurarUno(it){
+  const r = libRoots[it.rootIdx];
+  if (!r || !r.handle) return false;
+  try{
+    let p = await r.handle.queryPermission({mode:"read"});
+    if (p !== "granted") p = await r.handle.requestPermission({mode:"read"});
+    if (p !== "granted") return false;
+    if (r.kind === "file"){
+      const f = await r.handle.getFile();
+      it.file = f; it.url = URL.createObjectURL(f); it.pendiente = false;
+      if (!it.dur) queueDur(it);
+    } else {
+      // Una carpeta concedida sirve para todas sus pistas: se enlazan todas.
+      const out = [];
+      await recorrerDir(r.handle, r.nombre, out, it.rootIdx);
+      const mapa = new Map(out.map(f=> [f._relPath, f]));
+      state.list.forEach(x=>{
+        if (!x.pendiente || x.rootIdx !== it.rootIdx) return;
+        const f = mapa.get(x.relPath);
+        if (f){ x.file = f; x.url = URL.createObjectURL(f); x.pendiente = false; if (!x.dur) queueDur(x); }
+      });
+    }
+    renderList(); updateStats(); actualizarRestaurar();
+    recuperarCaratulas();
+    return !it.pendiente;
+  }catch(e){ return false; }
+}
+
+$("bAdoptar").addEventListener("click", adoptarCarpeta);
+$("bRestaurar").addEventListener("click", ()=>{
+  const sueltos = origenesPendientes().filter(r=> r.kind === "file").length;
+  if (sueltos > 8 && !confirm(
+      `Tendrás que aceptar ${sueltos} diálogos, uno por archivo.\n\n` +
+      `Es mucho más cómodo pulsar «Dar permiso a la carpeta»: un solo permiso ` +
+      `sirve para todas.\n\n¿Continuar de todos modos?`)) return;
+  restaurarAcceso();
+});
+$("bOlvidar").addEventListener("click", async ()=>{
+  await borrarBiblioteca();
+  clearList();
+  toast("Biblioteca guardada borrada");
+});
+
+/* ================= Reproducción ================= */
+async function playItem(it){ return playIndex(state.list.indexOf(it)); }
+async function playIndex(i, rememberHistory=true){
+  let it = state.list[i];
+  if (!it) return;
+  // Pista restaurada de una sesión anterior: el clic sirve como gesto para
+  // pedir el permiso que el navegador exige antes de poder leer el archivo.
+  if (it.pendiente){
+    if (MODO_COPIA){
+      // Sin permisos de por medio: si falta, es que la copia se borró.
+      const f = it.opfsName ? await opfsObtener(it.opfsName) : null;
+      if (!f){ toast(`«${it.title||it.name}» ya no está guardada. Vuelve a añadirla.`, true); return; }
+      it.file = f; it.url = URL.createObjectURL(f); it.pendiente = false;
+      renderList(); actualizarRestaurar();
+    } else {
+      const idAntes = it.id;
+      if (!(await restaurarUno(it))) return;   // solo el origen de ESTA pista
+      it = state.list.find(x=> x.id === idAntes);
+      if (!it || it.pendiente) return;
+      i = state.list.indexOf(it);
+    }
+  }
+  ensureCtx();
+  try{ await ctx.resume(); }catch(e){}
+  stopDemo(true);
+  if (rememberHistory && state.cur !== i && state.cur >= 0){
+    const previous=state.list[state.cur];
+    if (previous) state.history.push(previous.id);
+  }
+  state.cur = i;
+  if (state.shuffle && !state.shufflePlayed.includes(it.id)) state.shufflePlayed.push(it.id);
+  audioEl.src = it.url;
+  try{
+    await audioEl.play();
+  }catch(e){
+    it.bad = true;
+    touchRow(it);
+    toast(`No pude reproducir “${it.title||it.name}”`, true);
+    return;
+  }
+  it.bad = false;
+  // Cada pista tiene su propio balance tonal: la medida no debe arrastrarse
+  // de una canción a la siguiente.
+  amReiniciar();
+  renderList();
+  setDisplay(it);
+  const li = rowFor(it);
+  if (li) li.scrollIntoView({block:"nearest"});
+}
+function togglePlay(){
+  if (demo){ stopDemo(); return; }
+  if (state.cur < 0){ const o = playOrder(); if (o.length) playItem(o[0]); return; }
+  ensureCtx();
+  ctx.resume();
+  if (audioEl.paused) audioEl.play().catch(()=>{});
+  else audioEl.pause();
+}
+function stop(){
+  audioEl.pause();
+  try{ audioEl.currentTime = 0; }catch(e){}
+  updatePlayUI();
+}
+function resetShuffleCycle(){
+  const cur=state.list[state.cur];
+  state.shufflePlayed=cur?[cur.id]:[];
+  state.history=[];
+}
+/* Navega en el orden que se ve en pantalla, no en el de carga */
+function pickNext(dir){
+  const order = playOrder();
+  if (!order.length) return null;
+  const cur = state.list[state.cur];
+  if (state.shuffle){
+    if (dir<0) return null;
+    let available=order.filter(it=>it!==cur && !state.shufflePlayed.includes(it.id));
+    if (!available.length){
+      if (state.repeat!=="all") return null;
+      state.shufflePlayed=cur?[cur.id]:[];
+      available=order.filter(it=>it!==cur);
+    }
+    if (!available.length) return state.repeat==="all" ? cur : null;
+    return available[Math.floor(Math.random()*available.length)];
+  }
+  const pos = order.indexOf(cur);
+  if (pos < 0) return order[0];
+  let n = pos + dir;
+  if (n >= order.length) return state.repeat==="all" ? order[0] : null;
+  if (n < 0) return state.repeat==="all" ? order[order.length-1] : order[0];
+  return order[n];
+}
+function next(){ const it = pickNext(1); if (it) playItem(it); else stop(); }
+function prevTrack(){
+  if (audioEl.currentTime > 3){ audioEl.currentTime = 0; return; }
+  if (state.shuffle){
+    while (state.history.length){
+      const previousId=state.history.pop();
+      const previousIndex=state.list.findIndex(it=>it.id===previousId);
+      if (previousIndex>=0){ playIndex(previousIndex,false); return; }
+    }
+    return;
+  }
+  const it = pickNext(-1);
+  if (it) playItem(it);
+}
+audioEl.addEventListener("ended", ()=>{
+  if (state.repeat==="one"){ audioEl.currentTime = 0; audioEl.play(); return; }
+  const it = pickNext(1);
+  if (it) playItem(it); else { updatePlayUI(); $("lcdState").textContent = "■ FIN DE LA LISTA"; }
+});
+audioEl.addEventListener("error", ()=>{
+  const it = state.list[state.cur];
+  if (it){ it.bad = true; touchRow(it); toast(`Formato no soportado: ${it.name}`, true); }
+});
+audioEl.addEventListener("play", updatePlayUI);
+audioEl.addEventListener("pause", updatePlayUI);
+audioEl.addEventListener("loadedmetadata", ()=>{
+  const it = state.list[state.cur];
+  if (it && (!it.dur || !isFinite(it.dur))){ it.dur = audioEl.duration; touchRow(it); refreshGroupStats(); updateStats(); }
+  if (it) refreshInfoLine(it);
+  $("tTot").textContent = fmtTime(audioEl.duration);
+});
+
+/* ================= UI: display / transporte ================= */
+const playIcoPlay = '<path d="M7 4l13 8-13 8z"/>';
+const playIcoPause = '<path d="M6 4h4v16H6zM14 4h4v16h-4z"/>';
+function updatePlayUI(){
+  const playing = (!audioEl.paused && state.cur>=0) || !!demo;
+  $("playIco").innerHTML = playing ? playIcoPause : playIcoPlay;
+  $("bPlay").classList.toggle("is-playing", playing);
+  $("bPlay").setAttribute("aria-pressed", String(playing));
+  $("lcdState").textContent = demo ? "▶ DEMO GROOVE" :
+    state.cur<0 ? "■ DETENIDO" :
+    audioEl.paused ? "⏸ PAUSA" : "▶ REPRODUCIENDO";
+  if ("mediaSession" in navigator)
+    navigator.mediaSession.playbackState = playing ? "playing" : "paused";
+}
+function setMarquee(text){
+  const el = $("lcdTitle");
+  el.style.animation = "none";
+  el.textContent = text;
+  requestAnimationFrame(()=>{
+    const box = el.parentElement;
+    if (el.scrollWidth > box.clientWidth){
+      el.textContent = text + "   ✦   " + text + "   ✦   ";
+      const dur = Math.max(8, text.length * .35);
+      el.style.animation = `marquee ${dur}s linear infinite`;
+    }
+  });
+}
+function refreshInfoLine(it){
+  const ext = it.name.split(".").pop().toUpperCase();
+  const kbps = it.file && (it.dur||audioEl.duration) ? Math.round(it.file.size*8/((it.dur||audioEl.duration)*1000)) : 0;
+  const parts = [ext];
+  if (kbps) parts.push(`~${kbps} kbps`);
+  if (it.sr) parts.push(`${(it.sr/1000).toString().replace(".",",")} kHz`);
+  if (it.bits) parts.push(`${it.bits}-bit`);
+  $("lcdInfo").innerHTML = parts.map(p=>`<b>${p}</b>`).join(" · ");
+}
+function setDisplay(it){
+  const cov = $("cover");
+  if (!it){
+    setMarquee("Bienvenido a OndaAmp · agrega música para empezar");
+    $("lcdInfo").textContent = "— kbps · — kHz";
+    $("lcdTime").textContent = "0:00";
+    $("tCur").textContent = "0:00"; $("tTot").textContent = "0:00";
+    $("seek").value = 0; paintRange($("seek"));
+    cov.innerHTML = "♫";
+    document.title = "OndaAmp — Reproductor local Hi-Fi";
+    updatePlayUI();
+    return;
+  }
+  const full = it.artist ? `${it.title} — ${it.artist}` : it.title;
+  setMarquee(it.album ? `${full}  ·  ${it.album}` : full);
+  refreshInfoLine(it);
+  cov.innerHTML = it.picUrl ? `<img src="${it.picUrl}" alt="">` : "♫";
+  document.title = `▶ ${full} · OndaAmp`;
+  if ("mediaSession" in navigator){
+    navigator.mediaSession.metadata = new MediaMetadata({
+      title: it.title || it.name, artist: it.artist || "", album: it.album || "",
+      artwork: it.picUrl ? [{src:it.picUrl, sizes:"512x512"}] : []
+    });
+  }
+  updatePlayUI();
+}
+
+let seeking = false;
+setInterval(()=>{
+  if (state.cur < 0 && !demo) return;
+  const cur = audioEl.currentTime, dur = audioEl.duration;
+  if (!seeking && isFinite(dur) && dur > 0){
+    $("seek").value = Math.round(cur/dur*1000);
+    paintRange($("seek"));
+  }
+  $("tCur").textContent = fmtTime(cur);
+  $("lcdTime").textContent = demo ? fmtTime((ctx?ctx.currentTime:0)) :
+    state.remaining && isFinite(dur) ? "-"+fmtTime(dur-cur) : fmtTime(cur);
+}, 250);
+
+$("seek").addEventListener("input", ()=>{ seeking = true; paintRange($("seek")); });
+$("seek").addEventListener("change", ()=>{
+  const dur = audioEl.duration;
+  if (isFinite(dur)) audioEl.currentTime = $("seek").value/1000*dur;
+  seeking = false;
+});
+$("lcdTime").addEventListener("click", ()=>{ state.remaining = !state.remaining; });
+
+$("bPlay").addEventListener("click", togglePlay);
+$("bStop").addEventListener("click", ()=>{ stopDemo(); stop(); });
+$("bNext").addEventListener("click", next);
+$("bPrev").addEventListener("click", prevTrack);
+function updateShuffleUI(){
+  const button=$("bShuf");
+  button.classList.toggle("on",state.shuffle);
+  button.setAttribute("aria-pressed",String(state.shuffle));
+  button.title=state.shuffle ? "Aleatorio activado" : "Aleatorio desactivado";
+}
+$("bShuf").addEventListener("click", ()=>{
+  state.shuffle = !state.shuffle;
+  resetShuffleCycle();
+  updateShuffleUI();
+  save();
+});
+const REP_ICONS = {off:"🔁", all:"🔁", one:"🔂"};
+$("bRep").addEventListener("click", ()=>{
+  state.repeat = state.repeat==="off" ? "all" : state.repeat==="all" ? "one" : "off";
+  const b = $("bRep");
+  b.textContent = REP_ICONS[state.repeat];
+  b.classList.toggle("on", state.repeat!=="off");
+  b.title = "Repetir: " + (state.repeat==="off"?"no":state.repeat==="all"?"toda la lista":"una pista");
+  save();
+});
+
+$("vol").addEventListener("input", e=>{
+  state.vol = +e.target.value;
+  $("volOut").textContent = state.vol + "%";
+  paintRange(e.target);
+  applyAllAudio(); save();
+});
+$("bal").addEventListener("input", e=>{
+  let v = +e.target.value;
+  if (Math.abs(v) < 8){ v = 0; e.target.value = 0; }
+  state.bal = v;
+  $("balOut").textContent = v===0 ? "C" : v<0 ? "I"+Math.abs(v) : "D"+v;
+  paintRange(e.target);
+  applyAllAudio(); save();
+});
+$("bal").addEventListener("dblclick", e=>{
+  e.target.value = 0; e.target.dispatchEvent(new Event("input"));
+});
+
+/* ================= EQ UI ================= */
+function buildEqUI(){
+  const wrap = $("eqSliders");
+  const mk = (label, idx, isPre)=>{
+    const div = document.createElement("div");
+    div.className = "band" + (isPre ? " pre" : "");
+    div.innerHTML = `
+      <span class="db">0</span>
+      <div class="vwrap"><input type="range" min="-12" max="12" step="0.5" value="0"></div>
+      <span class="hz">${label}</span>`;
+    const inp = div.querySelector("input");
+    inp.addEventListener("input", ()=>{
+      const v = +inp.value;
+      div.querySelector(".db").textContent = (v>0?"+":"") + v;
+      if (isPre) state.pre = v; else { state.eq[idx] = v; $("preset").value = "__custom"; }
+      paintRange(inp);
+      applyAllAudio(); save();
+    });
+    paintRange(inp);
+    return div;
+  };
+  wrap.appendChild(mk("PRE", -1, true));
+  const divd = document.createElement("div");
+  divd.className = "eq-divider";
+  wrap.appendChild(divd);
+  EQ_LABELS.forEach((l,i)=> wrap.appendChild(mk(l,i,false)));
+}
+function reflectEq(){
+  const bands = document.querySelectorAll("#eqSliders .band");
+  bands.forEach(b=>{
+    const inp = b.querySelector("input");
+    const isPre = b.classList.contains("pre");
+    const idx = isPre ? -1 : [...b.parentElement.querySelectorAll(".band:not(.pre)")].indexOf(b);
+    const v = isPre ? state.pre : state.eq[idx];
+    inp.value = v;
+    b.querySelector(".db").textContent = (v>0?"+":"") + v;
+    paintRange(inp);
+  });
+}
+function fillPresetSelect(){
+  const sel = $("preset");
+  sel.innerHTML = "";
+  const og1 = document.createElement("optgroup"); og1.label = "Presets";
+  Object.keys(PRESETS).forEach(name=>{
+    const o = document.createElement("option"); o.value = name; o.textContent = name;
+    og1.appendChild(o);
+  });
+  sel.appendChild(og1);
+  const names = Object.keys(state.customPresets);
+  if (names.length){
+    const og2 = document.createElement("optgroup"); og2.label = "Míos";
+    names.forEach(name=>{
+      const o = document.createElement("option"); o.value = "c:"+name; o.textContent = name;
+      og2.appendChild(o);
+    });
+    sel.appendChild(og2);
+  }
+  const oc = document.createElement("option");
+  oc.value = "__custom"; oc.textContent = "Personalizado"; oc.hidden = true;
+  sel.appendChild(oc);
+}
+$("preset").addEventListener("change", e=>{
+  const v = e.target.value;
+  const curve = v.startsWith("c:") ? state.customPresets[v.slice(2)] : PRESETS[v];
+  $("bDelPre").style.display = v.startsWith("c:") ? "" : "none";
+  if (!curve) return;
+  state.eq = curve.slice();
+  reflectEq(); applyAllAudio(); save();
+});
+$("bSavePre").addEventListener("click", ()=>{
+  const name = prompt("Nombre para tu preset:", "Mi sonido");
+  if (!name) return;
+  state.customPresets[name] = state.eq.slice();
+  fillPresetSelect();
+  $("preset").value = "c:"+name;
+  $("bDelPre").style.display = "";
+  toast(`Preset “${name}” guardado`);
+  save();
+});
+$("bDelPre").addEventListener("click", ()=>{
+  const v = $("preset").value;
+  if (!v.startsWith("c:")) return;
+  delete state.customPresets[v.slice(2)];
+  fillPresetSelect();
+  $("preset").value = "__custom";
+  $("bDelPre").style.display = "none";
+  save();
+});
+$("bFlat").addEventListener("click", ()=>{
+  state.eq = new Array(10).fill(0); state.pre = 0;
+  $("preset").value = "Plano";
+  reflectEq(); applyAllAudio(); save();
+});
+$("bEqOn").addEventListener("click", ()=>{
+  state.eqOn = !state.eqOn;
+  const b = $("bEqOn");
+  b.textContent = "EQ: " + (state.eqOn?"ON":"OFF");
+  b.classList.toggle("on", state.eqOn);
+  applyAllAudio(); save();
+});
+$("width").addEventListener("input", e=>{
+  state.width = +e.target.value;
+  $("widthOut").textContent = state.width + "%";
+  paintRange(e.target);
+  applyAllAudio(); save();
+});
+$("bNight").addEventListener("click", ()=>{
+  state.night = !state.night;
+  $("bNight").classList.toggle("on", state.night);
+  applyAllAudio(); save();
+  toast(state.night ? "Modo noche: dinámica comprimida" : "Modo noche desactivado");
+});
+
+/* Secciones plegables */
+document.querySelectorAll(".section-head").forEach(h=>{
+  h.addEventListener("click", ()=>{
+    $(h.dataset.toggle).classList.toggle("closed");
+    save();
+  });
+});
+
+/* ================= Auto-máster: igualación espectral =================
+   Mide el balance tonal real de la pista y lo acerca a una curva de referencia,
+   que es lo que hacen las herramientas de "mastering asistido". No hay red
+   neuronal ni modelo descargado: son medidas acústicas sobre la propia señal.
+
+   Las curvas son espectros promedio típicos de un buen máster (dB relativos por
+   banda), NO ecualizaciones. La corrección es la diferencia entre lo medido y
+   el objetivo, así que un disco ya bien masterizado apenas se toca. */
+const AM_OBJETIVOS = {
+  referencia:  [ -4,  0,  0, -2, -5,  -8, -11, -14, -19, -27],
+  clasica:     [-10, -5, -2, -2, -4,  -7, -10, -13, -18, -25],
+  electronica: [  0,  1,  0, -3, -7, -10, -12, -14, -18, -24],
+  rock:        [ -7, -2,  0, -2, -4,  -7,  -9, -11, -16, -24],
+  voz:         [-14, -8, -3, -1, -3,  -5,  -8, -12, -18, -26],
+  antigua:     [ -8, -3,  0, -2, -5,  -8, -10, -12, -16, -22],
+};
+const AM_NOMBRES = {
+  referencia:"Referencia general", clasica:"Clásica / acústica",
+  electronica:"Electrónica / hip-hop", rock:"Rock / pop", voz:"Voz / jazz íntimo",
+  antigua:"Grabación antigua",
+};
+/* Compensación de auriculares: rebaja el objetivo donde el auricular ya exagera,
+   de modo que la corrección lo recorte. Son perfiles genéricos por familia, no
+   medidas de un modelo concreto. */
+const AM_PHONES = {
+  none:   [0,0,0,0,0,0,0,0,0,0],
+  bassy:  [-7,-6,-3,-1, 0, 0, 1, 0,-2,-1],   // Bluetooth de consumo (tipo Sony XM)
+  inear:  [-3,-3,-2, 0, 0, 1, 1, 0,-1,-2],
+  laptop: [-12,-10,-6,-2, 0, 2, 2, 1, 0,-2], // altavoces diminutos: no malgastar graves
+};
+const AM_PHONE_NOMBRES = {
+  none:"Sin compensación", bassy:"Auriculares con graves realzados",
+  inear:"In-ear / intraurales", laptop:"Altavoces de portátil",
+};
+/* A volumen bajo el oído pierde graves y agudos (curvas de igual sonoridad). */
+const AM_LOUD = [8, 6, 4, 2, 0, 0, 0, 1, 3, 5];
+
+const am = {
+  medido: null,        // nivel medio por banda, en dB
+  crest: 0,            // factor de cresta: pistas dinámicas puntúan alto
+  caida: 0,            // cuánto caen los agudos respecto a los medios, en dB
+  ancho: 22050,        // frecuencia por encima de la cual ya no hay contenido
+  estilo: "referencia",
+  correccion: new Array(10).fill(0),
+  muestras: 0,
+  timer: 0,
+};
+let amBins = null, amTiempo = null, amBandas = null;
+
+function amPrepararBandas(){
+  const sr = ctx.sampleRate, n = amAnalyser.frequencyBinCount;
+  amBins = new Float32Array(n);
+  amTiempo = new Float32Array(amAnalyser.fftSize);
+  amBandas = EQ_FREQS.map((f,i)=>{
+    const inf = i === 0 ? f/Math.SQRT2 : Math.sqrt(f * EQ_FREQS[i-1]);
+    const sup = i === 9 ? Math.min(sr/2, f*Math.SQRT2) : Math.sqrt(f * EQ_FREQS[i+1]);
+    return [Math.max(1, Math.floor(inf/(sr/2)*n)), Math.max(2, Math.ceil(sup/(sr/2)*n))];
+  });
+}
+function amReiniciar(){
+  am.medido = null; am.muestras = 0; am.crest = 0; am.ancho = 22050; am.caida = 0;
+}
+/* Mide un instante y lo promedia con lo acumulado (media móvil ~10 s). */
+function amMedir(){
+  amAnalyser.getFloatFrequencyData(amBins);
+  const nivel = new Array(10);
+  for (let i=0;i<10;i++){
+    const [a,b] = amBandas[i];
+    let s = 0, n = 0;
+    for (let k=a; k<b && k<amBins.length; k++){ s += Math.max(amBins[k], -140); n++; }
+    nivel[i] = n ? s/n : -140;
+  }
+  // Silencio o casi: no contamina la medida
+  const pico = Math.max(...nivel);
+  if (pico < -85) return false;
+
+  if (!am.medido) am.medido = nivel.slice();
+  else {
+    const a = 0.06;
+    for (let i=0;i<10;i++) am.medido[i] = am.medido[i]*(1-a) + nivel[i]*a;
+  }
+  am.muestras++;
+
+  // Caída de agudos MEDIDA CONTRA LOS MEDIOS, no contra el pico. El espectro de
+  // la música cae de por sí unos 30 dB de graves a agudos, así que compararlo
+  // con el pico haría pasar por "antiguo" a cualquier tema con mucho bajo.
+  const med = am.medido;
+  const prom = (a,b)=>{ let s=0; for(let i=a;i<b;i++) s+=med[i]; return s/(b-a); };
+  const medios = prom(3,7);
+  am.caida = medios - prom(8,10);
+  let ancho = EQ_FREQS[0];
+  for (let i=9;i>=0;i--){ if (med[i] > medios - 26){ ancho = EQ_FREQS[i]; break; } }
+  am.ancho = ancho;
+
+  // Factor de cresta: mide dinámica. Lo comprimido puntúa bajo; lo clásico, alto.
+  amAnalyser.getFloatTimeDomainData(amTiempo);
+  let sum = 0, max = 0;
+  for (let i=0;i<amTiempo.length;i++){
+    const v = amTiempo[i]; sum += v*v;
+    const abs = v < 0 ? -v : v;
+    if (abs > max) max = abs;
+  }
+  const rms = Math.sqrt(sum/amTiempo.length);
+  if (rms > 1e-5){
+    const cr = 20*Math.log10(max/rms);
+    am.crest = am.crest ? am.crest*0.9 + cr*0.1 : cr;
+  }
+  return true;
+}
+/* Rasgos de la pista, medidos como DESVIACIÓN respecto a un máster típico.
+   En absoluto no sirven: todo espectro musical cae con la frecuencia, así que
+   cualquier tema parecería "grave-pesado". Comparando contra la referencia,
+   un cero significa "se comporta como un buen máster". */
+function amRasgos(){
+  const m = am.medido;
+  if (!m) return null;
+  const media = arr => arr.reduce((a,b)=>a+b,0)/arr.length;
+  const ref = AM_OBJETIVOS.referencia;
+  const mm = media(m), mr = media(ref);
+  const dev = m.map((v,i)=> (v-mm) - (ref[i]-mr));
+  return {
+    graves: media(dev.slice(0,3)),
+    medios: media(dev.slice(3,6)),
+    brillo: media(dev.slice(7)),
+    dev,
+  };
+}
+/* Clasifica por rasgos acústicos medibles. Reglas explícitas y auditables. */
+function amClasificar(){
+  const r = amRasgos();
+  if (!r) return "referencia";
+  if (am.caida > 32) return "antigua";           // agudos ausentes, no solo suaves
+  if (am.crest > 15) return "clasica";           // mucha dinámica sin comprimir
+  if (r.graves > 5) return "electronica";
+  if (r.medios > 3 && r.graves < 0) return "voz";
+  if (r.graves > 1.0) return "rock";
+  return "referencia";
+}
+function amCalcular(){
+  const m = am.medido;
+  if (!m) return new Array(10).fill(0);
+  const estilo = state.am.objetivo === "auto" ? amClasificar() : state.am.objetivo;
+  am.estilo = estilo;
+  const obj = AM_OBJETIVOS[estilo] || AM_OBJETIVOS.referencia;
+
+  // Comparamos FORMAS, no niveles: se quita la media de cada curva.
+  const media = arr => arr.reduce((a,b)=>a+b,0)/arr.length;
+  const mm = media(m), mo = media(obj);
+  const bruta = new Array(10);
+  for (let i=0;i<10;i++) bruta[i] = (obj[i]-mo) - (m[i]-mm);
+
+  // Suavizado entre bandas: evita correcciones en diente de sierra.
+  const suave = bruta.map((v,i,a)=>{
+    const p = a[i-1] ?? v, n = a[i+1] ?? v;
+    return (p + 2*v + n) / 4;
+  });
+
+  const k = state.am.fuerza/100 * 0.85;     // nunca corrige al 100 %: sonaría artificial
+  const phones = AM_PHONES[state.am.phones] || AM_PHONES.none;
+  const kLoud = state.am.loud ? Math.max(0, Math.min(1, (72 - state.vol)/72)) : 0;
+
+  return suave.map((v,i)=>{
+    const total = v*k + phones[i] + AM_LOUD[i]*kLoud;
+    return Math.max(-9, Math.min(9, total));
+  });
+}
+function amAplicar(){
+  if (!ctx || !autoFilters.length) return;
+  const activo = state.am.on;
+  const corr = activo ? amCalcular() : new Array(10).fill(0);
+  am.correccion = corr;
+  const t = ctx.currentTime;
+  // Constante lenta: los cambios de corrección deben ser imperceptibles.
+  autoFilters.forEach((f,i)=> f.gain.setTargetAtTime(corr[i], t, 0.5));
+  amPintar();
+}
+function amCiclo(){
+  if (!ctx || !amAnalyser || !state.am.on) return;
+  if (!amBandas) amPrepararBandas();
+  if (amMedir()) amAplicar();
+}
+
+/* ---- Interfaz del auto-máster ---- */
+function amConstruirGrafico(){
+  const g = $("amGraf");
+  if (g.children.length) return;
+  EQ_LABELS.forEach(l=>{
+    const d = document.createElement("div");
+    d.className = "am-b";
+    d.innerHTML = `<i></i><span>${l}</span>`;
+    g.appendChild(d);
+  });
+}
+function amPintar(){
+  amConstruirGrafico();
+  const barras = $("amGraf").children;
+  const corr = am.correccion;
+  for (let i=0;i<10;i++){
+    const b = barras[i], it = b.querySelector("i");
+    const v = corr[i] || 0;
+    const alto = Math.min(50, Math.abs(v)/9*50);   // ±9 dB llenan media altura
+    b.classList.toggle("neg", v < 0);
+    it.style.height = Math.max(1, alto) + "%";
+    if (v >= 0){ it.style.bottom = "50%"; it.style.top = "auto"; }
+    else { it.style.top = "50%"; it.style.bottom = "auto"; }
+    b.title = `${EQ_LABELS[i]} Hz: ${v>=0?"+":""}${v.toFixed(1)} dB`;
+  }
+  const e = $("amEstado");
+  if (!state.am.on){
+    e.textContent = "Apagado. Pulsa ON y reproduce algo para que analice la pista.";
+    return;
+  }
+  if (!am.medido || am.muestras < 6){
+    e.textContent = "Analizando la pista… (unos segundos de música)";
+    return;
+  }
+  const cambios = corr.filter(v=> Math.abs(v) >= 0.5).length;
+  const detectado = state.am.objetivo === "auto"
+    ? `detectado: <b>${AM_NOMBRES[am.estilo]}</b>`
+    : `referencia fija: <b>${AM_NOMBRES[state.am.objetivo]}</b>`;
+  const extra = [];
+  if (state.am.phones !== "none") extra.push(AM_PHONE_NOMBRES[state.am.phones]);
+  if (state.am.loud && state.vol < 72) extra.push("volumen bajo compensado");
+  e.innerHTML = `${detectado} · dinámica ${am.crest.toFixed(0)} dB · ` +
+    `agudos hasta ${am.ancho >= 1000 ? (am.ancho/1000)+" kHz" : am.ancho+" Hz"}<br>` +
+    `Corrigiendo <b>${cambios}</b> ${cambios===1?"banda":"bandas"}` +
+    (extra.length ? " · " + extra.join(" · ") : "");
+}
+function reflectAm(){
+  const on = state.am.on;
+  $("bAmOn").textContent = on ? "ON" : "OFF";
+  $("bAmOn").classList.toggle("on", on);
+  $("bMejora").classList.toggle("on", on);   // el botón grande refleja lo mismo
+  $("amObj").value = state.am.objetivo;
+  $("amFuerza").value = state.am.fuerza;
+  $("amFuerzaOut").textContent = state.am.fuerza + "%";
+  paintRange($("amFuerza"));
+  $("amPhones").value = state.am.phones;
+  $("bAmLoud").classList.toggle("on", state.am.loud);
+  amPintar();
+}
+$("bAmOn").addEventListener("click", ()=>{
+  state.am.on = !state.am.on;
+  ensureCtx();
+  if (state.am.on){ amReiniciar(); toast("Auto-máster activado: analizando…"); }
+  else toast("Auto-máster desactivado");
+  reflectAm(); amAplicar(); save();
+});
+$("amObj").addEventListener("change", e=>{
+  state.am.objetivo = e.target.value;
+  amAplicar(); save();
+});
+$("amFuerza").addEventListener("input", e=>{
+  state.am.fuerza = +e.target.value;
+  $("amFuerzaOut").textContent = state.am.fuerza + "%";
+  paintRange(e.target);
+  amAplicar(); save();
+});
+$("amPhones").addEventListener("change", e=>{
+  state.am.phones = e.target.value;
+  ensureCtx(); amAplicar(); save();
+});
+$("bAmLoud").addEventListener("click", ()=>{
+  state.am.loud = !state.am.loud;
+  $("bAmLoud").classList.toggle("on", state.am.loud);
+  ensureCtx(); amAplicar(); save();
+});
+$("bAmReset").addEventListener("click", ()=>{
+  amReiniciar(); amAplicar();
+  toast("Reanalizando desde cero");
+});
+/* ---- Botón ✨ Mejora: el único control que hace falta a diario ----
+   ON  = auto-máster con ajustes sensatos (se adapta solo a cada canción).
+   OFF = sonido fiel GARANTIZADO: apaga y aplana todo el procesamiento,
+         incluido lo que se hubiera tocado en los paneles avanzados. */
+function setMejora(on){
+  ensureCtx();
+  if (on){
+    state.am.on = true;
+    if (state.am.fuerza < 20) state.am.fuerza = 55;
+    if (!AM_OBJETIVOS[state.am.objetivo] && state.am.objetivo !== "auto") state.am.objetivo = "auto";
+    amReiniciar();
+    toast("✨ Mejora activada: analizando la canción…");
+  } else {
+    state.am.on = false;
+    state.eq = new Array(10).fill(0); state.pre = 0; state.eqOn = true;
+    state.width = 100; state.night = false;
+    Object.assign(state.fx, {nr:false, dc:false, rb:false, be:false, ex:false, xf:false});
+    $("preset").value = "Plano";
+    toast("Sonido fiel: sin ningún procesamiento");
+  }
+  reflectAllUI();
+  applyAllAudio();
+  amAplicar();
+  save();
+}
+$("bMejora").addEventListener("click", ()=> setMejora(!state.am.on));
+
+// Un análisis por medio segundo: suficiente para una media a largo plazo y
+// despreciable en CPU frente al procesado de audio.
+setInterval(amCiclo, 500);
+
+/* ================= Restauración y realce ================= */
+/* fila -> [clave de encendido, clave de cantidad, id del slider, id del output] */
+const FX_FILAS = {
+  fxNr: ["nr", "nrAmt", "nrAmt", "nrOut"],
+  fxDc: ["dc", "dcAmt", "dcAmt", "dcOut"],
+  fxRb: ["rb", null,    null,    null],
+  fxBe: ["be", "beAmt", "beAmt", "beOut"],
+  fxEx: ["ex", "exAmt", "exAmt", "exOut"],
+  fxXf: ["xf", "xfAmt", "xfAmt", "xfOut"],
+};
+function actualizarNotaFx(){
+  const n = $("fxNote");
+  if (!n) return;
+  if (dspEstado === "error" || dspEstado === "sin-soporte"){
+    n.classList.add("warn");
+    n.textContent = "⚠ Tu navegador no admite el procesador avanzado: el reductor de ruido y el quita-clics no funcionarán. El resto sí.";
+    return;
+  }
+  n.classList.remove("warn");
+  const fx = state.fx;
+  const act = ["nr","dc","rb","be","ex","xf"].filter(k=> fx[k]).length;
+  n.textContent = act
+    ? `${act} ${act===1?"efecto activo":"efectos activos"} · se aplican solo a lo que reproduce OndaAmp`
+    : "Los efectos se aplican solo a lo que reproduce OndaAmp.";
+}
+function reflectFx(){
+  Object.entries(FX_FILAS).forEach(([id,[on,amt,sid,oid]])=>{
+    const fila = $(id);
+    if (!fila) return;
+    const activo = !!state.fx[on];
+    fila.classList.toggle("on", activo);
+    const tog = fila.querySelector(".fx-tog");
+    if (tog) tog.textContent = activo ? "●" : "◯";
+    if (sid){
+      const s = $(sid);
+      s.value = state.fx[amt];
+      s.disabled = !activo;
+      $(oid).textContent = state.fx[amt] + "%";
+      paintRange(s);
+    }
+  });
+  actualizarNotaFx();
+}
+Object.entries(FX_FILAS).forEach(([id,[on,amt,sid,oid]])=>{
+  const fila = $(id);
+  if (!fila) return;
+  fila.querySelector(".fx-tog").addEventListener("click", ()=>{
+    state.fx[on] = !state.fx[on];
+    ensureCtx();
+    reflectFx(); applyAllAudio(); save();
+  });
+  if (!sid) return;
+  $(sid).addEventListener("input", e=>{
+    state.fx[amt] = +e.target.value;
+    $(oid).textContent = state.fx[amt] + "%";
+    paintRange(e.target);
+    applyAllAudio(); save();
+  });
+});
+$("bFxOld").addEventListener("click", ()=>{
+  const fx = state.fx;
+  // ¿Ya está puesto? Entonces el botón lo quita: sirve para comparar A/B.
+  const puesto = fx.nr && fx.dc && fx.rb && fx.ex;
+  ensureCtx();
+  if (puesto){
+    fx.nr = fx.dc = fx.rb = fx.ex = false;
+    toast("Restauración desactivada");
+  } else {
+    Object.assign(fx, {
+      nr:true, nrAmt:55, dc:true, dcAmt:50, rb:true,
+      ex:true, exAmt:45, be:false,
+    });
+    toast("Modo grabación antigua: ruido, clics, rumble y aire 🕰");
+  }
+  reflectFx(); applyAllAudio(); save();
+});
+
+/* ================= Vistas de biblioteca ================= */
+$("views").addEventListener("click", e=>{
+  const b = e.target.closest("button");
+  if (!b) return;
+  state.view = b.dataset.v;
+  reflectViews();
+  renderList();
+  save();
+});
+function reflectViews(){
+  document.querySelectorAll("#views button").forEach(b=>
+    b.classList.toggle("on", b.dataset.v === state.view));
+  $("bFold").style.display = state.view === "lista" ? "none" : "";
+}
+$("bFold").addEventListener("click", ()=>{
+  const groups = buildGroups();
+  const algunoAbierto = groups.some(g=> !state.closedGroups[g.key]);
+  groups.forEach(g=> state.closedGroups[g.key] = algunoAbierto);
+  renderList(); save();
+});
+
+/* ================= Visualizador ================= */
+const visCanvas = $("vis");
+const vctx = visCanvas.getContext("2d");
+let visBands = [], peaks = [], peakHold = [];
+const NBANDS = 26;
+function initVisBands(){
+  if (!analyser) return;
+  const sr = ctx.sampleRate, n = analyser.frequencyBinCount;
+  const fMin = 40, fMax = Math.min(17000, sr/2);
+  visBands = [];
+  for (let i=0;i<NBANDS;i++){
+    const f0 = fMin * Math.pow(fMax/fMin, i/NBANDS);
+    const f1 = fMin * Math.pow(fMax/fMin, (i+1)/NBANDS);
+    const b0 = Math.max(1, Math.floor(f0/(sr/2)*n));
+    const b1 = Math.max(b0+1, Math.ceil(f1/(sr/2)*n));
+    visBands.push([b0,b1]);
+  }
+  peaks = new Array(NBANDS).fill(0);
+  peakHold = new Array(NBANDS).fill(0);
+}
+function sizeCanvas(){
+  const dpr = window.devicePixelRatio || 1;
+  const w = visCanvas.clientWidth, h = visCanvas.clientHeight;
+  if (!w || !h) return;
+  if (visCanvas.width !== Math.round(w*dpr) || visCanvas.height !== Math.round(h*dpr)){
+    visCanvas.width = Math.round(w*dpr); visCanvas.height = Math.round(h*dpr);
+  }
+}
+const freqData = new Uint8Array(1024);
+const timeData = new Uint8Array(2048);
+function drawVis(){
+  requestAnimationFrame(drawVis);
+  sizeCanvas();
+  const W = visCanvas.width, H = visCanvas.height;
+  vctx.clearRect(0,0,W,H);
+  if (!analyser) return;
+  if (state.vis === "bars"){
+    analyser.getByteFrequencyData(freqData);
+    const gap = Math.max(1, W*0.004);
+    const bw = (W - gap*(NBANDS-1)) / NBANDS;
+    for (let i=0;i<NBANDS;i++){
+      const [b0,b1] = visBands[i] || [0,1];
+      let sum = 0;
+      for (let b=b0;b<b1;b++) sum += freqData[b];
+      let v = (sum/(b1-b0))/255;
+      v = Math.pow(v, 1.4);
+      const bh = v*(H-4);
+      const x = i*(bw+gap);
+      const seg = Math.max(3, H/16), segGap = Math.max(1, seg*0.28);
+      for (let y=0; y<bh; y+=seg){
+        const yy = H - y - seg + segGap;
+        const frac = y/H;
+        vctx.fillStyle = frac > .75 ? "#ffc857" : frac > .5 ? "#a8f06e" : "#38e08c";
+        vctx.globalAlpha = .95;
+        vctx.fillRect(x, yy, bw, seg-segGap);
+      }
+      vctx.globalAlpha = 1;
+      if (v >= peaks[i]){ peaks[i] = v; peakHold[i] = 22; }
+      else if (peakHold[i] > 0) peakHold[i]--;
+      else peaks[i] = Math.max(0, peaks[i] - 0.012);
+      if (peaks[i] > 0.01){
+        vctx.fillStyle = "#e6edf5";
+        vctx.fillRect(x, H - peaks[i]*(H-4) - 2, bw, 2);
+      }
+    }
+  } else {
+    analyser.getByteTimeDomainData(timeData);
+    vctx.strokeStyle = "#38e08c";
+    vctx.lineWidth = Math.max(1.5, H/40);
+    vctx.shadowColor = "rgba(56,224,140,.6)"; vctx.shadowBlur = 8;
+    vctx.beginPath();
+    const step = Math.ceil(timeData.length / W * 2);
+    for (let i=0, x=0; i<timeData.length; i+=step, x+=W/(timeData.length/step)){
+      const y = timeData[i]/255*H;
+      i===0 ? vctx.moveTo(x,y) : vctx.lineTo(x,y);
+    }
+    vctx.stroke();
+    vctx.shadowBlur = 0;
+  }
+}
+visCanvas.addEventListener("click", ()=>{
+  state.vis = state.vis==="bars" ? "osc" : "bars";
+  save();
+});
+drawVis();
+
+/* ================= Demo groove ================= */
+let demo = null;
+function makeNoise(){
+  if (noiseBuf) return noiseBuf;
+  noiseBuf = ctx.createBuffer(1, ctx.sampleRate*0.1, ctx.sampleRate);
+  const d = noiseBuf.getChannelData(0);
+  for (let i=0;i<d.length;i++) d[i] = Math.random()*2-1;
+  return noiseBuf;
+}
+function midiHz(n){ return 440*Math.pow(2,(n-69)/12); }
+function startDemo(){
+  ensureCtx();
+  ctx.resume();
+  audioEl.pause();
+  const bus = ctx.createGain(); bus.gain.value = 0.55;
+  // Entra por el mismo sitio que la música real (antes del análisis), para que
+  // el auto-máster y los efectos de restauración también actúen sobre el demo.
+  bus.connect(dspIn);
+  const bpm = 112, s16 = 60/bpm/4;
+  const bass = [45,45,48,45,43,43,50,52];
+  const arp  = [69,72,76,79,81,79,76,72,69,72,76,79,84,81,79,76];
+  let step = 0, nextT = ctx.currentTime + 0.06;
+  function kick(t){
+    const o = ctx.createOscillator(), g = ctx.createGain();
+    o.frequency.setValueAtTime(160,t);
+    o.frequency.exponentialRampToValueAtTime(45, t+0.12);
+    g.gain.setValueAtTime(1,t);
+    g.gain.exponentialRampToValueAtTime(0.001, t+0.3);
+    o.connect(g); g.connect(bus); o.start(t); o.stop(t+0.32);
+  }
+  function hat(t, vol){
+    const src = ctx.createBufferSource(); src.buffer = makeNoise();
+    const hp = ctx.createBiquadFilter(); hp.type = "highpass"; hp.frequency.value = 7500;
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(vol, t);
+    g.gain.exponentialRampToValueAtTime(0.001, t+0.05);
+    src.connect(hp); hp.connect(g); g.connect(bus); src.start(t); src.stop(t+0.06);
+  }
+  function bassN(f, t, dur){
+    const o = ctx.createOscillator(); o.type = "sawtooth"; o.frequency.value = f;
+    const lp = ctx.createBiquadFilter(); lp.type = "lowpass"; lp.frequency.value = 320; lp.Q.value = 2;
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.0001,t);
+    g.gain.exponentialRampToValueAtTime(0.32, t+0.01);
+    g.gain.exponentialRampToValueAtTime(0.001, t+dur);
+    o.connect(lp); lp.connect(g); g.connect(bus); o.start(t); o.stop(t+dur+0.05);
+  }
+  function pluck(f, t){
+    const o = ctx.createOscillator(); o.type = "triangle"; o.frequency.value = f;
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.0001,t);
+    g.gain.exponentialRampToValueAtTime(0.15, t+0.005);
+    g.gain.exponentialRampToValueAtTime(0.001, t+0.22);
+    o.connect(g); g.connect(bus); o.start(t); o.stop(t+0.25);
+  }
+  const timer = setInterval(()=>{
+    while (nextT < ctx.currentTime + 0.15){
+      const s = step % 16;
+      if (s % 4 === 0) kick(nextT);
+      hat(nextT, s % 2 === 1 ? 0.10 : 0.22);
+      if (s % 2 === 0) bassN(midiHz(bass[(s/2)|0]), nextT, s16*1.8);
+      pluck(midiHz(arp[s]), nextT);
+      step++; nextT += s16;
+    }
+  }, 40);
+  demo = {timer, bus};
+  $("bDemo").classList.add("on");
+  setMarquee("DEMO GROOVE · mueve el ecualizador y escucha la diferencia");
+  $("lcdInfo").innerHTML = "<b>SINTETIZADOR</b> · señal generada en tu PC";
+  updatePlayUI();
+}
+function stopDemo(silent){
+  if (!demo) return;
+  clearInterval(demo.timer);
+  const b = demo.bus;
+  b.gain.setTargetAtTime(0, ctx.currentTime, 0.04);
+  setTimeout(()=>{ try{ b.disconnect(); }catch(e){} }, 400);
+  demo = null;
+  $("bDemo").classList.remove("on");
+  if (!silent) setDisplay(state.list[state.cur] || null);
+  updatePlayUI();
+}
+$("bDemo").addEventListener("click", ()=>{ demo ? stopDemo() : startDemo(); });
+
+/* ================= Archivos / drag&drop ================= */
+// Se usan los selectores del sistema de archivos: a diferencia de <input type=file>
+// devuelven handles, que son los que permiten recuperar la lista en otra sesión.
+$("bAddFiles").addEventListener("click", elegirArchivos);
+$("bAddDir").addEventListener("click", elegirCarpeta);
+$("fileIn").addEventListener("change", e=>{
+  const fs = e.target.files;
+  e.target.value = "";
+  MODO_COPIA ? importarACopia(fs) : addFiles(fs);
+});
+$("dirIn").addEventListener("change", e=>{
+  // Al elegir carpeta, la vista por carpeta es la más útil
+  if (state.view === "lista"){ state.view = "carpeta"; reflectViews(); }
+  const fs = e.target.files;
+  e.target.value = "";
+  MODO_COPIA ? importarACopia(fs) : addFiles(fs);
+});
+$("bClear").addEventListener("click", ()=>{
+  if (!state.list.length) return;
+  clearList();
+  toast("Biblioteca vaciada");
+});
+$("find").addEventListener("input", ()=> renderList());
+$("find").addEventListener("keydown", e=>{
+  if (e.key === "Escape"){ e.target.value = ""; renderList(); e.target.blur(); }
+});
+$("bIrActual").addEventListener("click", ()=>{
+  const it = state.list[state.cur];
+  if (!it){ toast("No hay ninguna canción sonando"); return; }
+  $("find").value = "";                    // el filtro podría estar ocultándola
+  delete state.closedGroups[groupKeyOf(it)];
+  renderList();
+  const li = rowFor(it);
+  if (li){
+    li.scrollIntoView({block:"center"});
+    li.classList.add("flash");
+    setTimeout(()=> li.classList.remove("flash"), 1600);
+  }
+  save();
+});
+
+/* El aviso se mantiene mientras sigan llegando eventos de arrastre y se apaga
+   solo cuando dejan de llegar. Evita los contadores dragenter/dragleave, que
+   se descuadran con facilidad y dejan el overlay pegado en pantalla. */
+let dragTimer = 0;
+function dragOn(){
+  $("app").classList.add("drag");
+  clearTimeout(dragTimer);
+  dragTimer = setTimeout(dragOff, 180);
+}
+function dragOff(){
+  clearTimeout(dragTimer);
+  $("app").classList.remove("drag");
+}
+/* Registrado en document y window: si algún nodo intermedio se traga el evento,
+   sigue habiendo receptor. Sin preventDefault en dragover, el navegador abriría
+   el archivo en una pestaña en vez de entregárnoslo. */
+const dragHandler = e=>{
+  e.preventDefault();
+  try{ if (e.dataTransfer) e.dataTransfer.dropEffect = "copy"; }catch(err){}
+  dragOn();
+};
+["dragenter","dragover"].forEach(ev=>{
+  document.addEventListener(ev, dragHandler);
+  window.addEventListener(ev, dragHandler);
+});
+window.addEventListener("dragend", dragOff);
+
+async function handleDrop(e){
+  e.preventDefault();
+  dragOff();
+  const dt = e.dataTransfer;
+  if (!dt){ toast("El navegador no entregó datos al soltar", true); return; }
+
+  // Vía 1 — siempre disponible y síncrona: sirve para archivos sueltos.
+  const planos = dt.files ? [...dt.files] : [];
+
+  // Vía 2 — entradas del sistema de archivos: la única que permite recorrer carpetas.
+  let entradas = [];
+  try{
+    entradas = [...(dt.items || [])]
+      .map(it => (it && it.kind === "file" && it.webkitGetAsEntry) ? it.webkitGetAsEntry() : null)
+      .filter(Boolean);
+  }catch(err){ entradas = []; }
+
+  // Vía 3 — handles del arrastre: es lo único que permite que lo soltado
+  // sobreviva al cierre. Sin esto, arrastrar daría una lista no recuperable.
+  let porHandles = [];
+  let carpetaSoltada = false;
+  if (dt.items && dt.items[0] && dt.items[0].getAsFileSystemHandle){
+    try{
+      const hs = await Promise.all([...dt.items]
+        .filter(it=> it && it.kind === "file")
+        .map(it=> it.getAsFileSystemHandle().catch(()=>null)));
+      for (const h of hs.filter(Boolean)){
+        const idx = libRoots.push({kind:h.kind, handle:h, nombre:h.name}) - 1;
+        if (h.kind === "directory"){
+          carpetaSoltada = true;
+          await recorrerDir(h, h.name, porHandles, idx);
+        } else {
+          try{
+            const f = await h.getFile();
+            f._relPath = h.name; f._rootIdx = idx;
+            porHandles.push(f);
+          }catch(e){}
+        }
+      }
+    }catch(e){ porHandles = []; }
+  }
+
+  // Solo cuenta lo soltado AHORA, no los orígenes de sesiones anteriores.
+  const hayCarpeta = carpetaSoltada || entradas.some(en => en.isDirectory);
+  let archivos = porHandles.length ? porHandles : planos;
+  if (porHandles.length){
+    if (carpetaSoltada && state.view === "lista"){ state.view = "carpeta"; reflectViews(); }
+    addFiles(archivos);
+    return;
+  }
+
+  if (hayCarpeta){
+    const rec = [];
+    // Si el recorrido se cuelga, no perdemos lo que sí llegó por dt.files.
+    await Promise.race([
+      Promise.all(entradas.map(en => walkEntry(en, rec, "").catch(()=>{}))),
+      new Promise(r => setTimeout(r, 20000))
+    ]);
+    if (rec.length) archivos = rec;
+  } else if (!archivos.length && entradas.length){
+    const rec = [];
+    await Promise.all(entradas.map(en => walkEntry(en, rec, "").catch(()=>{})));
+    archivos = rec;
+  }
+
+  if (!archivos.length){
+    toast("No recibí ningún archivo al soltar. Prueba con el botón ➕ Archivos", true);
+    return;
+  }
+  if (hayCarpeta && state.view === "lista"){ state.view = "carpeta"; reflectViews(); }
+  addFiles(archivos);
+}
+document.addEventListener("drop", handleDrop);
+window.addEventListener("drop", e=>{ if (!e.defaultPrevented) handleDrop(e); });
+/* Recorre carpetas guardando la ruta relativa para poder agrupar por carpeta */
+function walkEntry(entry, out, prefix){
+  return new Promise(res=>{
+    if (entry.isFile){
+      entry.file(f=>{
+        try{ f._relPath = prefix + f.name; }catch(e){}
+        out.push(f); res();
+      }, res);
+    } else if (entry.isDirectory){
+      const rd = entry.createReader();
+      const sub = prefix + entry.name + "/";
+      const batch = ()=>{
+        rd.readEntries(async ents=>{
+          if (!ents.length){ res(); return; }
+          await Promise.all(ents.map(en=> walkEntry(en, out, sub)));
+          batch();
+        }, res);
+      };
+      batch();
+    } else res();
+  });
+}
+
+/* ================= Teclado ================= */
+window.addEventListener("keydown", e=>{
+  const tag = e.target.tagName;
+  if (tag==="INPUT" && e.target.type==="text") return;
+  if (tag==="SELECT") return;
+  const inRange = tag==="INPUT" && e.target.type==="range";
+  switch (e.code){
+    case "Space": e.preventDefault(); togglePlay(); break;
+    case "ArrowRight": if (!inRange){ e.preventDefault(); audioEl.currentTime = Math.min((audioEl.duration||0), audioEl.currentTime+5); } break;
+    case "ArrowLeft": if (!inRange){ e.preventDefault(); audioEl.currentTime = Math.max(0, audioEl.currentTime-5); } break;
+    case "ArrowUp": if (!inRange){ e.preventDefault(); $("vol").value = Math.min(100, state.vol+5); $("vol").dispatchEvent(new Event("input")); } break;
+    case "ArrowDown": if (!inRange){ e.preventDefault(); $("vol").value = Math.max(0, state.vol-5); $("vol").dispatchEvent(new Event("input")); } break;
+    case "KeyN": next(); break;
+    case "KeyP": prevTrack(); break;
+    case "KeyM": audioEl.muted = !audioEl.muted; toast(audioEl.muted ? "Silencio" : "Sonido activado"); break;
+    case "Slash": e.preventDefault(); $("find").focus(); $("find").select(); break;
+  }
+});
+
+if ("mediaSession" in navigator){
+  navigator.mediaSession.setActionHandler("play", ()=> togglePlay());
+  navigator.mediaSession.setActionHandler("pause", ()=> togglePlay());
+  navigator.mediaSession.setActionHandler("nexttrack", next);
+  navigator.mediaSession.setActionHandler("previoustrack", prevTrack);
+}
+
+/* ================= Persistencia ================= */
+const LS_KEY = "ondaamp.v1";
+let saveT = 0;
+function save(){
+  clearTimeout(saveT);
+  saveT = setTimeout(()=>{
+    try{
+      localStorage.setItem(LS_KEY, JSON.stringify({
+        eq:state.eq, pre:state.pre, eqOn:state.eqOn, vol:state.vol, bal:state.bal,
+        width:state.width, night:state.night, repeat:state.repeat, shuffle:state.shuffle,
+        vis:state.vis, customPresets:state.customPresets, view:state.view,
+        skin:state.skin, fx:state.fx, am:state.am, v3:true,
+        preset:$("preset").value,
+        eqClosed:$("eqPanel").classList.contains("closed"),
+        fxClosed:$("fxPanel").classList.contains("closed"),
+        amClosed:$("amPanel").classList.contains("closed"),
+        plClosed:$("plPanel").classList.contains("closed"),
+      }));
+    }catch(e){}
+  }, 250);
+}
+function load(){
+  let s = null;
+  try{ s = JSON.parse(localStorage.getItem(LS_KEY)); }catch(e){}
+  if (!s) return;
+  Object.assign(state, {
+    eq: Array.isArray(s.eq) && s.eq.length===10 ? s.eq : state.eq,
+    pre: s.pre ?? 0, eqOn: s.eqOn ?? true, vol: s.vol ?? 80, bal: s.bal ?? 0,
+    width: s.width ?? 100, night: s.night ?? false,
+    repeat: s.repeat ?? "off", shuffle: s.shuffle ?? false, vis: s.vis ?? "bars",
+    customPresets: s.customPresets ?? {},
+    view: ["lista","album","artista","carpeta"].includes(s.view) ? s.view : "album",
+    skin: typeof s.skin==="string" ? s.skin : "ondaamp",
+    // Mezclar sobre los valores por omisión: así una versión guardada antigua
+    // sigue cargando aunque le falten efectos añadidos después.
+    fx: Object.assign({}, state.fx, (s.fx && typeof s.fx === "object") ? s.fx : {}),
+    am: Object.assign({}, state.am, (s.am && typeof s.am === "object") ? s.am : {}),
+  });
+  // Los paneles de sonido nacen plegados; solo se abren si el usuario los dejó abiertos.
+  if (s.eqClosed === false) $("eqPanel").classList.remove("closed");
+  if (s.fxClosed === false) $("fxPanel").classList.remove("closed");
+  if (s.amClosed === false) $("amPanel").classList.remove("closed");
+  if (s.plClosed) $("plPanel").classList.add("closed");
+  // Migración única de la simplificación: la primera vez tras el cambio se
+  // pliegan los tres, aunque estuvieran abiertos en sesiones anteriores.
+  if (!s.v3) ["eqPanel","fxPanel","amPanel"].forEach(id=> $(id).classList.add("closed"));
+  fillPresetSelect();
+  if (s.preset) $("preset").value = s.preset;
+  $("bDelPre").style.display = String(s.preset||"").startsWith("c:") ? "" : "none";
+}
+function reflectAllUI(){
+  $("vol").value = state.vol; $("volOut").textContent = state.vol+"%"; paintRange($("vol"));
+  $("bal").value = state.bal;
+  $("balOut").textContent = state.bal===0?"C":state.bal<0?"I"+Math.abs(state.bal):"D"+state.bal;
+  paintRange($("bal"));
+  $("width").value = state.width; $("widthOut").textContent = state.width+"%"; paintRange($("width"));
+  $("bNight").classList.toggle("on", state.night);
+  resetShuffleCycle();
+  updateShuffleUI();
+  $("bRep").textContent = REP_ICONS[state.repeat];
+  $("bRep").classList.toggle("on", state.repeat!=="off");
+  $("bEqOn").textContent = "EQ: " + (state.eqOn?"ON":"OFF");
+  $("bEqOn").classList.toggle("on", state.eqOn);
+  reflectEq();
+  reflectViews();
+  reflectFx();
+  reflectAm();
+}
+
+const IMPORTED_STYLE_VARS = [
+  "--bg","--panel","--panel2","--txt","--mut","--acc","--acc-dim","--amber",
+  "--lcd","--lcd-dim","--lcdbg","--line","--selected-bg","--skin-buttons","--skin-title"
+];
+function clearImportedSkinStyle(){
+  IMPORTED_STYLE_VARS.forEach(name=>document.body.style.removeProperty(name));
+}
+function applySkin(name, notify=false){
+  const imported=importedSkins.get(name);
+  if (imported){
+    const c=imported.colors;
+    clearImportedSkinStyle();
+    const vars={
+      "--bg":c.bg,"--panel":c.panel,"--panel2":c.panel2,"--txt":c.txt,"--mut":c.mut,
+      "--acc":c.acc,"--acc-dim":c.accDim,"--amber":c.amber,"--lcd":c.lcd,
+      "--lcd-dim":c.lcdDim,"--lcdbg":c.lcdbg,"--line":c.line,
+      "--selected-bg":c.selectedBg,"--skin-buttons":`url("${imported.buttonUrl}")`,
+      "--skin-title":JSON.stringify(imported.name)
+    };
+    Object.entries(vars).forEach(([key,value])=>document.body.style.setProperty(key,value));
+    state.skin=name;
+    document.body.dataset.skin="imported";
+    $("skinSelect").value=name;
+    $("bRemoveSkin").hidden=false;
+    document.documentElement.style.colorScheme="dark";
+    if (notify) toast(`Skin ${imported.name} activado`);
+    return;
+  }
+  const skin=Object.prototype.hasOwnProperty.call(SKINS,name)?name:"ondaamp";
+  clearImportedSkinStyle();
+  state.skin=skin;
+  document.body.dataset.skin=skin;
+  $("skinSelect").value=skin;
+  $("bRemoveSkin").hidden=true;
+  document.documentElement.style.colorScheme = "dark";
+  if (notify) toast(`Skin ${SKINS[skin]} activado`);
+}
+
+$("skinSelect").addEventListener("change", e=>{
+  applySkin(e.target.value, true);
+  save();
+});
+$("bImportSkin").addEventListener("click",()=>$("skinIn").click());
+$("skinIn").addEventListener("change",async e=>{
+  const files=[...(e.target.files||[])];
+  e.target.value="";
+  await importSkinFiles(files);
+});
+$("bRemoveSkin").addEventListener("click",async ()=>{
+  const record=importedSkins.get(state.skin);
+  if (!record) return;
+  if (!confirm(`¿Eliminar el skin importado “${record.name}”?`)) return;
+  try{
+    await skinDbDelete(record.id);
+    if (record.buttonUrl) URL.revokeObjectURL(record.buttonUrl);
+    importedSkins.delete(record.id);
+    refreshImportedSkinOptions();
+    applySkin("ondaamp");
+    save();
+    toast(`Skin ${record.name} eliminado`);
+  }catch(e){ toast("No pude eliminar el skin",true); }
+});
+
+/* ================= Init ================= */
+buildEqUI();
+fillPresetSelect();
+$("preset").value = "Plano";
+load();
+if (Object.prototype.hasOwnProperty.call(SKINS,state.skin)) applySkin(state.skin);
+else { pendingSkin=state.skin; applySkin("ondaamp"); }
+reflectAllUI();
+renderList();
+updatePlayUI();
+loadImportedSkins();
+cargarBiblioteca();   // recupera la lista de la sesión anterior
+
+/* ---- Puesta a punto como app instalable ---- */
+if ("serviceWorker" in navigator && location.protocol.startsWith("http")){
+  // Sin service worker la app sigue funcionando; solo pierde el modo sin conexión.
+  navigator.serviceWorker.register("sw.js").catch(()=>{});
+}
+/* Pide almacenamiento persistente: sin esto Android puede borrar la música
+   copiada cuando el teléfono ande justo de espacio. */
+if (navigator.storage && navigator.storage.persist){
+  navigator.storage.persisted().then(ya=>{ if (!ya) navigator.storage.persist().catch(()=>{}); });
+}
+/* Botón de instalación: Android lo ofrece cuando la PWA cumple los requisitos. */
+let promptInstalar = null;
+window.addEventListener("beforeinstallprompt", e=>{
+  e.preventDefault();
+  promptInstalar = e;
+  const b = $("bInstalar");
+  if (b) b.style.display = "";
+});
+window.addEventListener("appinstalled", ()=>{
+  promptInstalar = null;
+  const b = $("bInstalar");
+  if (b) b.style.display = "none";
+  toast("OndaAmp instalado 🎉");
+});
+if ($("bInstalar")) $("bInstalar").addEventListener("click", async ()=>{
+  if (!promptInstalar) return;
+  promptInstalar.prompt();
+  await promptInstalar.userChoice;
+  promptInstalar = null;
+  $("bInstalar").style.display = "none";
+});
+
+/* API mínima para depuración */
+window.OA = {
+  state, addFiles, playIndex, playItem, next, prevTrack, togglePlay,
+  buildGroups, playOrder, renderList,
+  get ctx(){ return ctx; }, get analyser(){ return analyser; },
+  get filters(){ return filters; }, get audioEl(){ return audioEl; },
+  ensureCtx, startDemo, stopDemo: ()=>stopDemo(),
+  importedSkins, importSkinFiles,
+  applyAllAudio, reflectFx, reflectAm,
+  am, amCiclo, amCalcular, amClasificar, amReiniciar, amAplicar, amRasgos,
+  cargarBiblioteca, guardarBiblioteca, borrarBiblioteca, restaurarAcceso,
+  hacerGuardado, libGet, libSet, pendientes,
+  adoptarCarpeta, restaurarUno, origenesPendientes, compactarOrigenes,
+  actualizarRestaurar, setMejora, removeItems, groupKeyOf, recuperarCaratulas,
+  get libArt(){ return libArt; },
+  // Almacén del móvil
+  MODO_COPIA, SOPORTA_HANDLES, SOPORTA_OPFS,
+  opfsGuardar, opfsObtener, opfsBorrar, opfsPodar, opfsEspacio,
+  importarACopia, engancharDesdeCopia,
+  get libRoots(){ return libRoots; },
+  get autoFilters(){ return autoFilters; },
+  get amAnalyser(){ return amAnalyser; },
+  get fx(){ return {rumble:fxRumble, bass:fxBass, air:fxAir, xfOut,
+                    xL:xfCrossL, xR:xfCrossR, dsp:dspNode, estado:dspEstado,
+                    entrada:fxRumble}; },
+};
+</script>
+</body>
+</html>
