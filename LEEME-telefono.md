@@ -45,7 +45,7 @@ Necesitas una dirección **https**. Android solo permite instalar apps web servi
 
 En el PC, **doble clic a `Probar en el telefono.bat`** (o desde una terminal: `node servir.cjs`).
 
-Te dirá una dirección tipo `http://192.168.100.6:8080`. Ábrela en el teléfono estando en la misma WiFi. **Deja la ventana negra abierta** mientras pruebas; al cerrarla, el servidor se detiene.
+Te dirá la dirección de tu PC en la red (algo como `http://192.168.1.X:8080`). Ábrela en el teléfono estando en la misma WiFi. **Deja la ventana negra abierta** mientras pruebas; al cerrarla, el servidor se detiene.
 
 **Aviso importante:** por WiFi va sin cifrar, y Android reserva las funciones de app instalable para conexiones seguras. Así que por esta vía **podrás escuchar música y probar el sonido, pero no se instalará ni recordará tu biblioteca**. Sirve para ver si te convence antes de crear el repositorio.
 
