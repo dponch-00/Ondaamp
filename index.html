@@ -282,6 +282,182 @@ select:focus{border-color:var(--acc-dim);}
 .fx-note{font-size:10.5px; color:var(--mut); opacity:.8; line-height:1.5; margin-top:2px;}
 .fx-note.warn{color:var(--amber);}
 
+/* ================================================================
+   MÓVIL: la app se reorganiza como un reproductor de streaming.
+   Biblioteca a pantalla completa, mini-reproductor fijo abajo, y
+   "Reproduciendo" / "Sonido" como pantallas deslizables.
+   En escritorio nada de esto se activa.
+   ================================================================ */
+.sheet-cab{display:none;}
+.solo-movil{display:none;}
+#miniPlayer{display:none;}
+/* Invisible para la rejilla de escritorio: los paneles quedan como estaban */
+#sheetAjustes{display:contents;}
+
+@media (max-width:760px){
+  /* El bloqueo debe ir también en html: con overflow:hidden solo en body,
+     el desbordamiento se propaga al viewport y la página se mueve igual.
+     Se usa "html body" a propósito: el bloque de 620 px viene después en el
+     archivo y reimpondría su relleno con igual especificidad. */
+  html, body{height:100%; overflow:hidden; margin:0;}
+  html body{padding:0;}
+  .app{
+    width:100%; height:100%; gap:0; padding:0;
+    display:flex; flex-direction:column; overflow:hidden;
+  }
+  footer{display:none;}
+
+  /* --- Biblioteca: la vista principal, ocupa toda la pantalla --- */
+  #plPanel{
+    flex:1 1 auto; min-height:0; border:0; border-radius:0;
+    box-shadow:none; background:var(--bg);
+    display:flex; flex-direction:column;
+  }
+  #plPanel > .section-head{
+    padding:12px 14px; border-bottom:1px solid var(--line);
+    position:sticky; top:0; z-index:5; background:var(--panel);
+  }
+  #plPanel > .section-head .chev{display:none;}   /* no se pliega en móvil */
+  #plPanel.closed > .section-body{display:flex;}  /* … ni aunque venga plegado */
+  #plPanel > .section-body{flex:1; min-height:0; display:flex; flex-direction:column;}
+  .pl-scroll{
+    flex:1; min-height:0; max-height:none; border-top:0;
+    /* Hueco para que el mini-reproductor no tape la última canción */
+    padding-bottom:76px;
+  }
+  .pl-tools{padding:10px 12px; gap:7px;}
+  .solo-movil{display:inline-flex;}
+
+  /* Filas y cabeceras más altas: dedos, no ratón */
+  .pl-list li{
+    grid-template-columns:34px minmax(0,1fr) auto 34px;
+    padding:11px 12px 11px 8px; font-size:14px;
+  }
+  .pl-list li.ingrp{padding-left:20px; grid-template-columns:30px minmax(0,1fr) auto 34px;}
+  .pl-list li .t1{font-size:14.5px;}
+  .pl-list li .t2{font-size:12px;}
+  .pl-list li .rm{opacity:.55; padding:6px 8px; font-size:16px;}
+  .grp{padding:12px 12px 12px 8px; grid-template-columns:20px 46px minmax(0,1fr) auto auto;}
+  .grp .gart{width:46px; height:46px;}
+  .grp .g1{font-size:14.5px;}
+  .grp .gbtns{opacity:1;}
+  .grp .gbtns button{width:32px; height:32px; font-size:13px;}
+  .views button{padding:9px 12px; font-size:13px;}
+  .pl-tools .btn{padding:9px 12px;}
+  .pl-tools .find{padding:9px 12px; font-size:14px;}
+
+  /* --- Pantallas deslizables (Reproduciendo / Sonido) --- */
+  #deckPanel, #sheetAjustes{
+    position:fixed; inset:0; z-index:60;
+    margin:0; border:0; border-radius:0;
+    background:var(--bg);
+    display:flex; flex-direction:column;
+    overflow-y:auto; overscroll-behavior:contain;
+    transform:translateY(100%);
+    transition:transform .28s cubic-bezier(.32,.72,0,1);
+    visibility:hidden;
+  }
+  body.vista-reproduciendo #deckPanel,
+  body.vista-ajustes #sheetAjustes{transform:translateY(0); visibility:visible;}
+
+  .sheet-cab{
+    display:flex; align-items:center; gap:10px;
+    padding:10px 12px; position:sticky; top:0; z-index:2;
+    background:var(--bg); border-bottom:1px solid var(--line);
+    font-size:12px; letter-spacing:.14em; color:var(--mut); text-transform:uppercase;
+  }
+  .sheet-cab span{flex:1; text-align:center;}
+  .sheet-cerrar, .sheet-extra{
+    width:40px; height:40px; flex:none; cursor:pointer;
+    background:none; border:0; color:var(--txt);
+    font-size:22px; line-height:1; border-radius:50%;
+  }
+  .sheet-cerrar:active, .sheet-extra:active{background:rgba(255,255,255,.08);}
+
+  /* Deck como pantalla de reproducción: carátula grande y controles amplios */
+  #deckPanel .titlebar{display:none;}
+  #deckPanel .deck-body{padding:16px; gap:16px; flex:1; justify-content:center;}
+  #deckPanel .display{
+    grid-template-columns:minmax(0,1fr); gap:14px;
+    background:transparent; border:0; box-shadow:none; padding:0;
+  }
+  #deckPanel .display::after{display:none;}
+  #deckPanel .cover{
+    width:min(70vw,300px); height:min(70vw,300px);
+    margin:0 auto; border-radius:14px; font-size:70px;
+    box-shadow:0 18px 44px rgba(0,0,0,.55);
+  }
+  #deckPanel .lcd{text-align:center; align-items:center;}
+  #deckPanel .lcd-title-box{height:auto; white-space:normal;}
+  #deckPanel .lcd-title{
+    font-size:21px; white-space:normal; animation:none !important;
+    display:block; line-height:1.25;
+  }
+  #deckPanel .lcd-row{justify-content:center;}
+  #deckPanel .lcd-time{font-size:15px;}
+  #deckPanel canvas#vis{height:40px;}
+  #deckPanel .seek-row{gap:12px;}
+  #deckPanel .seek-row input[type=range]{height:34px;}
+  #deckPanel .transport{justify-content:center; gap:14px;}
+  #deckPanel .tbtns{gap:14px; order:1; width:100%; justify-content:center;}
+  #deckPanel .tbtns .btn{width:58px; height:58px; justify-content:center; border-radius:50%;}
+  #deckPanel .tbtns .btn svg{width:24px; height:24px;}
+  #deckPanel .btn.play-main{
+    width:70px; height:70px;
+    background:var(--acc); border-color:var(--acc); color:var(--bg);
+  }
+  #deckPanel .btn.play-main svg{width:30px; height:30px;}
+  #deckPanel .mode-group{order:2; gap:10px;}
+  #deckPanel .mode-group .btn{min-width:46px; height:44px; justify-content:center;}
+  #deckPanel .vol-group{order:3; flex:1 1 100%;}
+
+  /* Pantalla de Sonido: los tres paneles en columna, ya desplegados */
+  #sheetAjustes{padding-bottom:24px;}
+  #sheetAjustes .panel{
+    border-radius:0; border-left:0; border-right:0; box-shadow:none;
+    margin-bottom:10px;
+  }
+  #sheetAjustes .section-head{padding:13px 14px;}
+  #sheetAjustes .btn{min-height:38px;}
+  #sheetAjustes .fx-row{grid-template-columns:34px minmax(0,1fr) 84px 38px; gap:10px;}
+  #sheetAjustes .fx-tog{width:34px; height:34px; font-size:14px;}
+  #sheetAjustes .vwrap{width:28px;}
+  #sheetAjustes .vwrap input{height:28px;}
+
+  /* --- Mini-reproductor --- */
+  #miniPlayer{
+    display:block; position:fixed; left:0; right:0; bottom:0; z-index:50;
+    background:color-mix(in srgb, var(--panel) 96%, black);
+    border-top:1px solid var(--line);
+    box-shadow:0 -6px 20px rgba(0,0,0,.4);
+    padding-bottom:env(safe-area-inset-bottom, 0);
+    cursor:pointer;
+  }
+  body.vista-reproduciendo #miniPlayer, body.vista-ajustes #miniPlayer{display:none;}
+  .mini-prog{height:2px; background:var(--line);}
+  .mini-prog i{display:block; height:100%; width:0; background:var(--acc); transition:width .25s linear;}
+  .mini-cuerpo{display:flex; align-items:center; gap:11px; padding:9px 12px;}
+  .mini-art{
+    width:46px; height:46px; flex:none; border-radius:8px; overflow:hidden;
+    background:var(--panel2); border:1px solid var(--line);
+    display:flex; align-items:center; justify-content:center;
+    color:var(--mut); font-size:20px;
+  }
+  .mini-art img{width:100%; height:100%; object-fit:cover;}
+  .mini-txt{flex:1; min-width:0;}
+  .mini-t1{font-size:14px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+  .mini-t2{font-size:12px; color:var(--mut); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+  .mini-btn{
+    width:44px; height:44px; flex:none; cursor:pointer;
+    background:none; border:0; color:var(--txt);
+    display:flex; align-items:center; justify-content:center; border-radius:50%;
+  }
+  .mini-btn svg{width:24px; height:24px; fill:currentColor;}
+  .mini-btn:active{background:rgba(255,255,255,.1);}
+
+  #toasts{bottom:88px;}
+}
+
 /* ---------- Auto-máster ---------- */
 .am-body{padding:12px 14px 13px; display:flex; flex-direction:column; gap:9px; min-width:0;}
 .am-estado{
@@ -1107,7 +1283,13 @@ body{
 <div class="app" id="app">
 
   <!-- ============ DECK ============ -->
+  <!-- En móvil este panel se convierte en la pantalla "Reproduciendo". -->
   <div class="panel" id="deckPanel">
+    <div class="sheet-cab">
+      <button class="sheet-cerrar" data-cerrar="reproduciendo" aria-label="Volver a la biblioteca">⌄</button>
+      <span>Reproduciendo</span>
+      <button class="sheet-extra" data-abrir="ajustes" aria-label="Ajustes de sonido">⚙</button>
+    </div>
     <div class="titlebar">
       <span class="dots"><i></i><i></i><i></i></span>
       <b>ONDAAMP</b><span class="hide-narrow" style="opacity:.6">· reproductor local hi-fi</span>
@@ -1171,6 +1353,15 @@ body{
         </div>
       </div>
     </div>
+  </div>
+
+  <!-- Envoltorio de los tres paneles de sonido. En escritorio usa
+       display:contents, así que es invisible para la rejilla y el diseño no
+       cambia; en móvil se convierte en una pantalla de Ajustes deslizable. -->
+  <div id="sheetAjustes">
+  <div class="sheet-cab">
+    <button class="sheet-cerrar" data-cerrar="ajustes" aria-label="Volver">⌄</button>
+    <span>Sonido</span>
   </div>
 
   <!-- ============ EQ ============ -->
@@ -1331,6 +1522,8 @@ body{
     </div>
   </div>
 
+  </div><!-- /sheetAjustes -->
+
   <!-- ============ BIBLIOTECA ============ -->
   <div class="panel" id="plPanel">
     <div class="section-head" data-toggle="plPanel">
@@ -1350,6 +1543,7 @@ body{
         <input class="find" id="find" type="text" placeholder="Buscar artista, álbum, canción…  ( / )">
         <button class="btn sm" id="bFold" title="Plegar o desplegar todos los grupos">⇕<span class="lbl-fold"> Plegar</span></button>
         <button class="btn sm" id="bIrActual" title="Ir a la canción que está sonando">🎯</button>
+        <button class="btn sm solo-movil" data-abrir="ajustes" title="Ajustes de sonido">⚙</button>
         <button class="btn danger sm" id="bClear" title="Vaciar la biblioteca">🗑</button>
       </div>
       <div class="pl-restaurar" id="plRestaurar" style="display:none">
@@ -1374,6 +1568,25 @@ body{
     <kbd>Espacio</kbd> reproducir/pausa · <kbd>←</kbd><kbd>→</kbd> saltar 5 s · <kbd>↑</kbd><kbd>↓</kbd> volumen · <kbd>N</kbd> siguiente · <kbd>P</kbd> anterior · <kbd>M</kbd> silencio<br>
     OndaAmp v2.0 · procesamiento float32 · funciona 100 % local, tu música nunca sale de tu PC
   </footer>
+
+  <!-- Mini-reproductor: solo en móvil, siempre visible sobre la biblioteca.
+       Al tocarlo se abre la pantalla "Reproduciendo". -->
+  <div id="miniPlayer" aria-label="Reproduciendo ahora">
+    <div class="mini-prog"><i id="miniProg"></i></div>
+    <div class="mini-cuerpo">
+      <div class="mini-art" id="miniArt">♫</div>
+      <div class="mini-txt">
+        <div class="mini-t1" id="miniT1">Nada sonando</div>
+        <div class="mini-t2" id="miniT2">Toca una canción para empezar</div>
+      </div>
+      <button class="mini-btn" id="miniPlay" aria-label="Reproducir o pausar">
+        <svg viewBox="0 0 24 24" id="miniIco"><path d="M7 4l13 8-13 8z"/></svg>
+      </button>
+      <button class="mini-btn" id="miniNext" aria-label="Siguiente">
+        <svg viewBox="0 0 24 24"><path d="M15 5h3v14h-3zM4 5v14l10.5-7z"/></svg>
+      </button>
+    </div>
+  </div>
 
   <input type="file" id="fileIn" accept="audio/*,.flac,.opus,.m4a,.aac,.wma,.ogg,.oga" multiple hidden>
   <input type="file" id="dirIn" webkitdirectory multiple hidden>
@@ -3297,6 +3510,7 @@ function updatePlayUI(){
     audioEl.paused ? "⏸ PAUSA" : "▶ REPRODUCIENDO";
   if ("mediaSession" in navigator)
     navigator.mediaSession.playbackState = playing ? "playing" : "paused";
+  actualizarMini();
 }
 function setMarquee(text){
   const el = $("lcdTitle");
@@ -3358,6 +3572,7 @@ setInterval(()=>{
   $("tCur").textContent = fmtTime(cur);
   $("lcdTime").textContent = demo ? fmtTime((ctx?ctx.currentTime:0)) :
     state.remaining && isFinite(dur) ? "-"+fmtTime(dur-cur) : fmtTime(cur);
+  actualizarMiniProgreso();
 }, 250);
 
 $("seek").addEventListener("input", ()=>{ seeking = true; paintRange($("seek")); });
@@ -4294,6 +4509,71 @@ if ("mediaSession" in navigator){
   navigator.mediaSession.setActionHandler("previoustrack", prevTrack);
 }
 
+/* ================= Navegación móvil =================
+   Dos pantallas deslizables sobre la biblioteca: "Reproduciendo" y "Sonido".
+   Se registran en el historial para que el botón atrás de Android las cierre
+   en vez de salirse de la app, que es lo que espera cualquiera en un móvil. */
+const VISTAS = {reproduciendo:"vista-reproduciendo", ajustes:"vista-ajustes"};
+let vistaActual = null;
+function abrirVista(nombre){
+  if (!VISTAS[nombre] || vistaActual === nombre) return;
+  Object.values(VISTAS).forEach(c=> document.body.classList.remove(c));
+  document.body.classList.add(VISTAS[nombre]);
+  if (!vistaActual) history.pushState({oa:true}, "");   // una sola entrada
+  vistaActual = nombre;
+}
+function cerrarVistas(porHistorial){
+  if (!vistaActual) return;
+  Object.values(VISTAS).forEach(c=> document.body.classList.remove(c));
+  vistaActual = null;
+  if (!porHistorial && history.state && history.state.oa) history.back();
+}
+window.addEventListener("popstate", ()=> cerrarVistas(true));
+document.addEventListener("click", e=>{
+  const abrir = e.target.closest("[data-abrir]");
+  if (abrir){ e.preventDefault(); e.stopPropagation(); abrirVista(abrir.dataset.abrir); return; }
+  const cerrar = e.target.closest("[data-cerrar]");
+  if (cerrar){ e.preventDefault(); e.stopPropagation(); cerrarVistas(); }
+});
+
+/* ---- Mini-reproductor ---- */
+function actualizarMini(){
+  const it = state.list[state.cur];
+  const art = $("miniArt"), t1 = $("miniT1"), t2 = $("miniT2");
+  if (!art) return;
+  if (!it && !demo){
+    art.innerHTML = "♫";
+    t1.textContent = "Nada sonando";
+    t2.textContent = "Toca una canción para empezar";
+  } else if (demo){
+    art.innerHTML = "🎛";
+    t1.textContent = "Demo groove";
+    t2.textContent = "Señal generada en tu PC";
+  } else {
+    art.innerHTML = it.picUrl ? `<img src="${it.picUrl}" alt="">` : "♫";
+    t1.textContent = it.title || it.name;
+    t2.textContent = [it.artist, it.album].filter(Boolean).join(" · ") || "—";
+  }
+  const sonando = (!audioEl.paused && state.cur >= 0) || !!demo;
+  const ico = $("miniIco");
+  if (ico) ico.innerHTML = sonando ? playIcoPause : playIcoPlay;
+}
+function actualizarMiniProgreso(){
+  const barra = $("miniProg");
+  if (!barra) return;
+  const d = audioEl.duration;
+  barra.style.width = (isFinite(d) && d > 0) ? (audioEl.currentTime/d*100) + "%" : "0%";
+}
+if ($("miniPlayer")){
+  // Toca el mini-reproductor (salvo sus botones) para abrir la pantalla grande
+  $("miniPlayer").addEventListener("click", e=>{
+    if (e.target.closest(".mini-btn")) return;
+    abrirVista("reproduciendo");
+  });
+  $("miniPlay").addEventListener("click", e=>{ e.stopPropagation(); togglePlay(); });
+  $("miniNext").addEventListener("click", e=>{ e.stopPropagation(); next(); });
+}
+
 /* ================= Persistencia ================= */
 const LS_KEY = "ondaamp.v1";
 let saveT = 0;
@@ -4485,6 +4765,7 @@ window.OA = {
   hacerGuardado, libGet, libSet, pendientes,
   adoptarCarpeta, restaurarUno, origenesPendientes, compactarOrigenes,
   actualizarRestaurar, setMejora, removeItems, groupKeyOf, recuperarCaratulas,
+  abrirVista, cerrarVistas, actualizarMini,
   get libArt(){ return libArt; },
   // Almacén del móvil
   MODO_COPIA, SOPORTA_HANDLES, SOPORTA_OPFS,
