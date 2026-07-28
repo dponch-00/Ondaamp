@@ -2,7 +2,7 @@
    Guarda en caché el "esqueleto" de la app (HTML, iconos, manifiesto) para que
    abra sin internet. La música NUNCA pasa por aquí: vive en OPFS, el almacén
    privado del navegador, y se lee directamente. */
-const VERSION = "ondaamp-v1";
+const VERSION = "ondaamp-v2.1";
 const ESENCIALES = [
   "./",
   "./index.html",
@@ -22,6 +22,11 @@ self.addEventListener("install", e=>{
   })());
 });
 
+// La app pide tomar el control de inmediato al pulsar "Actualizar ahora".
+self.addEventListener("message", e=>{
+  if (e.data && e.data.tipo === "saltar-espera") self.skipWaiting();
+});
+
 self.addEventListener("activate", e=>{
   e.waitUntil((async ()=>{
     const nombres = await caches.keys();
@@ -35,6 +40,14 @@ self.addEventListener("fetch", e=>{
   if (req.method !== "GET") return;
   const url = new URL(req.url);
   if (url.origin !== self.location.origin) return;   // nada externo
+
+  // version.json NUNCA se guarda en caché: es justo el archivo que sirve para
+  // detectar si hay una versión nueva, así que debe leerse siempre de la red.
+  if (url.pathname.endsWith("version.json")){
+    e.respondWith(fetch(req, {cache:"no-store"}).catch(()=>
+      new Response('{"version":"?"}', {headers:{"Content-Type":"application/json"}})));
+    return;
+  }
 
   // Red primero para el HTML (así una versión nueva se ve al momento),
   // con la caché como respaldo cuando no hay conexión.

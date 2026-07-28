@@ -458,6 +458,21 @@ select:focus{border-color:var(--acc-dim);}
   #toasts{bottom:88px;}
 }
 
+/* ---------- Versión y actualizaciones ---------- */
+.ver-body{padding:12px 14px 13px; display:flex; flex-direction:column; gap:9px;}
+.ver-fila{display:flex; align-items:baseline; gap:10px; font-size:12.5px;}
+.ver-fila .lbl{color:var(--mut); min-width:78px;}
+.ver-fila b{font:600 13px Consolas,monospace; color:var(--txt);}
+.ver-notas{
+  font-size:11.5px; color:var(--mut); line-height:1.5;
+  padding:8px 10px; border-radius:8px; display:none;
+  background:color-mix(in srgb, var(--acc) 10%, transparent);
+  border:1px solid var(--acc-dim);
+}
+.ver-notas.hay{display:block;}
+.ver-acciones{display:flex; gap:8px; flex-wrap:wrap;}
+.pill.nueva{color:#0c1510; background:var(--acc); border-color:var(--acc); font-weight:700;}
+
 /* ---------- Auto-máster ---------- */
 .am-body{padding:12px 14px 13px; display:flex; flex-direction:column; gap:9px; min-width:0;}
 .am-estado{
@@ -1518,6 +1533,34 @@ body{
       <div class="fx-note">
         Mide el balance tonal real y lo acerca a un máster de referencia. Con la
         intensidad a 0 solo actúan la compensación de auriculares y la de volumen.
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ VERSIÓN Y ACTUALIZACIONES ============ -->
+  <div class="panel closed" id="verPanel">
+    <div class="section-head" data-toggle="verPanel">
+      <h2>VERSIÓN</h2>
+      <span class="pill" id="verEstado">—</span>
+      <span class="chev">▾</span>
+    </div>
+    <div class="section-body ver-body">
+      <div class="ver-fila">
+        <span class="lbl">Instalada</span>
+        <b id="verActual">—</b>
+      </div>
+      <div class="ver-fila">
+        <span class="lbl">Publicada</span>
+        <b id="verRemota">sin comprobar</b>
+      </div>
+      <div class="ver-notas" id="verNotas"></div>
+      <div class="ver-acciones">
+        <button class="btn" id="bBuscarAct">🔄 Buscar actualizaciones</button>
+        <button class="btn" id="bAplicarAct" style="display:none">⬇ Actualizar ahora</button>
+      </div>
+      <div class="fx-note">
+        La app se guarda en el teléfono para funcionar sin internet, así que las
+        novedades no llegan solas. Tu música y tus ajustes no se tocan al actualizar.
       </div>
     </div>
   </div>
@@ -4509,6 +4552,75 @@ if ("mediaSession" in navigator){
   navigator.mediaSession.setActionHandler("previoustrack", prevTrack);
 }
 
+/* ================= Versión y actualizaciones =================
+   Una app instalada vive en el teléfono, así que las novedades no llegan solas.
+   Se compara la versión incrustada con la publicada en version.json (que el
+   service worker nunca cachea) y, si difieren, se ofrece actualizar. */
+const APP_VERSION = "2.1";
+let verRemotaDatos = null;
+
+async function buscarActualizacion(silencioso){
+  const btn = $("bBuscarAct");
+  if (btn && !silencioso){ btn.disabled = true; btn.textContent = "🔄 Comprobando…"; }
+  try{
+    // Parámetro anti-caché por si algún proxy intermedio se pone creativo
+    const r = await fetch(`version.json?_=${Date.now()}`, {cache:"no-store"});
+    if (!r.ok) throw new Error("respuesta " + r.status);
+    const d = await r.json();
+    verRemotaDatos = d;
+    const hayNueva = d.version && d.version !== APP_VERSION;
+    pintarVersion(hayNueva);
+    if (!silencioso){
+      toast(hayNueva ? `Versión ${d.version} disponible` : "Ya tienes la última versión");
+    } else if (hayNueva){
+      toast(`Hay una versión nueva (${d.version}) · ábrela en Sonido → Versión`);
+    }
+    return hayNueva;
+  }catch(e){
+    if (!silencioso) toast("No pude comprobarlo: ¿hay conexión?", true);
+    const el = $("verRemota");
+    if (el && !silencioso) el.textContent = "sin conexión";
+    return false;
+  }finally{
+    if (btn && !silencioso){ btn.disabled = false; btn.textContent = "🔄 Buscar actualizaciones"; }
+  }
+}
+function pintarVersion(hayNueva){
+  const act = $("verActual"), rem = $("verRemota"), est = $("verEstado"),
+        notas = $("verNotas"), aplicar = $("bAplicarAct");
+  if (!act) return;
+  act.textContent = APP_VERSION;
+  rem.textContent = verRemotaDatos ? verRemotaDatos.version : "sin comprobar";
+  est.className = "pill" + (hayNueva ? " nueva" : "");
+  est.textContent = !verRemotaDatos ? "—" : hayNueva ? "HAY NOVEDADES" : "AL DÍA";
+  if (hayNueva && verRemotaDatos.notas){
+    notas.textContent = verRemotaDatos.notas;
+    notas.classList.add("hay");
+  } else notas.classList.remove("hay");
+  aplicar.style.display = hayNueva ? "" : "none";
+}
+/* Borra las cachés y recarga. Solo se llama tras confirmar que hay red: si se
+   vaciara la caché sin conexión, la app se quedaría sin nada que mostrar. */
+async function aplicarActualizacion(){
+  const btn = $("bAplicarAct");
+  if (btn){ btn.disabled = true; btn.textContent = "⬇ Actualizando…"; }
+  try{
+    if ("serviceWorker" in navigator){
+      const reg = await navigator.serviceWorker.getRegistration();
+      if (reg){
+        await reg.update().catch(()=>{});
+        if (reg.waiting) reg.waiting.postMessage({tipo:"saltar-espera"});
+      }
+    }
+    const nombres = await caches.keys();
+    await Promise.all(nombres.map(n=> caches.delete(n)));
+  }catch(e){}
+  // Recarga forzada al final: a partir de aquí todo se pide de nuevo a la red.
+  location.reload();
+}
+if ($("bBuscarAct")) $("bBuscarAct").addEventListener("click", ()=> buscarActualizacion(false));
+if ($("bAplicarAct")) $("bAplicarAct").addEventListener("click", aplicarActualizacion);
+
 /* ================= Navegación móvil =================
    Dos pantallas deslizables sobre la biblioteca: "Reproduciendo" y "Sonido".
    Se registran en el historial para que el botón atrás de Android las cierre
@@ -4724,6 +4836,11 @@ if ("serviceWorker" in navigator && location.protocol.startsWith("http")){
   // Sin service worker la app sigue funcionando; solo pierde el modo sin conexión.
   navigator.serviceWorker.register("sw.js").catch(()=>{});
 }
+/* Muestra la versión instalada y consulta en segundo plano si hay una nueva.
+   El retraso evita competir con la carga de la biblioteca al abrir. */
+pintarVersion(false);
+if (location.protocol.startsWith("http")) setTimeout(()=> buscarActualizacion(true), 4000);
+
 /* Pide almacenamiento persistente: sin esto Android puede borrar la música
    copiada cuando el teléfono ande justo de espacio. */
 if (navigator.storage && navigator.storage.persist){
@@ -4766,6 +4883,7 @@ window.OA = {
   adoptarCarpeta, restaurarUno, origenesPendientes, compactarOrigenes,
   actualizarRestaurar, setMejora, removeItems, groupKeyOf, recuperarCaratulas,
   abrirVista, cerrarVistas, actualizarMini,
+  APP_VERSION, buscarActualizacion, aplicarActualizacion, pintarVersion,
   get libArt(){ return libArt; },
   // Almacén del móvil
   MODO_COPIA, SOPORTA_HANDLES, SOPORTA_OPFS,

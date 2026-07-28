@@ -65,4 +65,20 @@ Para liberar espacio, quita canciones o grupos con la **✕** de cada cabecera: 
 - **Todo el procesamiento de audio funciona**: ecualizador, reductor de ruido, auto-máster, crossfeed. El botón **✨ Mejora** sigue siendo el control diario.
 - **Reproducción en segundo plano**: Android puede pausar la app si el sistema anda justo de memoria. Es una limitación de las apps web; si te resulta molesta, el siguiente paso sería empaquetarla como APK nativo.
 - **Espacio**: OndaAmp pide a Android almacenamiento *persistente* para que no borre tu música al quedarse corto de espacio.
-- **Actualizar la app**: vuelve a subir el `index.html` a GitHub. La app tomará la versión nueva la próxima vez que la abras con conexión.
+## 🔄 Actualizar la app
+
+Como la app vive instalada en el teléfono, las novedades **no llegan solas**. El proceso es:
+
+**1. Publicar (en el PC).** En GitHub Desktop pulsa **Push origin**. GitHub tarda 1–2 minutos en reconstruir el sitio.
+
+**2. Actualizar (en el teléfono).** Abre OndaAmp → **⚙ Sonido** → sección **VERSIÓN**:
+
+- Verás la versión **instalada** y la **publicada**.
+- Pulsa **🔄 Buscar actualizaciones**.
+- Si hay una nueva, aparece **⬇ Actualizar ahora** con un resumen de las novedades. Púlsalo y la app se recarga sola con la versión nueva.
+
+La app también comprueba sola al abrirse (a los pocos segundos) y te avisa si hay novedades.
+
+> **Tu música y tus ajustes no se tocan al actualizar.** Solo se renueva la app; la biblioteca, el volumen y los efectos se conservan. Está verificado.
+
+Si alguna vez algo queda raro, cierra la app del todo (deslízala fuera de la lista de apps recientes) y vuelve a abrirla.
