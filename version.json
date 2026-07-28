@@ -1,5 +1,5 @@
 {
-  "version": "2.1",
+  "version": "2.2",
   "fecha": "2026-07-28",
-  "notas": "Interfaz móvil tipo app de streaming: biblioteca a pantalla completa, mini-reproductor abajo, pantallas deslizables de Reproduciendo y Sonido, y buscador de actualizaciones."
+  "notas": "Ahora puedes añadir un álbum en .zip directamente, sin descomprimirlo. Ideal para lo que te compartan por Google Drive: descargas y sueltas el zip tal cual."
 }

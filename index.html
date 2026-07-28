@@ -1600,8 +1600,9 @@ body{
       </div>
       <div class="pl-empty" id="plEmpty">
         <div class="big">🎵</div>
-        <div><b>Arrastra aquí tu música</b> (archivos o carpetas completas)</div>
+        <div><b>Arrastra aquí tu música</b> (archivos, carpetas o un <b>.zip</b>)</div>
         <div>o usa los botones <b>➕</b> / <b>📁</b> · MP3, FLAC, WAV, OGG, M4A, OPUS…</div>
+        <div style="font-size:11px;opacity:.8">¿Te compartieron un álbum por Drive? Descárgalo y suelta el <b>.zip</b> tal cual.</div>
       </div>
       <div class="pl-stats" id="plStats" style="display:none"></div>
     </div>
@@ -1631,7 +1632,7 @@ body{
     </div>
   </div>
 
-  <input type="file" id="fileIn" accept="audio/*,.flac,.opus,.m4a,.aac,.wma,.ogg,.oga" multiple hidden>
+  <input type="file" id="fileIn" accept="audio/*,.flac,.opus,.m4a,.aac,.wma,.ogg,.oga,.zip" multiple hidden>
   <input type="file" id="dirIn" webkitdirectory multiple hidden>
   <input type="file" id="skinIn" accept=".wsz,.zip,application/zip" multiple hidden>
 </div>
@@ -1758,18 +1759,21 @@ function decodeZipName(bytes,utf8){
   try{ return new TextDecoder(utf8 ? "utf-8" : "windows-1252").decode(bytes); }
   catch(e){ return new TextDecoder().decode(bytes); }
 }
-function readZipDirectory(buffer){
+/* opts.maxEntradas permite reutilizar este lector para álbumes en ZIP, que
+   traen más archivos que un skin. Sin opts se comporta igual que siempre. */
+function readZipDirectory(buffer, opts){
+  const maxEntradas = (opts && opts.maxEntradas) || 1000;
   const view = new DataView(buffer);
   const bytes = new Uint8Array(buffer);
-  if (buffer.byteLength < 22) throw new Error("El archivo no es un ZIP/WSZ válido");
+  if (buffer.byteLength < 22) throw new Error("El archivo no es un ZIP válido");
   let eocd = -1;
   for (let i=buffer.byteLength-22, min=Math.max(0,buffer.byteLength-65557); i>=min; i--){
     if (zipU32(view,i)===0x06054b50){ eocd=i; break; }
   }
-  if (eocd<0) throw new Error("No encontré el directorio del archivo .wsz");
+  if (eocd<0) throw new Error("No encontré el directorio del ZIP");
   const count = zipU16(view,eocd+10);
   let pos = zipU32(view,eocd+16);
-  if (count>1000) throw new Error("El skin contiene demasiados archivos");
+  if (count>maxEntradas) throw new Error("El ZIP contiene demasiados archivos");
   const entries = [];
   for (let i=0;i<count;i++){
     if (pos+46>buffer.byteLength || zipU32(view,pos)!==0x02014b50)
@@ -1784,10 +1788,13 @@ function readZipDirectory(buffer){
   }
   return {buffer,view,entries};
 }
-async function extractZipEntry(zip,entry){
+/* opts.maxTam sube el tope por archivo: 8 MB basta para un skin, pero una
+   pista FLAC ronda los 30-50 MB. */
+async function extractZipEntry(zip,entry,opts){
+  const maxTam = (opts && opts.maxTam) || 8*1024*1024;
   if (!entry) return null;
   if (entry.flags&1) throw new Error(`“${entry.name}” está cifrado`);
-  if (entry.size>8*1024*1024) throw new Error(`“${entry.name}” es demasiado grande`);
+  if (entry.size>maxTam) throw new Error(`“${entry.name}” es demasiado grande`);
   const {view,buffer}=zip, off=entry.localOffset;
   if (off+30>buffer.byteLength || zipU32(view,off)!==0x04034b50)
     throw new Error(`No pude leer “${entry.name}”`);
@@ -1799,7 +1806,7 @@ async function extractZipEntry(zip,entry){
   if (entry.method===0) out=packed;
   else if (entry.method===8){
     if (!("DecompressionStream" in window))
-      throw new Error("Este navegador no puede descomprimir skins .wsz");
+      throw new Error("Este navegador no puede descomprimir archivos ZIP");
     const stream=new Blob([packed]).stream().pipeThrough(new DecompressionStream("deflate-raw"));
     out=await new Response(stream).arrayBuffer();
   } else throw new Error(`Compresión no compatible en “${entry.name}”`);
@@ -2703,6 +2710,94 @@ function playOrder(){
 
 /* ================= Playlist ================= */
 const AUDIO_RE = /\.(mp3|flac|wav|ogg|oga|opus|m4a|aac|weba|webm|mp4|wma)$/i;
+const ZIP_RE = /\.zip$/i;
+
+/* ---- Importar álbumes en ZIP ----
+   Al descargar una carpeta de Google Drive se obtiene un .zip. Aceptarlo tal
+   cual ahorra descomprimir a mano, que en Android es especialmente incómodo.
+   Reutiliza el lector de ZIP que ya existía para los skins. */
+const ZIP_MAX_PISTA  = 300*1024*1024;   // por pista; de sobra hasta para WAV
+const ZIP_MAX_TOTAL  = 2*1024*1024*1024;// el zip entero se carga en memoria
+
+async function expandirZips(files){
+  const lista = [...files];
+  const zips  = lista.filter(f=> ZIP_RE.test(f.name));
+  if (!zips.length) return lista;
+  const sueltos = lista.filter(f=> !ZIP_RE.test(f.name));
+  const sacados = [];
+
+  for (const z of zips){
+    if (z.size > ZIP_MAX_TOTAL){
+      toast(`«${z.name}» es demasiado grande para abrirlo aquí`, true);
+      continue;
+    }
+    let zip;
+    try{
+      zip = readZipDirectory(await z.arrayBuffer(), {maxEntradas: 5000});
+    }catch(e){
+      toast(`No pude leer «${z.name}»: ${e.message}`, true);
+      continue;
+    }
+    // Se descartan carpetas y la basura que mete macOS al comprimir
+    const pistas = zip.entries.filter(en=>
+      !en.name.endsWith("/") &&
+      !en.name.startsWith("__MACOSX/") &&
+      !en.base.startsWith("._") &&
+      AUDIO_RE.test(en.name));
+    if (!pistas.length){
+      toast(`«${z.name}» no contiene audio compatible`, true);
+      continue;
+    }
+    const raiz = z.name.replace(ZIP_RE,"");
+    let hechas = 0, fallos = 0;
+    for (const en of pistas){
+      try{
+        const datos = await extractZipEntry(zip, en, {maxTam: ZIP_MAX_PISTA});
+        // OJO: en.base viene en minúsculas (el lector lo usa para buscar
+        // archivos de skin sin importar mayúsculas). Si una pista no trae
+        // etiquetas, su título sale del nombre del archivo, así que hay que
+        // tomarlo de en.name para no destrozar la capitalización.
+        const nombreReal = en.name.split("/").pop();
+        const f = new File([datos], nombreReal, {type: tipoPorExtension(nombreReal)});
+        // La ruta dentro del zip se conserva: así la vista por carpeta funciona
+        f._relPath = raiz + "/" + en.name;
+        sacados.push(f);
+      }catch(e){ fallos++; }
+      if (++hechas % 3 === 0 || hechas === pistas.length)
+        mostrarProgresoZip(z.name, hechas, pistas.length);
+    }
+    ocultarProgresoZip();
+    if (fallos) toast(`${fallos} pista${fallos>1?"s":""} de «${z.name}» no se pudo extraer`, true);
+  }
+  return sueltos.concat(sacados);
+}
+function tipoPorExtension(nombre){
+  const e = (nombre.match(/\.([^.]+)$/) || ["",""])[1].toLowerCase();
+  return ({mp3:"audio/mpeg", flac:"audio/flac", wav:"audio/wav", ogg:"audio/ogg",
+           oga:"audio/ogg", opus:"audio/ogg", m4a:"audio/mp4", aac:"audio/aac",
+           weba:"audio/webm", webm:"audio/webm", wma:"audio/x-ms-wma"})[e] || "audio/*";
+}
+function mostrarProgresoZip(nombre, hechas, total){
+  const barra = $("plRestaurar");
+  if (!barra) return;
+  barra.style.display = "flex";
+  barra.dataset.copiando = "1";          // reutiliza el bloqueo de la barra
+  $("prTxt").innerHTML = `Abriendo <b>${nombre}</b>… ${hechas}/${total}`;
+  ["bAdoptar","bRestaurar","bOlvidar"].forEach(id=>{ if ($(id)) $(id).style.display = "none"; });
+}
+function ocultarProgresoZip(){
+  const barra = $("plRestaurar");
+  if (!barra) return;
+  delete barra.dataset.copiando;
+  ["bAdoptar","bRestaurar","bOlvidar"].forEach(id=>{ if ($(id)) $(id).style.display = ""; });
+  actualizarRestaurar();
+}
+/* Punto de entrada único: expande zips y luego reparte según la plataforma. */
+async function anadirEntrada(files){
+  const expandidos = await expandirZips(files);
+  if (!expandidos.length) return;
+  return MODO_COPIA ? importarACopia(expandidos) : addFiles(expandidos);
+}
 function folderOf(f){
   const rel = f._relPath || f.webkitRelativePath || "";
   const i = rel.lastIndexOf("/");
@@ -3340,20 +3435,25 @@ async function elegirArchivos(){
   let handles;
   try{
     handles = await showOpenFilePicker({ multiple:true, types:[{
-      description:"Audio",
-      accept:{"audio/*":[".mp3",".flac",".wav",".ogg",".oga",".opus",".m4a",".aac",".weba",".webm"]},
+      description:"Audio y álbumes en ZIP",
+      accept:{"audio/*":[".mp3",".flac",".wav",".ogg",".oga",".opus",".m4a",".aac",".weba",".webm"],
+              "application/zip":[".zip"]},
     }]});
   }catch(e){ return; }                       // el usuario canceló
-  const files = [];
+  const files = [], sueltos = [];
   for (const h of handles){
-    const idx = libRoots.push({kind:"file", handle:h, nombre:h.name}) - 1;
     try{
       const f = await h.getFile();
+      // Un ZIP no se guarda como origen: lo que importa son las pistas que
+      // salgan de dentro, y esas ya no dependen del archivo comprimido.
+      if (ZIP_RE.test(h.name)){ sueltos.push(f); continue; }
+      const idx = libRoots.push({kind:"file", handle:h, nombre:h.name}) - 1;
       f._relPath = h.name; f._rootIdx = idx;
       files.push(f);
     }catch(e){}
   }
-  if (files.length) addFiles(files);
+  const todo = files.concat(sueltos);
+  if (todo.length) await anadirEntrada(todo);
   // Cada archivo suelto guarda su propio permiso: con muchos, reabrir sería
   // una ráfaga de diálogos. Mejor avisar aquí que sufrirlo en la próxima sesión.
   if (files.length > 5)
@@ -3369,7 +3469,7 @@ async function elegirCarpeta(){
   toast("Explorando la carpeta…");
   await recorrerDir(dir, dir.name, files, idx);
   if (state.view === "lista"){ state.view = "carpeta"; reflectViews(); }
-  if (files.length) addFiles(files);
+  if (files.length) await anadirEntrada(files);
   else toast("No encontré audio en esa carpeta", true);
 }
 
@@ -4369,14 +4469,14 @@ $("bAddDir").addEventListener("click", elegirCarpeta);
 $("fileIn").addEventListener("change", e=>{
   const fs = e.target.files;
   e.target.value = "";
-  MODO_COPIA ? importarACopia(fs) : addFiles(fs);
+  anadirEntrada(fs);
 });
 $("dirIn").addEventListener("change", e=>{
   // Al elegir carpeta, la vista por carpeta es la más útil
   if (state.view === "lista"){ state.view = "carpeta"; reflectViews(); }
   const fs = e.target.files;
   e.target.value = "";
-  MODO_COPIA ? importarACopia(fs) : addFiles(fs);
+  anadirEntrada(fs);
 });
 $("bClear").addEventListener("click", ()=>{
   if (!state.list.length) return;
@@ -4476,7 +4576,7 @@ async function handleDrop(e){
   let archivos = porHandles.length ? porHandles : planos;
   if (porHandles.length){
     if (carpetaSoltada && state.view === "lista"){ state.view = "carpeta"; reflectViews(); }
-    addFiles(archivos);
+    anadirEntrada(archivos);
     return;
   }
 
@@ -4499,7 +4599,7 @@ async function handleDrop(e){
     return;
   }
   if (hayCarpeta && state.view === "lista"){ state.view = "carpeta"; reflectViews(); }
-  addFiles(archivos);
+  anadirEntrada(archivos);
 }
 document.addEventListener("drop", handleDrop);
 window.addEventListener("drop", e=>{ if (!e.defaultPrevented) handleDrop(e); });
@@ -4556,7 +4656,7 @@ if ("mediaSession" in navigator){
    Una app instalada vive en el teléfono, así que las novedades no llegan solas.
    Se compara la versión incrustada con la publicada en version.json (que el
    service worker nunca cachea) y, si difieren, se ofrece actualizar. */
-const APP_VERSION = "2.1";
+const APP_VERSION = "2.2";
 let verRemotaDatos = null;
 
 async function buscarActualizacion(silencioso){
@@ -4884,6 +4984,7 @@ window.OA = {
   actualizarRestaurar, setMejora, removeItems, groupKeyOf, recuperarCaratulas,
   abrirVista, cerrarVistas, actualizarMini,
   APP_VERSION, buscarActualizacion, aplicarActualizacion, pintarVersion,
+  expandirZips, anadirEntrada, tipoPorExtension,
   get libArt(){ return libArt; },
   // Almacén del móvil
   MODO_COPIA, SOPORTA_HANDLES, SOPORTA_OPFS,

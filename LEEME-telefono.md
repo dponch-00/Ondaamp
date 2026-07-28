@@ -51,6 +51,21 @@ Te dirá la dirección de tu PC en la red (algo como `http://192.168.1.X:8080`).
 
 ---
 
+## 📦 Compartir música con tu familia
+
+La forma más simple, sin servidores ni cuentas:
+
+**Tú (una vez por álbum):** sube la carpeta del álbum a Google Drive y comparte el enlace con permiso *«Cualquiera con el enlace»*.
+
+**Ellos:**
+1. Abren tu enlace y pulsan **Descargar** (Drive les da un `.zip`).
+2. Abren OndaAmp → **➕** y eligen ese `.zip` — **sin descomprimirlo**.
+3. Listo: las canciones entran con sus etiquetas, carátulas y agrupadas por álbum.
+
+Para que puedan usar la app solo tienen que abrir tu misma dirección en Chrome e instalarla; no hace falta tienda de aplicaciones.
+
+> **Por qué un .zip y no reproducir desde Drive directamente:** Google Drive no autoriza a otras webs a leer sus archivos. El audio llegaría "marcado" y toda la cadena de procesamiento de OndaAmp (ecualizador, reductor de ruido, auto-máster) daría silencio. Descargar el zip evita el problema por completo y además funciona sin conexión.
+
 ## Cómo se usa en el teléfono
 
 1. Pulsa **➕** (canciones sueltas) o **📁** (una carpeta entera con sus subcarpetas).
