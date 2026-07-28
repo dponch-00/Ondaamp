@@ -12,6 +12,7 @@ Esta es la versión **PWA**, instalable en Android desde el navegador.
 - **Ecualizador** de 10 bandas con presets, y un botón **✨ Mejora** que analiza cada canción y corrige su balance tonal automáticamente
 - **Restauración de audio**: reductor de ruido por sustracción espectral (para el *hiss* de cintas viejas), quita-clics de vinilo, filtro de rumble, refuerzo de graves psicoacústico, realce de aire y crossfeed para auriculares
 - **Biblioteca** agrupable por álbum, artista o carpeta, con búsqueda y carátulas
+- **10 skins** de la Colección OndaAmp, con importador de skins clásicos `.wsz`
 - **Funciona sin conexión** una vez instalada
 
 ## Privacidad
@@ -30,6 +31,18 @@ No hay analítica, ni cuentas, ni peticiones a servidores externos. La música q
 | `_generar-iconos.cjs` | Genera los iconos por código, sin dependencias |
 | `LEEME-telefono.md` | Guía de instalación en Android |
 
-## Nota sobre los skins
+## Skins
 
-La versión de escritorio admite skins clásicos de Winamp, que **no se incluyen aquí** por ser artwork de terceros. La app trae un importador: puedes cargar tus propios archivos `.wsz` y se guardan localmente en tu dispositivo.
+En **Ajustes ⚙ → Apariencia** eliges entre las diez skins de la **Colección OndaAmp**:
+Original, Studio Rack 1978, Neon Broadcast, Cassette Club '86, Polar FM, Noir Gold,
+Hoshi Drive, Quantum Field Lab, Event Horizon y Glasswave. Son obra propia y van en
+CSS puro, así que no engordan la descarga ni se pixelan en pantallas de alta densidad.
+
+Los skins clásicos de Winamp **no se incluyen** por ser artwork de terceros, pero la
+app trae un importador: con **＋ Importar skin .wsz** cargas los tuyos y se guardan
+solo en tu dispositivo.
+
+> El diseño móvil es una app de pantalla completa —biblioteca, pantalla de
+> reproducción y ajustes—, no la rejilla de paneles del escritorio. Las skins
+> aportan aquí su paleta, tipografía y controles; las rejillas propias de cada
+> skin son exclusivas de la versión de escritorio.

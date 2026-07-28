@@ -700,7 +700,10 @@ footer kbd{
 
 /* ================= SKINS =================
    Los controles y el motor de audio son comunes; cada skin solo cambia la
-   presentación. Los bitmaps de Zelda Amp III proceden del .wsz original. */
+   presentación. La Colección OndaAmp es obra propia y va en CSS puro: no
+   arrastra bitmaps, así que pesa poco y se ve nítida en cualquier pantalla.
+   Los clásicos de Winamp no viajan dentro de la app —sus bitmaps no son
+   nuestros—: se añaden en el propio teléfono con el importador de .wsz. */
 .skin-picker{
   display:flex; align-items:center; gap:6px; min-width:0;
   font-size:10px; letter-spacing:.12em; color:var(--mut);
@@ -716,393 +719,1237 @@ footer kbd{
 }
 .skin-action[hidden]{display:none;}
 
-body[data-skin="zelda"]{
-  --bg:#06170d; --panel:#0d2618; --panel2:#153c25; --line:#5c8f55;
-  --txt:#f4f2ff; --mut:#c6b6e7; --acc:#69fff2; --acc-dim:#147d66;
-  --amber:#ffe86b; --lcd:#b7ffff; --lcd-dim:#65aaa0; --lcdbg:#00140d;
-  --danger:#ff867d; --radius:0px;
-  background:
-    linear-gradient(rgba(0,20,10,.66),rgba(0,12,7,.84)),
-    url("assets/skins/zelda-amp-3/eqmain.bmp") center 15% / 720px auto repeat;
-  image-rendering:pixelated;
-  font-family:Consolas, "Cascadia Mono", monospace;
+/* ---------- Panel Apariencia ----------
+   En el teléfono la barra de título no se dibuja, así que el <select> de
+   arriba queda fuera de alcance: la forma de cambiar de skin es esta rejilla,
+   con la muestra de cada una y un área de toque holgada. */
+.ap-body{padding:12px; display:flex; flex-direction:column; gap:11px;}
+.skin-grid{
+  display:grid; gap:9px;
+  grid-template-columns:repeat(auto-fill,minmax(104px,1fr));
 }
-body[data-skin="zelda"] .app{
-  gap:8px;
-  scrollbar-color:#3d7c4b #071b10;
+.skin-card{
+  position:relative; display:flex; flex-direction:column; gap:6px;
+  padding:7px; cursor:pointer; text-align:left; font:inherit;
+  color:var(--txt); background:var(--panel2);
+  border:1px solid var(--line); border-radius:9px;
 }
-body[data-skin="zelda"] .panel{
-  position:relative;
-  border:3px ridge #78a66f;
-  border-radius:0;
-  background:linear-gradient(180deg,rgba(7,42,23,.96),rgba(1,18,11,.97));
-  box-shadow:
-    0 0 0 2px #102d1a,
-    0 10px 0 rgba(0,0,0,.32),
-    inset 0 0 0 1px #0b100b;
+.skin-card:active{transform:scale(.97);}
+.skin-card .sw{
+  position:relative; display:block; height:44px; overflow:hidden;
+  border:1px solid var(--line); border-radius:6px;
 }
-body[data-skin="zelda"] .titlebar{
-  min-height:38px;
-  padding:4px 9px;
-  color:#d7caf7;
-  border-bottom:3px ridge #78a66f;
-  background:
-    linear-gradient(90deg,rgba(0,31,14,.10),rgba(0,23,12,.65)),
-    url("assets/skins/zelda-amp-3/titlebar.bmp") left top / auto 87px repeat-x;
-  text-shadow:2px 2px #071108;
+/* Una barra de acento y una línea de "pantalla" bastan para reconocerla */
+.skin-card .sw i{
+  position:absolute; left:7px; right:7px; top:11px; height:7px; border-radius:2px;
 }
-body[data-skin="zelda"] .titlebar .dots{display:none;}
-body[data-skin="zelda"] .titlebar b{font-size:0;}
-body[data-skin="zelda"] .titlebar b::after{
-  content:"ZELDAAMP III";
-  font:900 18px/1 Georgia,serif;
-  letter-spacing:-1px; color:#f4f2e5;
-  -webkit-text-stroke:1px #102615;
-  text-shadow:2px 2px #020902, -1px -1px #b52d25;
+.skin-card .sw b{
+  position:absolute; left:7px; top:25px; width:52%; height:4px;
+  border-radius:2px; opacity:.85;
 }
-body[data-skin="zelda"] .titlebar .tag{
-  color:#b7ffff; background:#00170e;
-  border:1px solid #72a46a; border-radius:0;
+.skin-card .nm{
+  font-size:11.5px; line-height:1.25; color:var(--mut);
+  /* Dos líneas: "Quantum Field Lab" no cabe en una y cortarlo no ayuda */
+  min-height:2.5em; overflow-wrap:anywhere;
 }
-body[data-skin="zelda"] .skin-picker{color:#ffe86b;}
-body[data-skin="zelda"] .skin-picker select{
-  color:#b7ffff; background:#00170e;
-  border:2px inset #6b9165; border-radius:0;
+.skin-card.sel{border-color:var(--acc); box-shadow:0 0 0 1px var(--acc);}
+.skin-card.sel .nm{color:var(--txt); font-weight:600;}
+/* Dentro de la tarjeta, no colgando del borde: fuera se recorta contra la
+   tarjeta vecina y en el móvil queda a un dedo de tocarla sin querer. */
+.skin-card .quitar{
+  position:absolute; top:3px; right:3px; width:28px; height:28px;
+  display:none; align-items:center; justify-content:center;
+  font:700 14px/1 Consolas,monospace; cursor:pointer;
+  color:var(--txt); background:var(--panel);
+  border:1px solid var(--line); border-radius:50%;
+  box-shadow:0 1px 4px rgba(0,0,0,.35);
 }
+.skin-card.importada .quitar{display:flex;}
+.ap-pie{display:flex; gap:8px; flex-wrap:wrap; align-items:center;}
+.ap-nota{font-size:11.5px; color:var(--mut); line-height:1.5;}
 
-body[data-skin="zelda"] #deckPanel{
-  background:
-    linear-gradient(rgba(0,15,7,.18),rgba(0,15,7,.34)),
-    url("assets/skins/zelda-amp-3/main.bmp") center / cover no-repeat;
-}
-body[data-skin="zelda"] .deck-body{
-  padding:12px;
-  background:linear-gradient(90deg,rgba(0,18,8,.16),rgba(0,18,8,.48));
-}
-body[data-skin="zelda"] .display{
-  border:3px ridge #7aa274; border-radius:0;
-  background:rgba(0,16,10,.90);
-  box-shadow:inset 0 0 0 2px #00110a, 3px 3px 0 rgba(0,0,0,.45);
-}
-body[data-skin="zelda"] .display::after{
-  background:repeating-linear-gradient(0deg,rgba(0,0,0,.2) 0 1px,transparent 1px 3px);
-}
-body[data-skin="zelda"] .cover{
-  border:3px ridge #789a72; border-radius:0;
-  background:#00361a url("assets/skins/zelda-amp-3/zeldaamp.bmp") center / cover;
-  color:#ffe86b;
-}
-body[data-skin="zelda"] .cover img{image-rendering:auto;}
-body[data-skin="zelda"] .lcd-title,
-body[data-skin="zelda"] .lcd-time{
-  color:#fff; text-shadow:2px 2px #172817,0 0 5px #8affd8;
-  font-family:Consolas,"Cascadia Mono",monospace;
-}
-body[data-skin="zelda"] canvas#vis{
-  border:1px solid #3f7051; border-radius:0; background:rgba(0,9,5,.7);
-}
+/* Muestras con la paleta real de cada skin (las importadas se pintan desde JS) */
+.skin-card[data-skin="ondaamp"]  .sw{background:#0f1216;border-color:#2a3340;}
+.skin-card[data-skin="ondaamp"]  .sw i{background:#38e08c;}
+.skin-card[data-skin="ondaamp"]  .sw b{background:#9dffb0;}
+.skin-card[data-skin="rack"]     .sw{background:linear-gradient(#201d17,#0f0d0a);border-color:#77705d;}
+.skin-card[data-skin="rack"]     .sw i{background:#f2a33b;}
+.skin-card[data-skin="rack"]     .sw b{background:#ffd176;}
+.skin-card[data-skin="neon"]     .sw{background:linear-gradient(#12103a,#070611);border-color:#433b78;}
+.skin-card[data-skin="neon"]     .sw i{background:#25f6e8;}
+.skin-card[data-skin="neon"]     .sw b{background:#6efff5;}
+.skin-card[data-skin="cassette"] .sw{background:linear-gradient(#d7d1c3,#b9b2a3);border-color:#746f65;}
+.skin-card[data-skin="cassette"] .sw i{background:#e94f3d;}
+.skin-card[data-skin="cassette"] .sw b{background:#2f6f5c;}
+.skin-card[data-skin="polar"]    .sw{background:linear-gradient(#f6fafb,#dceaf1);border-color:#a9bec9;}
+.skin-card[data-skin="polar"]    .sw i{background:#00a9cc;}
+.skin-card[data-skin="polar"]    .sw b{background:#4a8ba3;}
+.skin-card[data-skin="noir"]     .sw{background:linear-gradient(#121212,#090909);border-color:#5d5037;}
+.skin-card[data-skin="noir"]     .sw i{background:#d7aa4d;}
+.skin-card[data-skin="noir"]     .sw b{background:#f4d687;}
+.skin-card[data-skin="hoshi"]    .sw{background:linear-gradient(#241c4d,#100d2b);border-color:#3d2f7a;}
+.skin-card[data-skin="hoshi"]    .sw i{background:#46f2e1;}
+.skin-card[data-skin="hoshi"]    .sw b{background:#a8fff5;}
+.skin-card[data-skin="quantum"]  .sw{background:linear-gradient(#0e1b20,#071014);border-color:#28505a;}
+.skin-card[data-skin="quantum"]  .sw i{background:#00f0c8;}
+.skin-card[data-skin="quantum"]  .sw b{background:#9fffea;}
+.skin-card[data-skin="horizon"]  .sw{background:linear-gradient(#0a1020,#030711);border-color:#273b61;}
+.skin-card[data-skin="horizon"]  .sw i{background:#6c8cff;}
+.skin-card[data-skin="horizon"]  .sw b{background:#9cb3ff;}
+.skin-card[data-skin="glass"]    .sw{background:linear-gradient(#f2f7fd,#dfe8f3);border-color:#b3c3d8;}
+.skin-card[data-skin="glass"]    .sw i{background:#006ee6;}
+.skin-card[data-skin="glass"]    .sw b{background:#5b7ea8;}
 
-/* Los cuatro controles principales usan directamente el sprite cbuttons.bmp. */
-body[data-skin="zelda"] .tbtns{gap:4px;}
-body[data-skin="zelda"] .tbtns .btn{
-  width:46px; height:36px; padding:0;
-  border:0; border-radius:0;
-  background-color:transparent;
-  background-image:url("assets/skins/zelda-amp-3/cbuttons.bmp");
+
+/* ---------- Studio Rack 1978 ----------
+   Una consola de estudio de 19": aluminio, baquelita, vúmetros y controles
+   mecánicos. En escritorio el transporte se convierte en un módulo lateral. */
+body[data-skin="rack"]{
+  --bg:#16130f; --panel:#292720; --panel2:#3a382f; --line:#77705d;
+  --txt:#eee8d5; --mut:#b2aa90; --acc:#f2a33b; --acc-dim:#7b4c1d;
+  --amber:#ffc45b; --lcd:#ffd176; --lcd-dim:#9b763b; --lcdbg:#17130b;
+  --danger:#e4654f; --radius:3px; --deck-h:96px;
+  background:
+    radial-gradient(circle at 22% -20%,rgba(255,204,111,.16),transparent 38%),
+    repeating-linear-gradient(90deg,rgba(255,255,255,.016) 0 1px,transparent 1px 4px),
+    linear-gradient(#201d17,#0f0d0a);
+  font-family:"Arial Narrow","Segoe UI",sans-serif;
+}
+body[data-skin="rack"] .app{width:min(1280px,100%);gap:9px;}
+body[data-skin="rack"] .panel{
+  position:relative; overflow:hidden;
+  border:1px solid #7b7462; border-radius:3px;
+  background:
+    linear-gradient(100deg,rgba(255,255,255,.045),transparent 24%,rgba(0,0,0,.10) 72%),
+    repeating-linear-gradient(0deg,#333128 0,#333128 2px,#302e26 3px,#302e26 5px);
+  box-shadow:inset 0 1px #aaa18a,inset 0 -2px #11100c,0 9px 20px rgba(0,0,0,.46);
+}
+body[data-skin="rack"] .panel::before{
+  content:""; position:absolute; z-index:4; pointer-events:none; inset:5px;
+  background:
+    radial-gradient(circle at 2px 2px,#17150f 0 1px,#8b846f 1.5px 2.5px,transparent 3px),
+    radial-gradient(circle at calc(100% - 2px) 2px,#17150f 0 1px,#8b846f 1.5px 2.5px,transparent 3px);
   background-repeat:no-repeat;
-  background-size:272px 72px;
-  box-shadow:none;
-  image-rendering:pixelated;
 }
-body[data-skin="zelda"] .tbtns .btn svg{display:none;}
-body[data-skin="zelda"] #bPrev{background-position:0 0;}
-body[data-skin="zelda"] #bPlay{background-position:-46px 0;}
-body[data-skin="zelda"] #bPlay.is-playing{background-position:-92px 0;}
-body[data-skin="zelda"] #bStop{background-position:-138px 0;}
-body[data-skin="zelda"] #bNext{background-position:-184px 0;}
-body[data-skin="zelda"] #bPrev:active{background-position:0 -36px;}
-body[data-skin="zelda"] #bPlay:active{background-position:-46px -36px;}
-body[data-skin="zelda"] #bPlay.is-playing:active{background-position:-92px -36px;}
-body[data-skin="zelda"] #bStop:active{background-position:-138px -36px;}
-body[data-skin="zelda"] #bNext:active{background-position:-184px -36px;}
+body[data-skin="rack"] .titlebar,
+body[data-skin="rack"] .section-head{
+  color:#211d14; border-color:#6c6555;
+  background:
+    repeating-linear-gradient(90deg,rgba(255,255,255,.035) 0 1px,transparent 1px 3px),
+    linear-gradient(#b8b09c,#77705f 52%,#5e584a);
+  text-shadow:0 1px rgba(255,255,255,.38);
+}
+body[data-skin="rack"] .titlebar{min-height:36px;padding:6px 16px;}
+body[data-skin="rack"] .titlebar .dots{display:none;}
+body[data-skin="rack"] .titlebar b{font-size:0;}
+body[data-skin="rack"] .titlebar b::after{
+  content:"ONDA RACK · 1978";
+  font:900 15px/1 "Arial Narrow","Segoe UI",sans-serif;
+  letter-spacing:.18em;color:#211b11;
+}
+body[data-skin="rack"] .titlebar .hide-narrow::after{
+  content:" / STEREO REFERENCE MONITOR";font-size:10px;letter-spacing:.12em;
+}
+body[data-skin="rack"] .titlebar .tag{
+  color:#ffd279;background:#201a10;border:1px inset #867c66;border-radius:2px;
+  box-shadow:inset 0 0 9px #000;
+}
+body[data-skin="rack"] .skin-picker{color:#292319;font-weight:800;}
+body[data-skin="rack"] .skin-picker select{
+  color:#f4dfb2;background:#211d15;border:1px inset #918773;border-radius:2px;
+}
+body[data-skin="rack"] .deck-body{padding:15px;}
+body[data-skin="rack"] .display{
+  grid-template-columns:96px minmax(0,1fr);padding:14px;
+  border:2px inset #77705d;border-radius:2px;
+  background:
+    linear-gradient(rgba(255,190,72,.035),rgba(0,0,0,.12)),
+    repeating-linear-gradient(90deg,transparent 0 39px,rgba(255,197,91,.035) 40px),
+    #17130b;
+  box-shadow:inset 0 0 26px #000,0 1px rgba(255,255,255,.08);
+}
+body[data-skin="rack"] .display::after{
+  background:repeating-linear-gradient(0deg,rgba(0,0,0,.12) 0 1px,transparent 1px 4px);
+}
+body[data-skin="rack"] .cover{
+  border:5px solid #18150f;border-radius:50%;
+  outline:2px solid #77705f;background:#211c12;color:#e8a13c;
+  box-shadow:inset 0 0 0 3px #474132,0 2px 5px #000;
+}
+body[data-skin="rack"].is-playing .cover{animation:rackReel 8s linear infinite;}
+@keyframes rackReel{to{transform:rotate(360deg);}}
+body[data-skin="rack"] .lcd-title{font-family:"Arial Narrow","Segoe UI",sans-serif;letter-spacing:.06em;}
+body[data-skin="rack"] .lcd-time{
+  font-family:"Courier New",monospace;color:#ffcb68;text-shadow:0 0 10px #b16818;
+}
+body[data-skin="rack"] .lcd-info{color:#a77c3c;}
+body[data-skin="rack"] canvas#vis{
+  height:74px;border:1px solid #655d4a;border-radius:2px;
+  background:linear-gradient(#e0d2aa,#b7a87e);box-shadow:inset 0 0 13px rgba(54,35,12,.45);
+}
+body[data-skin="rack"] .transport{align-content:center;}
+body[data-skin="rack"] .tbtns{gap:7px;}
+body[data-skin="rack"] .tbtns .btn{
+  width:50px;height:42px;padding:0;justify-content:center;
+  color:#17140f;border:1px solid #8f8979;border-radius:3px;
+  background:linear-gradient(#d1ccbd,#777265 55%,#504c43);
+  box-shadow:inset 0 2px #f1eee7,0 3px 0 #17150f;
+}
+body[data-skin="rack"] .tbtns .btn:active{transform:translateY(2px);box-shadow:inset 0 2px 4px #29261f,0 1px #111;}
+body[data-skin="rack"] .tbtns #bPlay{
+  color:#ffe2a0;border-color:#a96f28;background:linear-gradient(#9a672d,#4d3117);
+  box-shadow:inset 0 1px #dba55f,0 3px #171109,0 0 13px rgba(242,163,59,.18);
+}
+body[data-skin="rack"] .tbtns #bPlay.is-playing{color:#fff4c3;box-shadow:inset 0 1px #edbd73,0 3px #171109,0 0 18px #c27422;}
+body[data-skin="rack"] .btn{
+  color:#e8dfc6;border-color:#6d6758;border-radius:3px;
+  background:linear-gradient(#4b483d,#2d2b24);box-shadow:inset 0 1px rgba(255,255,255,.13),0 2px #17150f;
+}
+body[data-skin="rack"] .btn.on{color:#ffd06d;border-color:#9c6829;background:#49331c;}
+body[data-skin="rack"] select,
+body[data-skin="rack"] .pl-tools .find{
+  color:#eadfbd;background:#18150f;border-color:#6e6652;border-radius:2px;
+}
+body[data-skin="rack"] input[type=range]::-webkit-slider-runnable-track{
+  height:7px;border:1px inset #756e5c;border-radius:1px;background:var(--range-bg,#17140f);
+}
+body[data-skin="rack"] input[type=range]::-webkit-slider-thumb{
+  width:14px;height:20px;margin-top:-7px;border-radius:2px;border:1px solid #a59d89;
+  background:repeating-linear-gradient(90deg,#d0c9b8 0 2px,#756f61 2px 4px);box-shadow:0 2px 3px #000;
+}
+body[data-skin="rack"] .section-head{padding:8px 16px;}
+body[data-skin="rack"] .section-head h2{
+  color:#241e14;font:900 12px/1 "Arial Narrow","Segoe UI",sans-serif;letter-spacing:.16em;
+}
+body[data-skin="rack"] .section-head h2::before{content:"MODULE / ";opacity:.58;}
+body[data-skin="rack"] .eq-body{background:linear-gradient(90deg,rgba(0,0,0,.12),transparent,rgba(255,255,255,.025));}
+body[data-skin="rack"] .band .hz{font-family:"Arial Narrow",sans-serif;letter-spacing:.04em;}
+body[data-skin="rack"] .band .db{color:#d6a856;}
+body[data-skin="rack"] .pl-tools{background:#29271f;border-bottom:1px solid #625b4c;}
+body[data-skin="rack"] .views{border-radius:2px;}
+body[data-skin="rack"] .views button{background:#211f19;color:#aaa187;border-color:#625b4c;}
+body[data-skin="rack"] .views button.on{color:#21180c;background:#d5963f;}
+body[data-skin="rack"] .pl-scroll{background:#15130f;border-color:#5b5547;}
+body[data-skin="rack"] .grp{background:linear-gradient(#454136,#29271f);border-color:#69614f;}
+body[data-skin="rack"] .grp .gart{border-radius:50%;background:#1c1811;border-color:#7d725d;}
+body[data-skin="rack"] .pl-list li{border-color:rgba(127,116,91,.25);}
+body[data-skin="rack"] .pl-list li.cur{background:linear-gradient(90deg,rgba(231,156,53,.25),transparent);}
+body[data-skin="rack"] .pl-list li.cur .t1,
+body[data-skin="rack"] .pl-list li.cur .idx{color:#ffca66;}
+body[data-skin="rack"] .pl-stats{background:#2a271e;border-color:#615946;}
+body[data-skin="rack"] footer{color:#8e866f;}
 
-body[data-skin="zelda"] .btn{
-  color:#f6eaff; border:2px outset #73946b; border-radius:0;
-  background:linear-gradient(#285232,#102d1b);
-  box-shadow:2px 2px 0 rgba(0,0,0,.55);
+@media (min-width:800px){
+  body[data-skin="rack"] .deck-body{
+    display:grid;grid-template-columns:minmax(0,1fr) minmax(315px,.55fr);
+    grid-template-rows:auto auto;gap:12px 18px;
+  }
+  body[data-skin="rack"] .display{grid-column:1;grid-row:1;}
+  body[data-skin="rack"] .seek-row{grid-column:1;grid-row:2;}
+  body[data-skin="rack"] .transport{
+    grid-column:2;grid-row:1 / 3;padding:13px;
+    border:1px inset #67604f;background:rgba(20,18,13,.45);
+  }
+}
+
+/* ---------- Neon Broadcast ----------
+   Cabina de radio nocturna: composición vertical, controles de emisión y
+   espectro luminoso. La biblioteca se vuelve la segunda mesa de la cabina. */
+body[data-skin="neon"]{
+  --bg:#070611;--panel:#101022;--panel2:#17152e;--line:#433b78;
+  --txt:#f2edff;--mut:#9e93c5;--acc:#25f6e8;--acc-dim:#127f82;
+  --amber:#ffdc5c;--lcd:#6efff5;--lcd-dim:#789dc2;--lcdbg:#050411;
+  --danger:#ff4f8b;--radius:18px;--deck-h:112px;
+  background:
+    radial-gradient(circle at 18% 0,rgba(255,39,146,.24),transparent 32%),
+    radial-gradient(circle at 92% 15%,rgba(37,246,232,.20),transparent 34%),
+    linear-gradient(145deg,#090715,#030308 72%);
+  font-family:"Segoe UI",system-ui,sans-serif;
+}
+body[data-skin="neon"]::before{
+  content:"";position:fixed;inset:0;pointer-events:none;opacity:.22;
+  background-image:
+    linear-gradient(rgba(78,67,135,.18) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(78,67,135,.18) 1px,transparent 1px);
+  background-size:42px 42px;mask-image:linear-gradient(to bottom,#000,transparent 72%);
+}
+body[data-skin="neon"] .app{width:min(1320px,100%);gap:12px;}
+body[data-skin="neon"] .panel{
+  border:1px solid rgba(112,92,190,.65);border-radius:18px;
+  background:linear-gradient(145deg,rgba(27,24,59,.96),rgba(8,8,23,.98));
+  box-shadow:0 18px 46px rgba(0,0,0,.52),inset 0 1px rgba(255,255,255,.08),0 0 22px rgba(77,47,156,.13);
+}
+body[data-skin="neon"] .titlebar{
+  min-height:42px;padding:8px 14px;border-color:#3c346f;
+  background:linear-gradient(90deg,rgba(255,43,145,.15),transparent 38%,rgba(36,237,229,.08));
+}
+body[data-skin="neon"] .titlebar .dots i{background:#523e79;}
+body[data-skin="neon"] .titlebar .dots i:first-child{background:#ff398f;box-shadow:0 0 10px #ff398f;}
+body[data-skin="neon"] .titlebar .dots i:nth-child(2){background:#ffdc5c;box-shadow:0 0 8px #ffdc5c;}
+body[data-skin="neon"] .titlebar .dots i:nth-child(3){background:#25f6e8;box-shadow:0 0 8px #25f6e8;}
+body[data-skin="neon"] .titlebar b{font-size:0;}
+body[data-skin="neon"] .titlebar b::after{
+  content:"ONDA // BROADCAST";
+  font:800 13px/1 "Segoe UI",sans-serif;letter-spacing:.24em;color:#fff;
+  text-shadow:0 0 13px #ff398f;
+}
+body[data-skin="neon"] .titlebar .tag{
+  color:#ff5b9f;background:#0a0715;border-color:#67315b;text-transform:uppercase;
+  box-shadow:inset 0 0 9px #000,0 0 8px rgba(255,57,143,.18);
+}
+body[data-skin="neon"].is-playing .titlebar .tag{animation:onAir 1.6s ease-in-out infinite;}
+@keyframes onAir{50%{color:#fff;background:#b81c5d;box-shadow:0 0 17px #ff398f;}}
+body[data-skin="neon"] .skin-picker{color:#25f6e8;}
+body[data-skin="neon"] .skin-picker select{
+  color:#e9e3ff;background:#090817;border-color:#4a3e83;border-radius:12px;
+}
+body[data-skin="neon"] .deck-body{padding:16px;gap:15px;}
+body[data-skin="neon"] .display{
+  grid-template-columns:112px minmax(0,1fr);padding:15px;border-color:#414079;border-radius:15px;
+  background:
+    radial-gradient(circle at 14% 40%,rgba(255,45,145,.13),transparent 28%),
+    linear-gradient(120deg,#080616,#0c1024);
+  box-shadow:inset 0 0 40px rgba(19,10,42,.85),0 0 18px rgba(37,246,232,.08);
+}
+body[data-skin="neon"] .display::after{
+  background:repeating-linear-gradient(0deg,rgba(0,0,0,.18) 0 1px,transparent 1px 4px);
+}
+body[data-skin="neon"] .cover{
+  border:2px solid #ff398f;border-radius:50%;
+  background:radial-gradient(circle,#1e1740 0 22%,#080715 23% 100%);
+  box-shadow:0 0 18px rgba(255,57,143,.42),inset 0 0 18px #08040d;color:#25f6e8;
+}
+body[data-skin="neon"].is-playing .cover{animation:neonDisc 5s linear infinite;}
+@keyframes neonDisc{to{transform:rotate(360deg);}}
+body[data-skin="neon"] .lcd-title{color:#fff;text-shadow:0 0 9px #c93fff;letter-spacing:.04em;}
+body[data-skin="neon"] .lcd-time{color:#25f6e8;text-shadow:0 0 15px #16aab3;}
+body[data-skin="neon"] .lcd-info,
+body[data-skin="neon"] .lcd-info b{color:#b2a6dc;}
+body[data-skin="neon"] canvas#vis{
+  height:105px;border:1px solid #3e3675;border-radius:12px;
+  background:linear-gradient(#080618,#060513);box-shadow:inset 0 0 22px #030208;
+}
+body[data-skin="neon"] .tbtns{gap:10px;}
+body[data-skin="neon"] .tbtns .btn{
+  width:50px;height:50px;padding:0;justify-content:center;border-radius:50%;
+  color:#b9aff0;border-color:#4a4285;background:radial-gradient(circle at 38% 28%,#30275d,#110e27 65%);
+  box-shadow:inset 0 1px rgba(255,255,255,.13),0 5px 12px #05030e;
+}
+body[data-skin="neon"] .tbtns #bPlay{
+  width:64px;height:64px;margin-top:-7px;color:#070616;border-color:#25f6e8;
+  background:radial-gradient(circle at 35% 28%,#a8fff8,#25f6e8 50%,#0a939b);
+  box-shadow:0 0 23px rgba(37,246,232,.55),inset 0 2px #dcfffc;
+}
+body[data-skin="neon"] .tbtns #bPlay.is-playing{
+  color:#fff;border-color:#ff398f;background:radial-gradient(circle at 35% 28%,#ff9bc6,#ff398f 55%,#9b124c);
+  box-shadow:0 0 25px rgba(255,57,143,.72);
+}
+body[data-skin="neon"] .btn{
+  color:#cdc4f0;border-color:#443b7a;border-radius:12px;
+  background:linear-gradient(145deg,#242044,#111026);
+}
+body[data-skin="neon"] .btn:hover{color:#fff;border-color:#25f6e8;box-shadow:0 0 12px rgba(37,246,232,.18);}
+body[data-skin="neon"] .btn.on{color:#25f6e8;border-color:#177f83;background:#102f3e;}
+body[data-skin="neon"] select,
+body[data-skin="neon"] .pl-tools .find{
+  color:#ede8ff;background:#090817;border-color:#443b78;border-radius:12px;
+}
+body[data-skin="neon"] input[type=range]::-webkit-slider-runnable-track{
+  height:6px;border:0;border-radius:8px;background:var(--range-bg,#28224c);box-shadow:inset 0 1px 3px #000;
+}
+body[data-skin="neon"] input[type=range]::-webkit-slider-thumb{
+  width:17px;height:17px;margin-top:-5.5px;border:2px solid #e9ffff;border-radius:50%;
+  background:#25f6e8;box-shadow:0 0 12px #25f6e8;
+}
+body[data-skin="neon"] .section-head{
+  border-color:#3e356f;background:linear-gradient(90deg,rgba(197,48,255,.09),transparent);
+}
+body[data-skin="neon"] .section-head h2{color:#cfc7f0;}
+body[data-skin="neon"] .section-head h2::before{content:"◉ ";color:#ff398f;text-shadow:0 0 9px #ff398f;}
+body[data-skin="neon"] .pl-tools{background:rgba(15,13,35,.72);border-bottom:1px solid #3d356c;}
+body[data-skin="neon"] .views{border-color:#443b7a;border-radius:12px;}
+body[data-skin="neon"] .views button{color:#a99fcf;background:#0e0d20;border-color:#443b7a;}
+body[data-skin="neon"] .views button.on{color:#071113;background:#25dace;}
+body[data-skin="neon"] .pl-scroll{background:rgba(5,5,15,.72);border-color:#3e356b;}
+body[data-skin="neon"] .grp{background:linear-gradient(90deg,#191631,#111025);border-color:#3b3467;}
+body[data-skin="neon"] .grp .gart{border-radius:50%;border-color:#5f4ea2;background:#090716;}
+body[data-skin="neon"] .pl-list li.cur{
+  background:linear-gradient(90deg,rgba(255,57,143,.22),rgba(37,246,232,.08),transparent);
+  box-shadow:inset 3px 0 #ff398f;
+}
+body[data-skin="neon"] .pl-list li.cur .t1,
+body[data-skin="neon"] .pl-list li.cur .idx{color:#65fff4;}
+body[data-skin="neon"] .pl-stats{background:#121028;border-color:#3c346d;color:#9f95c8;}
+body[data-skin="neon"] footer{color:#69618d;}
+
+
+/* ---------- Cassette Club '86 ----------
+   El acomodo Broadcast reinterpretado como radiocasetera de plástico crema,
+   ventana de cinta, botones rectangulares y acentos coral. */
+body[data-skin="cassette"]{
+  --bg:#b9b2a3;--panel:#d7d1c3;--panel2:#c5beaf;--line:#746f65;
+  --txt:#272c2d;--mut:#626965;--acc:#e94f3d;--acc-dim:#9a3b31;
+  --amber:#f2a83b;--lcd:#b8f2dd;--lcd-dim:#649385;--lcdbg:#182322;
+  --danger:#b9272d;--radius:7px;--deck-h:96px;
+  background:
+    linear-gradient(90deg,rgba(255,255,255,.15),transparent 28%,rgba(48,43,35,.11)),
+    repeating-linear-gradient(0deg,#bdb6a8 0 2px,#b7b0a2 2px 4px);
+  font-family:"Arial Narrow","Segoe UI",sans-serif;
+}
+body[data-skin="cassette"] .app{width:min(1300px,100%);gap:10px;}
+body[data-skin="cassette"] .panel{
+  position:relative;border:1px solid #726c61;border-radius:7px;
+  background:
+    radial-gradient(circle at 8px 8px,rgba(38,35,30,.12) 0 1px,transparent 1.5px) 0 0/16px 16px,
+    linear-gradient(#ded8cb,#c7c0b2);
+  box-shadow:inset 0 1px #f5f0e6,inset 0 -2px #9e978a,0 8px 18px rgba(45,39,31,.25);
+}
+body[data-skin="cassette"] .titlebar{
+  min-height:38px;padding:6px 12px;color:#e6f0e9;border-color:#273b3d;
+  background:linear-gradient(#41636a,#29464c);text-shadow:0 1px #152527;
+}
+body[data-skin="cassette"] .titlebar .dots{display:none;}
+body[data-skin="cassette"] .titlebar b{font-size:0;}
+body[data-skin="cassette"] .titlebar b::after{
+  content:"CASSETTE CLUB '86";font:900 14px/1 "Arial Narrow",sans-serif;
+  letter-spacing:.22em;color:#f6f1e7;
+}
+body[data-skin="cassette"] .titlebar .hide-narrow::after{content:" · AUTO REVERSE / HIGH BIAS";font-size:10px;}
+body[data-skin="cassette"] .titlebar .tag{
+  color:#ffe0a6;background:#162526;border-color:#668287;border-radius:2px;
+}
+body[data-skin="cassette"] .skin-picker{color:#eef7f2;font-weight:700;}
+body[data-skin="cassette"] .skin-picker select{
+  color:#e8f2ec;background:#1d3033;border-color:#769096;border-radius:3px;
+}
+body[data-skin="cassette"] .deck-body{padding:14px;}
+body[data-skin="cassette"] .display{
+  grid-template-columns:96px minmax(0,1fr);padding:13px;border:3px inset #918a7d;border-radius:5px;
+  background:
+    linear-gradient(115deg,rgba(255,255,255,.06),transparent 35%),
+    repeating-linear-gradient(0deg,rgba(255,255,255,.025) 0 1px,transparent 1px 4px),
+    #172120;box-shadow:inset 0 0 25px #070b0a;
+}
+body[data-skin="cassette"] .display::after{opacity:.45;}
+body[data-skin="cassette"] .cover{
+  border:3px solid #a5a092;border-radius:7px;background:#273735;color:#f5a044;
+  box-shadow:inset 0 0 0 6px #151f1e,0 2px 4px #0e0e0d;
+}
+body[data-skin="cassette"].is-playing .cover{animation:cassetteNudge 1.8s steps(2,end) infinite;}
+@keyframes cassetteNudge{50%{filter:saturate(1.15) brightness(1.06);}}
+body[data-skin="cassette"] .lcd-title{color:#e8fff4;text-shadow:0 0 7px #6fbda2;font-family:"Courier New",monospace;}
+body[data-skin="cassette"] .lcd-time{color:#ffb24c;text-shadow:0 0 8px #a75122;}
+body[data-skin="cassette"] .lcd-info,
+body[data-skin="cassette"] .lcd-info b{color:#8fb9aa;}
+body[data-skin="cassette"] canvas#vis{
+  height:90px;border:2px inset #5c6965;border-radius:3px;background:#d5cdbb;
+}
+body[data-skin="cassette"] .tbtns{gap:5px;}
+body[data-skin="cassette"] .tbtns .btn{
+  width:52px;height:42px;padding:0;justify-content:center;color:#17282b;
+  border:1px solid #79746a;border-radius:3px;background:linear-gradient(#f1ece1,#aca598 58%,#837d72);
+  box-shadow:inset 0 2px #fff,0 4px 0 #656056;
+}
+body[data-skin="cassette"] .tbtns #bPlay{
+  color:#fff3e8;border-color:#a8372e;background:linear-gradient(#ef6a55,#b83c32);
+  box-shadow:inset 0 1px #ffac9d,0 4px 0 #7e2d28;
+}
+body[data-skin="cassette"] .tbtns .btn:active{transform:translateY(3px);box-shadow:inset 0 2px 4px #5c574e,0 1px #514d46;}
+body[data-skin="cassette"] .btn{
+  color:#303635;border-color:#888176;border-radius:4px;background:linear-gradient(#e9e3d8,#bbb4a7);
+  box-shadow:inset 0 1px #f8f4eb;
+}
+body[data-skin="cassette"] .btn.on{color:#fff;background:#d74b3d;border-color:#a43831;}
+body[data-skin="cassette"] select,
+body[data-skin="cassette"] .pl-tools .find{
+  color:#e5f3ec;background:#203234;border-color:#6f7771;border-radius:3px;
+}
+body[data-skin="cassette"] input[type=range]::-webkit-slider-runnable-track{
+  height:8px;border:1px inset #827b70;border-radius:1px;background:var(--range-bg,#4a5551);
+}
+body[data-skin="cassette"] input[type=range]::-webkit-slider-thumb{
+  width:18px;height:18px;margin-top:-6px;border:1px solid #777167;border-radius:2px;
+  background:linear-gradient(90deg,#e7e1d5,#9e978a);box-shadow:0 2px 3px #625d54;
+}
+body[data-skin="cassette"] .section-head{
+  border-color:#8b8478;background:linear-gradient(90deg,#cbc4b6,#b6afa1);
+}
+body[data-skin="cassette"] .section-head h2{color:#344548;font-weight:900;}
+body[data-skin="cassette"] .section-head h2::before{content:"A/B · ";color:#e34c3b;}
+body[data-skin="cassette"] .pl-tools{background:#bcb5a8;border-bottom:1px solid #898277;}
+body[data-skin="cassette"] .views{border-color:#777167;border-radius:3px;}
+body[data-skin="cassette"] .views button{color:#cadbd4;background:#31484c;border-color:#637477;}
+body[data-skin="cassette"] .views button.on{color:#fff;background:#d74b3d;}
+body[data-skin="cassette"] .pl-scroll{background:#202b2a;border-color:#75776f;}
+body[data-skin="cassette"] .grp{background:linear-gradient(#405657,#2b3f40);border-color:#637476;color:#eef5ef;}
+body[data-skin="cassette"] .grp .gart{border-radius:4px;border-color:#84918b;background:#192422;}
+body[data-skin="cassette"] .grp .g2,
+body[data-skin="cassette"] .grp .gmeta{color:#a8beb5;}
+body[data-skin="cassette"] .pl-list li{color:#dce8e2;border-color:rgba(143,170,157,.18);}
+body[data-skin="cassette"] .pl-list li .t2,
+body[data-skin="cassette"] .pl-list li .dur,
+body[data-skin="cassette"] .pl-list li .idx{color:#91aaa0;}
+body[data-skin="cassette"] .pl-list li.cur{background:linear-gradient(90deg,#9b3d34,rgba(215,75,61,.18));box-shadow:inset 4px 0 #ffad4c;}
+body[data-skin="cassette"] .pl-list li.cur .t1,
+body[data-skin="cassette"] .pl-list li.cur .idx{color:#fff1d3;}
+body[data-skin="cassette"] .pl-empty{color:#99afa5;background:#202b2a;}
+body[data-skin="cassette"] .pl-stats{color:#d8e7df;background:#314647;border-color:#677776;}
+body[data-skin="cassette"] footer{color:#5e5b54;}
+
+/* ---------- Polar FM ----------
+   La misma cabina, ahora como estudio de radio escandinavo: blanco mate,
+   azul glaciar, precisión editorial y controles limpios. */
+body[data-skin="polar"]{
+  --bg:#dceaf1;--panel:#f6fafb;--panel2:#e8f1f5;--line:#a9bec9;
+  --txt:#173449;--mut:#668191;--acc:#00a9cc;--acc-dim:#5ba9b9;
+  --amber:#f2a72c;--lcd:#bffbff;--lcd-dim:#6faeba;--lcdbg:#092b38;
+  --danger:#dd4b5e;--radius:12px;--deck-h:104px;
+  background:
+    radial-gradient(circle at 14% 0,rgba(255,255,255,.95),transparent 33%),
+    linear-gradient(135deg,#eaf4f7,#cbdde6);
+  font-family:"Segoe UI Variable","Segoe UI",sans-serif;
+}
+body[data-skin="polar"] .app{width:min(1320px,100%);gap:11px;}
+body[data-skin="polar"] .panel{
+  border:1px solid rgba(118,151,166,.55);border-radius:12px;
+  background:linear-gradient(145deg,rgba(255,255,255,.92),rgba(229,240,244,.92));
+  box-shadow:0 13px 30px rgba(50,87,104,.14),inset 0 1px #fff;
+}
+body[data-skin="polar"] .titlebar{
+  min-height:42px;padding:7px 14px;color:#58798b;border-color:#bfd0d8;background:rgba(232,243,247,.85);
+}
+body[data-skin="polar"] .titlebar .dots i{background:#b9ccd5;}
+body[data-skin="polar"] .titlebar .dots i:first-child{background:#00a9cc;box-shadow:0 0 0 4px rgba(0,169,204,.13);}
+body[data-skin="polar"] .titlebar b{font-size:0;}
+body[data-skin="polar"] .titlebar b::after{
+  content:"POLAR FM / 101.7";font:750 14px/1 "Segoe UI",sans-serif;letter-spacing:.15em;color:#193d53;
+}
+body[data-skin="polar"] .titlebar .tag{color:#17647a;background:#fff;border-color:#b5cad3;}
+body[data-skin="polar"] .skin-picker{color:#587789;font-weight:700;}
+body[data-skin="polar"] .skin-picker select{
+  color:#22475b;background:#fff;border-color:#b6cbd4;border-radius:8px;
+}
+body[data-skin="polar"] .deck-body{padding:15px;}
+body[data-skin="polar"] .display{
+  grid-template-columns:104px minmax(0,1fr);padding:15px;border:0;border-radius:10px;
+  background:
+    linear-gradient(120deg,rgba(0,196,222,.10),transparent 40%),
+    #092b38;box-shadow:inset 0 0 28px #04151c,0 9px 20px rgba(28,69,87,.18);
+}
+body[data-skin="polar"] .display::after{opacity:.28;}
+body[data-skin="polar"] .cover{
+  border:5px solid rgba(255,255,255,.82);border-radius:12px;background:#174757;color:#93f6ff;
+  box-shadow:0 8px 18px rgba(0,0,0,.25);
+}
+body[data-skin="polar"].is-playing .cover{animation:polarFloat 3.8s ease-in-out infinite;}
+@keyframes polarFloat{50%{transform:translateY(-3px);box-shadow:0 13px 22px rgba(0,0,0,.23);}}
+body[data-skin="polar"] .lcd-title{color:#e8feff;text-shadow:none;}
+body[data-skin="polar"] .lcd-time{color:#5feaf4;text-shadow:0 0 12px rgba(38,218,233,.45);}
+body[data-skin="polar"] .lcd-info,
+body[data-skin="polar"] .lcd-info b{color:#80b9c3;}
+body[data-skin="polar"] canvas#vis{
+  height:92px;border:0;border-radius:8px;background:linear-gradient(#eaf6f8,#d2e7eb);
+}
+body[data-skin="polar"] .tbtns{gap:7px;}
+body[data-skin="polar"] .tbtns .btn{
+  width:51px;height:48px;padding:0;justify-content:center;color:#365d70;
+  border-color:#b7ccd5;border-radius:10px;background:linear-gradient(#fff,#dae7ec);
+  box-shadow:0 5px 10px rgba(50,87,104,.14),inset 0 1px #fff;
+}
+body[data-skin="polar"] .tbtns #bPlay{
+  color:#fff;border-color:#0098b6;background:linear-gradient(145deg,#13c5df,#008fb4);
+  box-shadow:0 8px 16px rgba(0,153,187,.28),inset 0 1px rgba(255,255,255,.35);
+}
+body[data-skin="polar"] .btn{
+  color:#3d6274;border-color:#b5c9d2;border-radius:9px;background:linear-gradient(#fff,#e0ebef);
+}
+body[data-skin="polar"] .btn.on{color:#007f9a;border-color:#71becd;background:#d7f3f7;}
+body[data-skin="polar"] select,
+body[data-skin="polar"] .pl-tools .find{
+  color:#24485b;background:#fff;border-color:#b6cad3;border-radius:8px;
+}
+body[data-skin="polar"] input[type=range]::-webkit-slider-runnable-track{
+  height:7px;border:0;border-radius:8px;background:var(--range-bg,#c7dbe2);
+}
+body[data-skin="polar"] input[type=range]::-webkit-slider-thumb{
+  width:17px;height:17px;margin-top:-5px;border:3px solid #fff;border-radius:50%;
+  background:#00a9cc;box-shadow:0 2px 6px rgba(18,84,104,.28);
+}
+body[data-skin="polar"] .section-head{border-color:#c3d4db;background:#e9f2f5;}
+body[data-skin="polar"] .section-head h2{color:#31576a;}
+body[data-skin="polar"] .section-head h2::before{content:"● ";color:#00a9cc;}
+body[data-skin="polar"] .pl-tools{background:#e5eff3;border-bottom:1px solid #b9cdd5;}
+body[data-skin="polar"] .views{border-color:#b4c9d2;border-radius:8px;}
+body[data-skin="polar"] .views button{color:#5d7b89;background:#f8fbfc;border-color:#c3d3da;}
+body[data-skin="polar"] .views button.on{color:#fff;background:#00a9cc;}
+body[data-skin="polar"] .pl-scroll{background:#f8fbfc;border-color:#bfd1d8;}
+body[data-skin="polar"] .grp{background:rgba(232,242,246,.95);border-color:#c1d2d9;}
+body[data-skin="polar"] .grp .gart{border-radius:9px;border-color:#b6cbd3;background:#dcebf0;}
+body[data-skin="polar"] .pl-list li{border-color:rgba(116,151,167,.17);}
+body[data-skin="polar"] .pl-list li.cur{background:linear-gradient(90deg,rgba(0,169,204,.18),rgba(0,169,204,.04));box-shadow:inset 4px 0 #00a9cc;}
+body[data-skin="polar"] .pl-list li.cur .t1,
+body[data-skin="polar"] .pl-list li.cur .idx{color:#007d99;}
+body[data-skin="polar"] .pl-empty{color:#6b8795;background:#f8fbfc;}
+body[data-skin="polar"] .pl-stats{color:#547585;background:#e8f2f5;border-color:#bed0d8;}
+body[data-skin="polar"] footer{color:#66818e;}
+body[data-skin="polar"] footer kbd{color:#32566a;background:#f5fafb;border-color:#b5cbd4;}
+body[data-skin="polar"] .toast{color:#24485b;background:#f7fbfcee;border-color:#b6cdd7;border-left-color:#00a9cc;}
+
+/* ---------- Noir Gold ----------
+   Cabina Broadcast de lujo: laca negra, líneas art déco, tipografía editorial,
+   oro cálido y una biblioteca que recuerda un archivo privado. */
+body[data-skin="noir"]{
+  --bg:#090909;--panel:#121212;--panel2:#1b1915;--line:#5d5037;
+  --txt:#f2ead8;--mut:#9e927b;--acc:#d7aa4d;--acc-dim:#806328;
+  --amber:#f0c96d;--lcd:#f4d687;--lcd-dim:#887447;--lcdbg:#080705;
+  --danger:#bf4d42;--radius:0;--deck-h:106px;
+  background:
+    radial-gradient(circle at 50% -10%,rgba(215,170,77,.14),transparent 32%),
+    repeating-linear-gradient(135deg,#0b0b0b 0 2px,#080808 2px 5px);
+  font-family:Georgia,"Times New Roman",serif;
+}
+body[data-skin="noir"] .app{width:min(1320px,100%);gap:8px;}
+body[data-skin="noir"] .panel{
+  border:1px solid #594b30;border-radius:0;background:linear-gradient(145deg,#171717,#0c0c0c 68%);
+  box-shadow:inset 0 0 0 1px #050505,0 14px 28px rgba(0,0,0,.52);
+}
+body[data-skin="noir"] .titlebar{
+  min-height:43px;padding:8px 14px;color:#a99b80;border-color:#5c4c30;
+  background:
+    linear-gradient(90deg,transparent,rgba(215,170,77,.09) 50%,transparent),
+    #0b0b0b;
+}
+body[data-skin="noir"] .titlebar .dots{display:none;}
+body[data-skin="noir"] .titlebar b{font-size:0;}
+body[data-skin="noir"] .titlebar b::after{
+  content:"N O I R  ·  G O L D";font:700 14px/1 Georgia,serif;letter-spacing:.25em;color:#e5c36e;
+}
+body[data-skin="noir"] .titlebar .hide-narrow{font-style:italic;letter-spacing:.08em;}
+body[data-skin="noir"] .titlebar .tag{
+  color:#e1bd66;background:#050505;border-color:#685638;border-radius:0;
+}
+body[data-skin="noir"] .skin-picker{color:#c5a65f;}
+body[data-skin="noir"] .skin-picker select{
+  color:#e8d7ad;background:#070707;border-color:#655437;border-radius:0;font-family:Georgia,serif;
+}
+body[data-skin="noir"] .deck-body{padding:16px;}
+body[data-skin="noir"] .display{
+  grid-template-columns:106px minmax(0,1fr);padding:15px;border:1px solid #665638;border-radius:0;
+  background:
+    linear-gradient(90deg,rgba(215,170,77,.05),transparent 42%),
+    #070706;box-shadow:inset 0 0 35px #000;
+}
+body[data-skin="noir"] .display::after{
+  background:
+    linear-gradient(135deg,transparent 49.5%,rgba(215,170,77,.09) 50%,transparent 50.5%),
+    repeating-linear-gradient(0deg,rgba(0,0,0,.2) 0 1px,transparent 1px 4px);
+}
+body[data-skin="noir"] .cover{
+  border:1px solid #b68e3e;border-radius:0;background:#15110a;color:#d7aa4d;
+  box-shadow:inset 0 0 0 6px #070706,0 0 0 1px #332813;
+}
+body[data-skin="noir"].is-playing .cover{animation:noirGlow 2.8s ease-in-out infinite;}
+@keyframes noirGlow{50%{box-shadow:inset 0 0 0 6px #070706,0 0 18px rgba(215,170,77,.38);}}
+body[data-skin="noir"] .lcd-title{color:#f4ead0;text-shadow:none;font-family:Georgia,serif;font-style:italic;}
+body[data-skin="noir"] .lcd-time{color:#e2b857;text-shadow:0 0 10px rgba(215,170,77,.42);}
+body[data-skin="noir"] .lcd-info,
+body[data-skin="noir"] .lcd-info b{color:#8d7a52;}
+body[data-skin="noir"] canvas#vis{
+  height:94px;border:1px solid #493c27;border-radius:0;background:#080706;
+}
+body[data-skin="noir"] .tbtns{gap:8px;}
+body[data-skin="noir"] .tbtns .btn{
+  width:51px;height:51px;padding:0;justify-content:center;color:#ceb670;
+  border:1px solid #685735;border-radius:50%;background:radial-gradient(circle at 35% 28%,#30291d,#0d0c0a 68%);
+  box-shadow:inset 0 1px rgba(255,232,172,.22),0 5px 11px #000;
+}
+body[data-skin="noir"] .tbtns #bPlay{
+  color:#161109;border-color:#dbb75e;background:radial-gradient(circle at 35% 28%,#f5dc91,#bf8f31 66%);
+  box-shadow:0 0 18px rgba(215,170,77,.22),inset 0 1px #fff0b5;
+}
+body[data-skin="noir"] .btn{
+  color:#c9b682;border-color:#57492f;border-radius:0;background:linear-gradient(#252118,#0e0d0b);
+  font-family:Georgia,serif;
+}
+body[data-skin="noir"] .btn:hover{color:#f2d988;border-color:#a4833f;}
+body[data-skin="noir"] .btn.on{color:#f4d475;border-color:#a47e32;background:#2c2311;}
+body[data-skin="noir"] select,
+body[data-skin="noir"] .pl-tools .find{
+  color:#e3d4af;background:#070707;border-color:#56472e;border-radius:0;font-family:Georgia,serif;
+}
+body[data-skin="noir"] input[type=range]::-webkit-slider-runnable-track{
+  height:5px;border:0;border-radius:0;background:var(--range-bg,#44371f);
+}
+body[data-skin="noir"] input[type=range]::-webkit-slider-thumb{
+  width:15px;height:15px;margin-top:-5px;border:1px solid #ebd38c;border-radius:50%;
+  background:#ad8437;box-shadow:0 0 7px rgba(215,170,77,.3);
+}
+body[data-skin="noir"] .section-head{
+  border-color:#55462c;background:linear-gradient(90deg,#111,#1c1811 50%,#111);
+}
+body[data-skin="noir"] .section-head h2{color:#cdb36f;font-family:Georgia,serif;font-weight:400;}
+body[data-skin="noir"] .section-head h2::before{content:"◆ ";font-size:9px;color:#8e6d2f;}
+body[data-skin="noir"] .pl-tools{background:#12100c;border-bottom:1px solid #514329;}
+body[data-skin="noir"] .views{border-color:#56482e;border-radius:0;}
+body[data-skin="noir"] .views button{color:#9e8c62;background:#090909;border-color:#514329;font-family:Georgia,serif;}
+body[data-skin="noir"] .views button.on{color:#171108;background:#c69a43;}
+body[data-skin="noir"] .pl-scroll{background:#070707;border-color:#4e4028;}
+body[data-skin="noir"] .grp{background:linear-gradient(90deg,#17140f,#0e0d0b);border-color:#4b3e27;}
+body[data-skin="noir"] .grp .gart{border-radius:0;border-color:#6c5835;background:#0a0805;}
+body[data-skin="noir"] .pl-list li{border-color:rgba(129,105,58,.18);}
+body[data-skin="noir"] .pl-list li.cur{background:linear-gradient(90deg,rgba(215,170,77,.23),transparent);box-shadow:inset 3px 0 #d7aa4d;}
+body[data-skin="noir"] .pl-list li.cur .t1,
+body[data-skin="noir"] .pl-list li.cur .idx{color:#f1d583;}
+body[data-skin="noir"] .pl-empty{color:#8f8268;background:#070707;}
+body[data-skin="noir"] .pl-stats{color:#9f8c61;background:#12100c;border-color:#514329;}
+body[data-skin="noir"] footer{color:#5f5544;}
+body[data-skin="noir"] footer kbd{color:#cdb570;background:#0a0907;border-color:#58492e;border-radius:0;}
+body[data-skin="noir"] .toast{color:#eadbb8;background:#0d0c0aee;border-color:#5e4e31;border-left-color:#d7aa4d;border-radius:0;}
+
+/* ---------- Hoshi Drive ----------
+   Animé espacial original, sin personajes licenciados: composición tipo
+   panel de manga, tinta oscura, colores cel-shading y señal estelar. */
+body[data-skin="hoshi"]{
+  --bg:#100d2b;--panel:#241c4d;--panel2:#352666;--line:#090716;
+  --txt:#fff9ef;--mut:#b8a9dc;--acc:#46f2e1;--acc-dim:#167f88;
+  --amber:#ffe35b;--lcd:#a8fff5;--lcd-dim:#769fbb;--lcdbg:#09071c;
+  --danger:#ff4f82;--radius:16px;--deck-h:106px;
+  background:
+    radial-gradient(circle at 12% 8%,#fff 0 1px,transparent 1.8px) 0 0/93px 93px,
+    radial-gradient(circle at 72% 23%,#89f7ff 0 1px,transparent 1.7px) 0 0/137px 137px,
+    radial-gradient(circle at 85% 0,rgba(255,63,149,.38),transparent 32%),
+    linear-gradient(145deg,#17113b,#090719 75%);
+  font-family:"Trebuchet MS","Segoe UI",sans-serif;
+}
+body[data-skin="hoshi"]::before{
+  content:"";position:fixed;right:-13vw;top:10vh;width:42vw;height:42vw;border-radius:50%;
+  pointer-events:none;border:2px solid rgba(70,242,225,.10);
+  box-shadow:0 0 0 34px rgba(255,255,255,.015),0 0 0 69px rgba(255,83,151,.025);
+}
+body[data-skin="hoshi"] .app{width:min(1420px,100%);gap:13px;}
+body[data-skin="hoshi"] .panel{
+  border:3px solid #090716;border-radius:16px;
+  background:linear-gradient(145deg,#30225f,#171438 72%);
+  box-shadow:7px 7px 0 #090716,0 16px 28px rgba(0,0,0,.35),inset 0 1px rgba(255,255,255,.10);
+}
+body[data-skin="hoshi"] .titlebar{
+  min-height:43px;padding:7px 14px;color:#d9cef3;border-bottom:3px solid #090716;
+  background:linear-gradient(105deg,#ff4f91 0 8%,#4a2e88 8% 68%,#22bfc2 68%);
+}
+body[data-skin="hoshi"] .titlebar .dots{display:none;}
+body[data-skin="hoshi"] .titlebar b{font-size:0;}
+body[data-skin="hoshi"] .titlebar b::after{
+  content:"HOSHI☆DRIVE";font:900 italic 17px/1 "Trebuchet MS",sans-serif;
+  letter-spacing:.08em;color:#fff;text-shadow:2px 2px #25134d;
+}
+body[data-skin="hoshi"] .titlebar .hide-narrow::after{content:" // STELLAR SOUND SYSTEM";font-size:10px;}
+body[data-skin="hoshi"] .titlebar .tag{
+  color:#090719;background:#ffe35b;border:2px solid #090716;border-radius:20px;
+  font-weight:900;box-shadow:2px 2px #090716;
+}
+body[data-skin="hoshi"] .skin-picker{color:#fff;font-weight:900;}
+body[data-skin="hoshi"] .skin-picker select{
+  color:#fff;background:#181135;border:2px solid #090716;border-radius:20px;
+}
+body[data-skin="hoshi"] .deck-body{padding:16px;}
+body[data-skin="hoshi"] .display{
+  grid-template-columns:106px minmax(0,1fr);padding:15px;border:3px solid #090716;border-radius:14px;
+  background:
+    linear-gradient(112deg,rgba(255,79,145,.20),transparent 34%),
+    repeating-linear-gradient(135deg,rgba(70,242,225,.035) 0 2px,transparent 2px 8px),
+    #09071c;box-shadow:inset 0 0 30px #03020b;
+}
+body[data-skin="hoshi"] .display::after{
+  background:repeating-linear-gradient(0deg,rgba(0,0,0,.18) 0 1px,transparent 1px 4px);
+}
+body[data-skin="hoshi"] .cover{
+  border:3px solid #090716;border-radius:50%;
+  background:conic-gradient(#ff4f91,#8e5dff,#46f2e1,#ffe35b,#ff4f91);color:#fff;
+  box-shadow:0 0 0 5px #2a2055,5px 5px 0 #090716;
+}
+body[data-skin="hoshi"].is-playing .cover{animation:hoshiSpin 7s linear infinite;}
+@keyframes hoshiSpin{to{transform:rotate(360deg);}}
+body[data-skin="hoshi"] .lcd-title{color:#fff;text-shadow:2px 2px #9d2865;font-style:italic;}
+body[data-skin="hoshi"] .lcd-time{color:#46f2e1;text-shadow:0 0 13px #18a5aa;}
+body[data-skin="hoshi"] .lcd-info,
+body[data-skin="hoshi"] .lcd-info b{color:#c4b2f2;}
+body[data-skin="hoshi"] canvas#vis{
+  height:94px;border:3px solid #090716;border-radius:11px;background:#100b29;
+}
+body[data-skin="hoshi"] .tbtns{gap:8px;}
+body[data-skin="hoshi"] .tbtns .btn{
+  width:50px;height:48px;padding:0;justify-content:center;color:#fff;
+  border:3px solid #090716;border-radius:10px;background:#49327f;box-shadow:3px 3px #090716;
+}
+body[data-skin="hoshi"] .tbtns #bPlay{
+  width:60px;color:#090716;background:#46f2e1;transform:skewX(-7deg);
+}
+body[data-skin="hoshi"] .tbtns #bPlay svg{transform:skewX(7deg);}
+body[data-skin="hoshi"] .tbtns #bPlay.is-playing{background:#ff4f91;color:#fff;}
+body[data-skin="hoshi"] .btn{
+  color:#f9f4ff;border:2px solid #090716;border-radius:9px;background:#3a2869;
+  box-shadow:2px 2px #090716;font-family:"Trebuchet MS",sans-serif;font-weight:700;
+}
+body[data-skin="hoshi"] .btn:hover{color:#090716;background:#ffe35b;}
+body[data-skin="hoshi"] .btn.on{color:#090716;background:#46f2e1;}
+body[data-skin="hoshi"] select,
+body[data-skin="hoshi"] .pl-tools .find{
+  color:#fff;background:#100b29;border:2px solid #090716;border-radius:9px;
+}
+body[data-skin="hoshi"] input[type=range]::-webkit-slider-runnable-track{
+  height:8px;border:2px solid #090716;border-radius:7px;background:var(--range-bg,#4a3775);
+}
+body[data-skin="hoshi"] input[type=range]::-webkit-slider-thumb{
+  width:18px;height:18px;margin-top:-7px;border:3px solid #090716;border-radius:50%;
+  background:#ffe35b;box-shadow:2px 2px #090716;
+}
+body[data-skin="hoshi"] .section-head{
+  border-bottom:3px solid #090716;background:linear-gradient(100deg,#3e2b75,#24184c);
+}
+body[data-skin="hoshi"] .section-head h2{color:#fff;font-weight:900;font-style:italic;}
+body[data-skin="hoshi"] .section-head h2::before{content:"✦ ";color:#ffe35b;}
+body[data-skin="hoshi"] .pl-tools{background:#2f215a;border-bottom:3px solid #090716;}
+body[data-skin="hoshi"] .views{border:2px solid #090716;border-radius:9px;}
+body[data-skin="hoshi"] .views button{color:#d8c7f9;background:#191139;border-color:#090716;}
+body[data-skin="hoshi"] .views button.on{color:#090716;background:#46f2e1;}
+body[data-skin="hoshi"] .pl-scroll{background:#0d0922;border-color:#090716;}
+body[data-skin="hoshi"] .grp{background:linear-gradient(90deg,#40296e,#25194e);border-color:#090716;}
+body[data-skin="hoshi"] .grp .gart{border:2px solid #090716;border-radius:50%;background:#15102d;}
+body[data-skin="hoshi"] .pl-list li{border-color:rgba(105,82,168,.28);}
+body[data-skin="hoshi"] .pl-list li.cur{
+  background:linear-gradient(90deg,#c72e75,rgba(70,242,225,.13));box-shadow:inset 5px 0 #ffe35b;
+}
+body[data-skin="hoshi"] .pl-list li.cur .t1,
+body[data-skin="hoshi"] .pl-list li.cur .idx{color:#fff;}
+body[data-skin="hoshi"] .pl-empty{color:#b5a4dd;background:#0d0922;}
+body[data-skin="hoshi"] .pl-stats{color:#c9baf0;background:#261a4c;border-color:#090716;}
+body[data-skin="hoshi"] footer{color:#746a9c;}
+
+
+/* ---------- Quantum Field Lab ----------
+   Física convertida en instrumento musical: retícula de laboratorio, módulos
+   numerados y biblioteca panorámica como registro de experimentos. */
+body[data-skin="quantum"]{
+  --bg:#071014;--panel:#0e1b20;--panel2:#13272d;--line:#28505a;
+  --txt:#defaff;--mut:#72a0a9;--acc:#00f0c8;--acc-dim:#087d70;
+  --amber:#ffd45a;--lcd:#9fffea;--lcd-dim:#4fa995;--lcdbg:#031012;
+  --danger:#ff5f6d;--radius:3px;--deck-h:92px;
+  background:
+    linear-gradient(rgba(40,91,101,.14) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(40,91,101,.14) 1px,transparent 1px),
+    radial-gradient(circle at 50% 0,rgba(0,240,200,.11),transparent 36%),#061014;
+  background-size:32px 32px,32px 32px,auto,auto;
   font-family:Consolas,"Cascadia Mono",monospace;
 }
-body[data-skin="zelda"] .btn:hover{
-  color:#b7ffff; border-color:#a6d29c; box-shadow:0 0 0 1px #07140b,2px 2px 0 #000;
+body[data-skin="quantum"] .app{width:min(1400px,100%);gap:8px;}
+body[data-skin="quantum"] .panel{
+  position:relative;border:1px solid #2c5c65;border-radius:3px;
+  background:linear-gradient(150deg,rgba(20,43,49,.97),rgba(6,20,23,.98));
+  box-shadow:inset 0 0 0 1px rgba(93,196,197,.04),0 10px 24px rgba(0,0,0,.34);
 }
-body[data-skin="zelda"] .btn:active{border-style:inset; transform:translate(1px,1px);}
-body[data-skin="zelda"] .btn.on{color:#ffe86b; background:#164d2b;}
-body[data-skin="zelda"] select,
-body[data-skin="zelda"] .pl-tools .find{
-  color:#b7ffff; background:#00140c; border:2px inset #63895e; border-radius:0;
-  font-family:Consolas,"Cascadia Mono",monospace;
+body[data-skin="quantum"] .panel::after{
+  content:"";position:absolute;right:6px;top:6px;width:5px;height:5px;border-radius:50%;
+  background:#00f0c8;box-shadow:0 0 8px #00f0c8;pointer-events:none;
 }
-body[data-skin="zelda"] input[type=range]::-webkit-slider-runnable-track{
-  height:9px; border-radius:0; border:2px inset #558054;
-  background:var(--range-bg,#052a17);
+body[data-skin="quantum"] .titlebar{
+  min-height:36px;padding:6px 12px;color:#6ea3aa;border-color:#28515a;
+  background:linear-gradient(90deg,#10252b,#0b191d);
 }
-body[data-skin="zelda"] input[type=range]::-webkit-slider-thumb{
-  width:13px; height:18px; margin-top:-6px; border-radius:0;
-  border:2px outset #c6d7c0; background:#4b6d51;
-  box-shadow:1px 1px #001108;
+body[data-skin="quantum"] .titlebar .dots{display:none;}
+body[data-skin="quantum"] .titlebar b{font-size:0;}
+body[data-skin="quantum"] .titlebar b::after{
+  content:"Q-FIELD AUDIO LAB";font:700 13px/1 Consolas,monospace;letter-spacing:.16em;color:#a9fff1;
+}
+body[data-skin="quantum"] .titlebar .hide-narrow::after{content:" / OBSERVER NODE 01";font-size:10px;}
+body[data-skin="quantum"] .titlebar .tag{
+  color:#00f0c8;background:#041012;border-color:#23606a;border-radius:2px;
+}
+body[data-skin="quantum"].is-playing .titlebar .tag{box-shadow:inset 0 0 9px #001b18,0 0 9px rgba(0,240,200,.35);}
+body[data-skin="quantum"] .skin-picker{color:#6ca9ae;}
+body[data-skin="quantum"] .skin-picker select{
+  color:#b8fff2;background:#041012;border-color:#295c64;border-radius:2px;
+}
+body[data-skin="quantum"] .deck-body{padding:13px;gap:10px;}
+body[data-skin="quantum"] .display{
+  grid-template-columns:92px minmax(0,1fr);padding:12px;border:1px solid #2a6067;border-radius:2px;
+  background:
+    linear-gradient(rgba(0,240,200,.045) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(0,240,200,.045) 1px,transparent 1px),#031012;
+  background-size:17px 17px;box-shadow:inset 0 0 24px #000;
+}
+body[data-skin="quantum"] .display::after{background:repeating-linear-gradient(0deg,rgba(0,0,0,.16) 0 1px,transparent 1px 3px);}
+body[data-skin="quantum"] .cover{
+  border:1px solid #3c8a8b;border-radius:2px;background:#08282c;color:#00f0c8;
+  box-shadow:inset 0 0 18px #020a0b;
+}
+body[data-skin="quantum"].is-playing .cover{animation:quantumPhase 2.3s ease-in-out infinite alternate;}
+@keyframes quantumPhase{to{filter:hue-rotate(34deg);box-shadow:inset 0 0 18px #020a0b,0 0 12px rgba(0,240,200,.35);}}
+body[data-skin="quantum"] .lcd-title{color:#cafff6;text-shadow:0 0 7px rgba(0,240,200,.45);}
+body[data-skin="quantum"] .lcd-time{color:#00f0c8;text-shadow:0 0 12px rgba(0,240,200,.48);}
+body[data-skin="quantum"] .lcd-info,
+body[data-skin="quantum"] .lcd-info b{color:#64aaa5;}
+body[data-skin="quantum"] canvas#vis{
+  height:84px;border:1px solid #27545c;border-radius:2px;background:#031012;
+}
+body[data-skin="quantum"] .tbtns{gap:5px;}
+body[data-skin="quantum"] .tbtns .btn{
+  width:48px;height:42px;padding:0;justify-content:center;color:#7bc8c4;
+  border-color:#28545c;border-radius:2px;background:#0b1c20;
+}
+body[data-skin="quantum"] .tbtns #bPlay{
+  color:#03211c;border-color:#00d9b7;background:#00d9b7;box-shadow:0 0 12px rgba(0,240,200,.22);
+}
+body[data-skin="quantum"] .btn{
+  color:#91c5c8;border-color:#28525a;border-radius:2px;background:linear-gradient(#173038,#0b191d);
+  font-family:Consolas,monospace;
+}
+body[data-skin="quantum"] .btn:hover{color:#00f0c8;border-color:#00a992;}
+body[data-skin="quantum"] .btn.on{color:#001b17;background:#00c9aa;border-color:#00f0c8;}
+body[data-skin="quantum"] select,
+body[data-skin="quantum"] .pl-tools .find{
+  color:#bdf5ef;background:#061316;border-color:#28545c;border-radius:2px;font-family:Consolas,monospace;
+}
+body[data-skin="quantum"] input[type=range]::-webkit-slider-runnable-track{
+  height:5px;border:1px solid #24515a;border-radius:0;background:var(--range-bg,#09262a);
+}
+body[data-skin="quantum"] input[type=range]::-webkit-slider-thumb{
+  width:13px;height:16px;margin-top:-6px;border:1px solid #9effef;border-radius:1px;background:#00b99d;
+  box-shadow:0 0 7px rgba(0,240,200,.4);
+}
+body[data-skin="quantum"] .section-head{
+  border-color:#28515a;background:linear-gradient(90deg,#10252b,#0a181c);
+}
+body[data-skin="quantum"] .section-head h2{color:#8bd6d4;font-family:Consolas,monospace;letter-spacing:.13em;}
+body[data-skin="quantum"] .section-head h2::before{content:"[λ] ";color:#00f0c8;}
+body[data-skin="quantum"] .pl-tools{background:#0b1b20;border-bottom:1px solid #28515a;}
+body[data-skin="quantum"] .views{border-color:#28525a;border-radius:2px;}
+body[data-skin="quantum"] .views button{color:#76a5aa;background:#071519;border-color:#28515a;font-family:Consolas,monospace;}
+body[data-skin="quantum"] .views button.on{color:#001b17;background:#00c8aa;}
+body[data-skin="quantum"] .pl-scroll{background:#051114;border-color:#28515a;}
+body[data-skin="quantum"] .grp{background:#10262b;border-color:#28515a;}
+body[data-skin="quantum"] .grp .gart{border-radius:2px;border-color:#32707a;background:#061519;}
+body[data-skin="quantum"] .pl-list li{border-color:rgba(48,110,119,.20);}
+body[data-skin="quantum"] .pl-list li.cur{background:linear-gradient(90deg,rgba(0,240,200,.18),transparent);box-shadow:inset 3px 0 #00f0c8;}
+body[data-skin="quantum"] .pl-list li.cur .t1,
+body[data-skin="quantum"] .pl-list li.cur .idx{color:#91fff0;}
+body[data-skin="quantum"] .pl-empty{color:#66949a;background:#051114;}
+body[data-skin="quantum"] .pl-stats{color:#6fa2a7;background:#0b1b20;border-color:#28515a;}
+body[data-skin="quantum"] footer{color:#416a70;}
+
+
+/* ---------- Event Horizon ----------
+   Cabina orbital sobria: el deck es el núcleo central y la biblioteca y los
+   procesadores funcionan como alas laterales de una nave científica. */
+body[data-skin="horizon"]{
+  --bg:#030711;--panel:#0a1020;--panel2:#101a31;--line:#273b61;
+  --txt:#e8f0ff;--mut:#8192b4;--acc:#6c8cff;--acc-dim:#344c9a;
+  --amber:#ffb84b;--lcd:#9cb3ff;--lcd-dim:#6275a5;--lcdbg:#02050c;
+  --danger:#ff576f;--radius:28px;--deck-h:118px;
+  background:
+    radial-gradient(circle at 50% 20%,rgba(82,111,255,.20),transparent 25%),
+    radial-gradient(circle at 50% 20%,transparent 0 17%,rgba(255,157,59,.10) 18%,transparent 19%),
+    linear-gradient(#060b18,#02040a 80%);
+  font-family:"Segoe UI Variable","Segoe UI",sans-serif;
+}
+body[data-skin="horizon"]::before{
+  content:"";position:fixed;left:50%;top:22%;width:58vmin;height:58vmin;transform:translate(-50%,-50%);
+  border-radius:50%;pointer-events:none;
+  background:radial-gradient(circle,transparent 0 43%,rgba(100,129,255,.055) 44%,transparent 46%);
+  box-shadow:0 0 80px rgba(69,91,212,.10);
+}
+body[data-skin="horizon"] .app{width:min(1450px,100%);gap:12px;}
+body[data-skin="horizon"] .panel{
+  border:1px solid rgba(74,100,160,.55);border-radius:28px;
+  background:linear-gradient(145deg,rgba(17,28,55,.94),rgba(5,9,20,.98));
+  box-shadow:0 20px 45px rgba(0,0,0,.48),inset 0 1px rgba(169,190,255,.10);
+}
+body[data-skin="horizon"] .titlebar{
+  min-height:43px;padding:8px 15px;color:#8293b7;border-color:#26395e;
+  background:linear-gradient(90deg,rgba(91,118,255,.13),transparent 50%,rgba(255,167,65,.07));
+}
+body[data-skin="horizon"] .titlebar .dots i{background:#273b64;}
+body[data-skin="horizon"] .titlebar .dots i:first-child{background:#718fff;box-shadow:0 0 9px #718fff;}
+body[data-skin="horizon"] .titlebar b{font-size:0;}
+body[data-skin="horizon"] .titlebar b::after{
+  content:"EVENT HORIZON / Ω";font:650 14px/1 "Segoe UI",sans-serif;letter-spacing:.18em;color:#dbe4ff;
+}
+body[data-skin="horizon"] .titlebar .tag{
+  color:#ffbd62;background:#060a14;border-color:#59482d;border-radius:20px;
+}
+body[data-skin="horizon"] .skin-picker{color:#8da1d4;}
+body[data-skin="horizon"] .skin-picker select{
+  color:#dce6ff;background:#060b17;border-color:#31466f;border-radius:18px;
+}
+body[data-skin="horizon"] .deck-body{padding:18px;}
+body[data-skin="horizon"] .display{
+  grid-template-columns:118px minmax(0,1fr);padding:17px;border:1px solid #2f4674;border-radius:25px;
+  background:
+    radial-gradient(circle at 12% 42%,rgba(104,137,255,.16),transparent 26%),
+    linear-gradient(125deg,#060b1a,#02040b);box-shadow:inset 0 0 42px #000;
+}
+body[data-skin="horizon"] .display::after{background:repeating-linear-gradient(0deg,rgba(0,0,0,.15) 0 1px,transparent 1px 4px);}
+body[data-skin="horizon"] .cover{
+  border:1px solid #758eff;border-radius:50%;
+  background:radial-gradient(circle,#020308 0 31%,#ffab45 32% 34%,#4e65d8 38% 47%,#090d1d 54%);color:#fff;
+  box-shadow:0 0 28px rgba(92,119,255,.48),inset 0 0 20px #000;
+}
+body[data-skin="horizon"].is-playing .cover{animation:horizonOrbit 9s linear infinite;}
+@keyframes horizonOrbit{to{transform:rotate(360deg);filter:hue-rotate(18deg);}}
+body[data-skin="horizon"] .lcd-title{color:#edf2ff;text-shadow:0 0 8px rgba(111,140,255,.45);}
+body[data-skin="horizon"] .lcd-time{color:#93aaff;text-shadow:0 0 16px rgba(93,124,255,.55);}
+body[data-skin="horizon"] .lcd-info,
+body[data-skin="horizon"] .lcd-info b{color:#7184ad;}
+body[data-skin="horizon"] canvas#vis{
+  height:100px;border:1px solid #293d66;border-radius:20px;background:#02050d;
+}
+body[data-skin="horizon"] .tbtns{gap:10px;}
+body[data-skin="horizon"] .tbtns .btn{
+  width:52px;height:52px;padding:0;justify-content:center;color:#aab9e3;
+  border-color:#314873;border-radius:50%;background:radial-gradient(circle at 38% 30%,#26365d,#080e20 68%);
+  box-shadow:inset 0 1px rgba(255,255,255,.10),0 7px 15px #01030a;
+}
+body[data-skin="horizon"] .tbtns #bPlay{
+  width:68px;height:68px;margin-top:-8px;color:#080b15;border-color:#9eb0ff;
+  background:radial-gradient(circle at 35% 28%,#ced8ff,#718cff 58%,#3c55b7);
+  box-shadow:0 0 25px rgba(102,133,255,.48),inset 0 1px #fff;
+}
+body[data-skin="horizon"] .btn{
+  color:#acb9da;border-color:#2c416b;border-radius:18px;background:linear-gradient(145deg,#182749,#090f20);
+}
+body[data-skin="horizon"] .btn:hover{color:#fff;border-color:#6f8dff;}
+body[data-skin="horizon"] .btn.on{color:#dce4ff;border-color:#718eff;background:#263e81;}
+body[data-skin="horizon"] select,
+body[data-skin="horizon"] .pl-tools .find{
+  color:#d8e2ff;background:#050a16;border-color:#2d426b;border-radius:18px;
+}
+body[data-skin="horizon"] input[type=range]::-webkit-slider-runnable-track{
+  height:6px;border:0;border-radius:8px;background:var(--range-bg,#26375b);
+}
+body[data-skin="horizon"] input[type=range]::-webkit-slider-thumb{
+  width:18px;height:18px;margin-top:-6px;border:3px solid #dce4ff;border-radius:50%;
+  background:#6f8cff;box-shadow:0 0 12px rgba(104,133,255,.55);
+}
+body[data-skin="horizon"] .section-head{
+  border-color:#293d63;background:linear-gradient(90deg,rgba(102,132,255,.10),transparent);
+}
+body[data-skin="horizon"] .section-head h2{color:#abb9df;}
+body[data-skin="horizon"] .section-head h2::before{content:"◌ ";color:#ffb84b;}
+body[data-skin="horizon"] .pl-tools{background:#0b1226;border-bottom:1px solid #293d63;}
+body[data-skin="horizon"] .views{border-color:#2d426b;border-radius:18px;}
+body[data-skin="horizon"] .views button{color:#8192b5;background:#070c19;border-color:#293d63;}
+body[data-skin="horizon"] .views button.on{color:#071020;background:#718cff;}
+body[data-skin="horizon"] .pl-scroll{background:#030711;border-color:#293c61;}
+body[data-skin="horizon"] .grp{background:linear-gradient(90deg,#111c35,#091020);border-color:#293c61;}
+body[data-skin="horizon"] .grp .gart{border-radius:50%;border-color:#3c5688;background:#040815;}
+body[data-skin="horizon"] .pl-list li{border-color:rgba(56,77,122,.22);}
+body[data-skin="horizon"] .pl-list li.cur{background:linear-gradient(90deg,rgba(108,140,255,.22),transparent);box-shadow:inset 3px 0 #ffb84b;}
+body[data-skin="horizon"] .pl-list li.cur .t1,
+body[data-skin="horizon"] .pl-list li.cur .idx{color:#cdd7ff;}
+body[data-skin="horizon"] .pl-empty{color:#7182a5;background:#030711;}
+body[data-skin="horizon"] .pl-stats{color:#788bad;background:#0a1123;border-color:#293c61;}
+body[data-skin="horizon"] footer{color:#46536e;}
+
+
+/* ---------- Glasswave ----------
+   OndaAmp deja de parecer equipo clásico: cristal claro, carátula orbital,
+   controles táctiles y la biblioteca en el lado dominante. */
+body[data-skin="glass"]{
+  --bg:#dfe8f3;--panel:rgba(248,252,255,.64);--panel2:rgba(255,255,255,.52);
+  --line:rgba(75,99,132,.24);--txt:#15243b;--mut:#61738b;--acc:#006ee6;
+  --acc-dim:#78aee8;--amber:#ed8a22;--lcd:#102d59;--lcd-dim:#5a789f;
+  --lcdbg:rgba(244,250,255,.55);--danger:#d43f5e;--radius:24px;--deck-h:126px;
+  background:
+    radial-gradient(circle at 12% 2%,rgba(81,211,255,.48),transparent 30%),
+    radial-gradient(circle at 86% 8%,rgba(173,105,255,.32),transparent 31%),
+    radial-gradient(circle at 62% 88%,rgba(86,255,194,.25),transparent 34%),
+    linear-gradient(140deg,#f5f9ff,#d9e3f0);
+  color:#15243b;font-family:"Segoe UI Variable","Segoe UI",system-ui,sans-serif;
+}
+body[data-skin="glass"]::before{
+  content:"";position:fixed;width:34vw;height:34vw;right:-8vw;bottom:-13vw;
+  border:1px solid rgba(255,255,255,.7);border-radius:50%;pointer-events:none;
+  box-shadow:0 0 0 34px rgba(255,255,255,.12),0 0 0 70px rgba(255,255,255,.08);
+}
+body[data-skin="glass"] .app{width:min(1340px,100%);gap:14px;}
+body[data-skin="glass"] .panel{
+  border:1px solid rgba(255,255,255,.78);border-radius:24px;
+  background:linear-gradient(145deg,rgba(255,255,255,.76),rgba(239,246,255,.48));
+  backdrop-filter:blur(24px) saturate(140%);
+  box-shadow:0 18px 45px rgba(54,76,111,.16),inset 0 1px rgba(255,255,255,.92);
+}
+body[data-skin="glass"] .titlebar{
+  min-height:48px;padding:9px 16px;color:#61738b;border-color:rgba(83,107,141,.16);
+  background:linear-gradient(90deg,rgba(255,255,255,.55),rgba(255,255,255,.18));
+}
+body[data-skin="glass"] .titlebar .dots i{width:8px;height:8px;background:#c1cede;}
+body[data-skin="glass"] .titlebar .dots i:first-child{background:#006ee6;box-shadow:0 0 0 5px rgba(0,110,230,.11);}
+body[data-skin="glass"] .titlebar b{font-size:0;}
+body[data-skin="glass"] .titlebar b::after{
+  content:"glasswave";font:700 17px/1 "Segoe UI Variable","Segoe UI",sans-serif;
+  letter-spacing:-.03em;color:#15243b;
+}
+body[data-skin="glass"] .titlebar .hide-narrow{font-size:11px;letter-spacing:.06em;}
+body[data-skin="glass"] .titlebar .tag{
+  color:#36526f;background:rgba(255,255,255,.55);border-color:rgba(70,99,132,.22);
+}
+body[data-skin="glass"] .skin-picker{color:#58718d;font-weight:700;}
+body[data-skin="glass"] .skin-picker select{
+  color:#17304e;background:rgba(255,255,255,.66);border-color:rgba(65,93,126,.22);border-radius:14px;
+}
+body[data-skin="glass"] .deck-body{padding:18px;gap:16px;}
+body[data-skin="glass"] .display{
+  grid-template-columns:126px minmax(0,1fr);padding:18px;border:1px solid rgba(255,255,255,.8);border-radius:22px;
+  background:
+    radial-gradient(circle at 8% 30%,rgba(67,188,255,.20),transparent 33%),
+    linear-gradient(135deg,rgba(255,255,255,.68),rgba(231,241,253,.38));
+  box-shadow:inset 0 1px rgba(255,255,255,.85),0 12px 30px rgba(56,81,119,.10);
+}
+body[data-skin="glass"] .display::after{display:none;}
+body[data-skin="glass"] .cover{
+  border:7px solid rgba(255,255,255,.78);border-radius:50%;outline:1px solid rgba(62,94,134,.18);
+  background:conic-gradient(from 40deg,#78e2ff,#8279ff,#ff86c7,#78e2ff);color:#fff;
+  box-shadow:0 15px 30px rgba(57,104,156,.22),inset 0 0 0 1px rgba(255,255,255,.8);
+}
+body[data-skin="glass"] .cover::after{
+  content:"";position:absolute;width:22%;height:22%;border-radius:50%;
+  left:50%;top:50%;transform:translate(-50%,-50%);z-index:2;
+  background:rgba(255,255,255,.88);box-shadow:0 0 0 5px rgba(21,55,94,.12);
+}
+body[data-skin="glass"] .cover{position:relative;}
+body[data-skin="glass"].is-playing .cover{animation:glassOrbit 12s linear infinite;}
+body[data-skin="glass"].is-playing .cover img{animation:glassOrbitReverse 12s linear infinite;}
+@keyframes glassOrbit{to{transform:rotate(360deg);}}
+@keyframes glassOrbitReverse{to{transform:rotate(-360deg);}}
+body[data-skin="glass"] .lcd-title{color:#172b46;text-shadow:none;font-size:17px;}
+body[data-skin="glass"] .lcd-time{color:#006ee6;text-shadow:none;font-family:"Segoe UI Variable","Segoe UI",sans-serif;font-weight:650;}
+body[data-skin="glass"] .lcd-info,
+body[data-skin="glass"] .lcd-info b{color:#617b99;}
+body[data-skin="glass"] canvas#vis{
+  height:92px;border:0;border-radius:18px;background:rgba(255,255,255,.36);
+}
+body[data-skin="glass"] .seek-row .t{color:#647993;}
+body[data-skin="glass"] .tbtns{gap:10px;align-items:center;}
+body[data-skin="glass"] .tbtns .btn{
+  width:48px;height:48px;padding:0;justify-content:center;color:#47617e;
+  border-color:rgba(66,94,128,.15);border-radius:50%;background:rgba(255,255,255,.52);
+  box-shadow:0 8px 16px rgba(53,79,111,.12),inset 0 1px #fff;
+}
+body[data-skin="glass"] .tbtns #bPlay{
+  width:66px;height:66px;color:#fff;border:0;
+  background:linear-gradient(145deg,#1684f5,#6056e8);
+  box-shadow:0 14px 24px rgba(21,103,216,.30),inset 0 1px rgba(255,255,255,.45);
+}
+body[data-skin="glass"] .btn{
+  color:#405a77;border-color:rgba(66,94,128,.18);border-radius:14px;
+  background:rgba(255,255,255,.48);box-shadow:inset 0 1px rgba(255,255,255,.75);
+}
+body[data-skin="glass"] .btn:hover{color:#006ee6;border-color:rgba(0,110,230,.35);background:rgba(255,255,255,.72);}
+body[data-skin="glass"] .btn.on{color:#005fc9;border-color:#70aceb;background:rgba(101,174,255,.18);box-shadow:none;}
+body[data-skin="glass"] select,
+body[data-skin="glass"] .pl-tools .find{
+  color:#263e5b;background:rgba(255,255,255,.55);border-color:rgba(75,99,132,.22);border-radius:14px;
+}
+body[data-skin="glass"] input[type=range]::-webkit-slider-runnable-track{
+  height:7px;border:0;border-radius:10px;background:var(--range-bg,rgba(72,104,143,.18));
+}
+body[data-skin="glass"] input[type=range]::-webkit-slider-thumb{
+  width:18px;height:18px;margin-top:-5.5px;border:4px solid #fff;border-radius:50%;
+  background:#0878eb;box-shadow:0 3px 9px rgba(25,82,143,.28);
+}
+body[data-skin="glass"] .section-head{
+  border-color:rgba(74,98,130,.17);background:rgba(255,255,255,.22);
+}
+body[data-skin="glass"] .section-head h2{color:#38516d;letter-spacing:.12em;}
+body[data-skin="glass"] .eq-body,
+body[data-skin="glass"] .fx-body,
+body[data-skin="glass"] .am-body{background:rgba(255,255,255,.10);}
+body[data-skin="glass"] .pl-tools{background:rgba(255,255,255,.19);}
+body[data-skin="glass"] .views{border-color:rgba(70,96,129,.18);border-radius:14px;}
+body[data-skin="glass"] .views button{color:#637992;background:rgba(255,255,255,.26);border-color:rgba(70,96,129,.16);}
+body[data-skin="glass"] .views button.on{color:#fff;background:#147de8;}
+body[data-skin="glass"] .pl-scroll{background:rgba(247,251,255,.25);border-color:rgba(70,96,129,.15);}
+body[data-skin="glass"] .grp{
+  background:rgba(245,249,255,.76);border-color:rgba(70,96,129,.15);backdrop-filter:blur(15px);
+}
+body[data-skin="glass"] .grp .gart{border-radius:13px;border-color:rgba(70,96,129,.18);background:#edf5fd;}
+body[data-skin="glass"] .pl-list li{border-color:rgba(82,107,138,.12);}
+body[data-skin="glass"] .pl-list li:hover{background:rgba(255,255,255,.38);}
+body[data-skin="glass"] .pl-list li.cur{background:linear-gradient(90deg,rgba(39,133,238,.16),rgba(115,87,239,.08));}
+body[data-skin="glass"] .pl-list li.cur .t1,
+body[data-skin="glass"] .pl-list li.cur .idx{color:#005fc8;}
+body[data-skin="glass"] .pl-empty{color:#6a7f96;background:rgba(255,255,255,.20);}
+body[data-skin="glass"] .pl-stats{color:#61758d;background:rgba(255,255,255,.24);border-color:rgba(70,96,129,.15);}
+body[data-skin="glass"] .am-estado{background:rgba(255,255,255,.32);}
+body[data-skin="glass"] footer{color:#71849a;}
+body[data-skin="glass"] footer kbd{color:#36516f;background:rgba(255,255,255,.52);border-color:rgba(70,96,129,.20);}
+body[data-skin="glass"] .toast{color:#17304e;background:rgba(249,252,255,.88);border-color:#fff;border-left-color:#0878eb;backdrop-filter:blur(18px);}
+
+
+@media (max-width:799px){
+  body[data-skin="neon"]{--deck-h:82px;}
+  body[data-skin="cassette"]{--deck-h:78px;}
+  body[data-skin="polar"]{--deck-h:82px;}
+  body[data-skin="noir"]{--deck-h:82px;}
+  body[data-skin="hoshi"]{--deck-h:82px;}
+  body[data-skin="quantum"]{--deck-h:78px;}
+  body[data-skin="horizon"]{--deck-h:86px;}
+  body[data-skin="glass"]{--deck-h:88px;}
+  body[data-skin="neon"] canvas#vis,
+  body[data-skin="cassette"] canvas#vis,
+  body[data-skin="polar"] canvas#vis,
+  body[data-skin="noir"] canvas#vis,
+  body[data-skin="hoshi"] canvas#vis,
+  body[data-skin="quantum"] canvas#vis,
+  body[data-skin="horizon"] canvas#vis,
+  body[data-skin="glass"] canvas#vis,
+  body[data-skin="rack"] canvas#vis{height:56px;}
+}
+@media (prefers-reduced-motion:reduce){
+  body[data-skin="rack"].is-playing .cover,
+  body[data-skin="neon"].is-playing .cover,
+  body[data-skin="neon"].is-playing .titlebar .tag,
+  body[data-skin="cassette"].is-playing .cover,
+  body[data-skin="polar"].is-playing .cover,
+  body[data-skin="noir"].is-playing .cover,
+  body[data-skin="hoshi"].is-playing .cover,
+  body[data-skin="quantum"].is-playing .cover,
+  body[data-skin="horizon"].is-playing .cover,
+  body[data-skin="glass"].is-playing .cover,
+  body[data-skin="glass"].is-playing .cover img{animation:none;}
 }
 
-body[data-skin="zelda"] #eqPanel{
-  background:
-    linear-gradient(rgba(0,27,12,.22),rgba(0,18,9,.78)),
-    url("assets/skins/zelda-amp-3/eqmain.bmp") center top / 100% auto no-repeat,
-    #062514;
-}
-body[data-skin="zelda"] .section-head{
-  color:#e1d5ff;
-  border-bottom:3px ridge #749b6e;
-  background:
-    linear-gradient(rgba(27,56,30,.22),rgba(5,22,10,.65)),
-    url("assets/skins/zelda-amp-3/pledit.bmp") center 13% / 100% auto no-repeat;
-  text-shadow:2px 2px #050805;
-}
-body[data-skin="zelda"] .section-head h2{
-  color:#cfc0ff; font:900 16px/1 Georgia,serif; letter-spacing:.08em;
-  text-shadow:2px 2px #111,0 0 2px #b4a3ff;
-}
-body[data-skin="zelda"] .eq-body{background:rgba(0,20,9,.58);}
-body[data-skin="zelda"] .band .db,
-body[data-skin="zelda"] .band .hz,
-body[data-skin="zelda"] .eq-extra .lbl{color:#e5d9ff;}
-body[data-skin="zelda"] .band.pre .hz{color:#ffe86b;}
+/* ---------- Las skins, en el teléfono ----------
+   Las rejillas de escritorio que traen algunas skins no viajan a la PWA: aquí
+   manda el diseño de app (biblioteca a pantalla completa + pantallas
+   deslizables). Esto solo corrige lo que una skin puede desajustar de él. */
 
-body[data-skin="zelda"] #plPanel{
-  border-color:#9a734f;
-  background:#020504;
-  box-shadow:0 0 0 3px #3f2617,0 10px 0 rgba(0,0,0,.35);
-}
-body[data-skin="zelda"] #plPanel .section-head{
-  border-color:#ae8054;
-  background:
-    linear-gradient(rgba(67,36,18,.15),rgba(38,18,9,.4)),
-    url("assets/skins/zelda-amp-3/pledit.bmp") center 14% / 100% auto no-repeat,
-    #6e4528;
-}
-body[data-skin="zelda"] #plPanel .section-head h2::before{content:"GAME OVER · ";}
-body[data-skin="zelda"] .pl-tools{
-  border-bottom:3px ridge #9d7148;
-  background:linear-gradient(#825836,#53331e);
-}
-body[data-skin="zelda"] .views{border:2px inset #a3734c; border-radius:0;}
-body[data-skin="zelda"] .views button{
-  color:#d7c7ff; background:#071010; border-color:#75583d;
-  font-family:Consolas,"Cascadia Mono",monospace;
-}
-body[data-skin="zelda"] .views button.on{color:#69fff2; background:#173751;}
-body[data-skin="zelda"] .pl-scroll{border-color:#8c6848;background:#000;}
-body[data-skin="zelda"] .grp{
-  background:linear-gradient(#342418,#1f150f);
-  border-color:#8f6744; color:#f2e9ff;
-}
-body[data-skin="zelda"] .grp .gart{border-radius:0;border-color:#9b754f;background:#07140d;}
-body[data-skin="zelda"] .grp .g2,
-body[data-skin="zelda"] .grp .gmeta{color:#c3b2e1;}
-body[data-skin="zelda"] .pl-list li{
-  color:#f3eaff; border-color:#233d36; font-family:Arial,sans-serif;
-}
-body[data-skin="zelda"] .pl-list li:hover{background:#16213b;}
-body[data-skin="zelda"] .pl-list li.cur{background:#433454;}
-body[data-skin="zelda"] .pl-list li.cur .t1,
-body[data-skin="zelda"] .pl-list li.cur .idx{color:#b7ffff;}
-body[data-skin="zelda"] .pl-list li .t2,
-body[data-skin="zelda"] .pl-list li .dur,
-body[data-skin="zelda"] .pl-list li .idx{color:#decaFF;}
-body[data-skin="zelda"] .pl-empty{color:#decaFF;background:#000;}
-body[data-skin="zelda"] .pl-empty b{color:#b7ffff;}
-body[data-skin="zelda"] .pl-stats{
-  color:#b7ffff; border-color:#9c714b;
-  background:linear-gradient(#745033,#442a1a);
-}
-body[data-skin="zelda"] footer{color:#b9adcf;text-shadow:1px 1px #000;}
-body[data-skin="zelda"] footer kbd{
-  color:#b7ffff; background:#071b10; border-color:#709468; border-radius:0;
-}
-body[data-skin="zelda"] .toast{
-  color:#f5eaff; background:#07180eee; border-color:#71946b; border-radius:0;
+/* Velo de pulsación y mezcla del mini-reproductor: por omisión claros sobre
+   fondo oscuro; las tres skins claras los invierten para que se vean. */
+body[data-skin="cassette"],
+body[data-skin="polar"],
+body[data-skin="glass"]{--velo:rgba(0,0,0,.10); --velo-mezcla:white;}
+
+@media (max-width:760px){
+  /* Las pantallas deslizables y el mini-reproductor siguen a la skin activa */
+  #deckPanel, #sheetAjustes{background:var(--bg);}
+  #miniPlayer{background:color-mix(in srgb, var(--panel) 96%, var(--velo-mezcla, black));}
+  .sheet-cerrar:active, .sheet-extra:active,
+  .mini-btn:active{background:var(--velo, rgba(255,255,255,.1));}
+
+  /* Los adornos de panel (tornillos, cintas, cantos) se pensaron para paneles
+     pequeños de escritorio; a pantalla completa estorban. */
+  #deckPanel::before, #deckPanel::after,
+  #sheetAjustes > .panel::before{content:none;}
+
+  /* Apariencia va siempre desplegado: es el motivo de entrar aquí */
+  #apPanel.closed > .section-body{display:flex;}
+  #apPanel > .section-head .chev{display:none;}
+
+  /* Ninguna skin puede encoger los objetivos táctiles del transporte */
+  #deckPanel .tbtns .btn{width:58px; height:58px; border-radius:50%;}
+  #deckPanel .btn.play-main{width:70px; height:70px;}
 }
 
-/* ---------- Bento Classified ---------- */
-body[data-skin="bento"]{
-  --bg:#08090a; --panel:#181b1e; --panel2:#262a2e; --line:#4e555b;
-  --txt:#d5dadd; --mut:#93afb9; --acc:#f28a20; --acc-dim:#8c4b17;
-  --amber:#f7a13e; --lcd:#c8c8c8; --lcd-dim:#768a91; --lcdbg:#08090a;
-  --danger:#f0604d; --radius:3px;
-  background:
-    radial-gradient(900px 420px at 50% -80px,rgba(91,101,108,.32),transparent 70%),
-    linear-gradient(#191c1f,#070809);
-  font-family:"Segoe UI",Arial,sans-serif;
-}
-body[data-skin="bento"] .app{gap:7px;}
-body[data-skin="bento"] .panel{
-  position:relative; border:1px solid #596066; border-radius:3px;
-  background:linear-gradient(#282c30,#111315 58%,#090a0b);
-  box-shadow:0 8px 20px rgba(0,0,0,.55),inset 0 1px #737b80;
-}
-body[data-skin="bento"] .titlebar{
-  min-height:29px; padding:4px 8px;
-  border-bottom:1px solid #0b0c0d;
-  background:
-    linear-gradient(90deg,rgba(5,6,7,.28),rgba(5,6,7,.7)),
-    url("assets/skins/bento-classified/TITLEBAR.bmp") left top / auto 87px repeat-x;
-  color:#a2c1cc; text-shadow:1px 1px #000;
-}
-body[data-skin="bento"] .titlebar .dots{display:none;}
-body[data-skin="bento"] .titlebar b{font-size:0;}
-body[data-skin="bento"] .titlebar b::after{
-  content:"BENTO CLASSIFIED";
-  font:700 12px/1 "Segoe UI",Arial,sans-serif;
-  letter-spacing:.15em; color:#d8dde0;
-}
-body[data-skin="bento"] .titlebar .tag,
-body[data-skin="bento"] .skin-picker select{
-  color:#c8c8c8; background:#08090a; border:1px solid #596067; border-radius:2px;
-}
-body[data-skin="bento"] .skin-picker{color:#f28a20;}
-
-body[data-skin="bento"] #deckPanel{
-  background:
-    linear-gradient(rgba(8,9,10,.35),rgba(8,9,10,.6)),
-    url("assets/skins/bento-classified/MAIN.bmp") center / cover no-repeat;
-}
-body[data-skin="bento"] .deck-body{padding:11px;background:rgba(5,6,7,.25);}
-body[data-skin="bento"] .display{
-  border:1px solid #41484d; border-radius:2px;
-  background:rgba(4,5,6,.94);
-  box-shadow:inset 0 0 0 1px #111416,inset 0 0 28px rgba(109,139,148,.08);
-}
-body[data-skin="bento"] .display::after{
-  background:repeating-linear-gradient(0deg,rgba(0,0,0,.22) 0 1px,transparent 1px 3px);
-}
-body[data-skin="bento"] .cover{
-  border:1px solid #555d62; border-radius:2px;
-  background:#0b0d0e url("assets/skins/bento-classified/GEN.bmp") center / cover;
-  color:#f28a20;
-}
-body[data-skin="bento"] .cover img{image-rendering:auto;}
-body[data-skin="bento"] .lcd-title,
-body[data-skin="bento"] .lcd-time{
-  color:#c8c8c8; text-shadow:0 0 6px rgba(162,193,204,.32);
-}
-body[data-skin="bento"] .lcd-info,
-body[data-skin="bento"] .lcd-info b{color:#93afb9;}
-body[data-skin="bento"] canvas#vis{
-  border:1px solid #343a3e; border-radius:1px; background:#060708;
-}
-
-body[data-skin="bento"] .tbtns{gap:2px;}
-body[data-skin="bento"] .tbtns .btn{
-  width:46px; height:36px; padding:0; border:0; border-radius:0;
-  background-color:transparent;
-  background-image:url("assets/skins/bento-classified/CBUTTONS.bmp");
-  background-repeat:no-repeat; background-size:272px 72px;
-  box-shadow:none; image-rendering:pixelated;
-}
-body[data-skin="bento"] .tbtns .btn svg{display:none;}
-body[data-skin="bento"] #bPrev{background-position:0 0;}
-body[data-skin="bento"] #bPlay{background-position:-46px 0;}
-body[data-skin="bento"] #bPlay.is-playing{background-position:-92px 0;}
-body[data-skin="bento"] #bStop{background-position:-138px 0;}
-body[data-skin="bento"] #bNext{background-position:-184px 0;}
-body[data-skin="bento"] #bPrev:active{background-position:0 -36px;}
-body[data-skin="bento"] #bPlay:active{background-position:-46px -36px;}
-body[data-skin="bento"] #bPlay.is-playing:active{background-position:-92px -36px;}
-body[data-skin="bento"] #bStop:active{background-position:-138px -36px;}
-body[data-skin="bento"] #bNext:active{background-position:-184px -36px;}
-
-body[data-skin="bento"] .btn{
-  color:#d3d8db; border:1px solid #5b6267; border-radius:2px;
-  background:linear-gradient(#4a5054,#25292c 48%,#17191b);
-  box-shadow:inset 0 1px #737b80,0 1px 2px #000;
-}
-body[data-skin="bento"] .btn:hover{color:#fff;border-color:#7b858b;}
-body[data-skin="bento"] .btn:active{background:linear-gradient(#17191b,#34393c);}
-body[data-skin="bento"] .btn.on{
-  color:#ffab50; border-color:#965820; box-shadow:inset 0 0 5px rgba(242,138,32,.25);
-}
-body[data-skin="bento"] select,
-body[data-skin="bento"] .pl-tools .find{
-  color:#c8c8c8; background:#08090a; border:1px solid #555d62; border-radius:2px;
-}
-body[data-skin="bento"] input[type=range]::-webkit-slider-runnable-track{
-  height:7px; border:1px solid #4a5054; border-radius:1px;
-  background:var(--range-bg,#171a1c);
-}
-body[data-skin="bento"] input[type=range]::-webkit-slider-thumb{
-  width:16px; height:12px; margin-top:-4px; border-radius:2px;
-  border:1px solid #747c81; background:linear-gradient(#d2d5d7,#73797d);
-  box-shadow:0 1px 2px #000;
-}
-
-body[data-skin="bento"] #eqPanel{
-  background:
-    linear-gradient(rgba(8,9,10,.28),rgba(8,9,10,.82)),
-    url("assets/skins/bento-classified/EQMAIN.bmp") center top / 100% auto no-repeat,
-    #101214;
-}
-body[data-skin="bento"] .section-head{
-  color:#a2c1cc; border-bottom:1px solid #4a5054;
-  background:
-    linear-gradient(rgba(25,28,30,.3),rgba(8,9,10,.75)),
-    url("assets/skins/bento-classified/PLEDIT.bmp") center 10% / 100% auto no-repeat,
-    #24282b;
-}
-body[data-skin="bento"] .section-head h2{
-  color:#c8c8c8; font-size:12px; letter-spacing:.14em;
-}
-body[data-skin="bento"] .eq-body{background:rgba(8,9,10,.54);}
-body[data-skin="bento"] .band .db,
-body[data-skin="bento"] .band .hz,
-body[data-skin="bento"] .eq-extra .lbl{color:#93afb9;}
-body[data-skin="bento"] .band.pre .hz{color:#f28a20;}
-
-body[data-skin="bento"] #plPanel{background:#08090a;}
-body[data-skin="bento"] #plPanel .section-head{
-  background:
-    linear-gradient(rgba(20,22,24,.15),rgba(8,9,10,.58)),
-    url("assets/skins/bento-classified/PLEDIT.bmp") center 10% / 100% auto no-repeat,
-    #24282b;
-}
-body[data-skin="bento"] #plPanel .section-head h2::before{content:"CLASSIFIED · ";}
-body[data-skin="bento"] .pl-tools{background:#202427;border-bottom:1px solid #4f565b;}
-body[data-skin="bento"] .views{border-color:#4f565b;border-radius:2px;}
-body[data-skin="bento"] .views button{color:#93afb9;background:#121416;border-color:#4f565b;}
-body[data-skin="bento"] .views button.on{color:#fff;background:#313540;}
-body[data-skin="bento"] .pl-scroll{border-color:#34393c;background:#08090a;}
-body[data-skin="bento"] .grp{background:#323637;border-color:#50575b;}
-body[data-skin="bento"] .grp .gart{border-radius:2px;border-color:#596166;background:#111416;}
-body[data-skin="bento"] .grp .g2,
-body[data-skin="bento"] .grp .gmeta{color:#93afb9;}
-body[data-skin="bento"] .pl-list li{
-  color:#93afb9; border-color:rgba(78,85,91,.35); font-family:Arial,sans-serif;
-}
-body[data-skin="bento"] .pl-list li:hover{background:#22262b;}
-body[data-skin="bento"] .pl-list li.cur{background:#313540;}
-body[data-skin="bento"] .pl-list li.cur .t1,
-body[data-skin="bento"] .pl-list li.cur .idx{color:#c8c8c8;}
-body[data-skin="bento"] .pl-list li .t2,
-body[data-skin="bento"] .pl-list li .dur,
-body[data-skin="bento"] .pl-list li .idx{color:#93afb9;}
-body[data-skin="bento"] .pl-empty{color:#93afb9;background:#08090a;}
-body[data-skin="bento"] .pl-empty b{color:#c8c8c8;}
-body[data-skin="bento"] .pl-stats{color:#a2c1cc;border-color:#4f565b;background:#202427;}
-body[data-skin="bento"] footer{color:#78858b;}
-body[data-skin="bento"] footer kbd{
-  color:#c8c8c8;background:#191c1e;border-color:#51585d;border-radius:2px;
-}
-body[data-skin="bento"] .toast{
-  color:#d8dde0;background:#171a1dee;border-color:#596166;border-left-color:#f28a20;
-  border-radius:2px;
-}
 
 /* ---------- Skins .wsz importados ----------
    Los colores se inyectan como variables y el único bitmap empleado es el
@@ -1202,31 +2049,6 @@ body[data-skin="imported"] footer{color:var(--mut);}
 @media (max-width:620px){
   .skin-picker span{display:none;}
   .skin-picker select{max-width:112px;}
-  body[data-skin="zelda"] .titlebar b::after{font-size:15px;}
-  body[data-skin="zelda"] .tbtns .btn{
-    width:38px; height:30px; background-size:225px 60px;
-  }
-  body[data-skin="zelda"] #bPlay{background-position:-38px 0;}
-  body[data-skin="zelda"] #bPlay.is-playing{background-position:-76px 0;}
-  body[data-skin="zelda"] #bStop{background-position:-114px 0;}
-  body[data-skin="zelda"] #bNext{background-position:-152px 0;}
-  body[data-skin="zelda"] #bPrev:active{background-position:0 -30px;}
-  body[data-skin="zelda"] #bPlay:active{background-position:-38px -30px;}
-  body[data-skin="zelda"] #bPlay.is-playing:active{background-position:-76px -30px;}
-  body[data-skin="zelda"] #bStop:active{background-position:-114px -30px;}
-  body[data-skin="zelda"] #bNext:active{background-position:-152px -30px;}
-  body[data-skin="bento"] .tbtns .btn{
-    width:38px; height:30px; background-size:225px 60px;
-  }
-  body[data-skin="bento"] #bPlay{background-position:-38px 0;}
-  body[data-skin="bento"] #bPlay.is-playing{background-position:-76px 0;}
-  body[data-skin="bento"] #bStop{background-position:-114px 0;}
-  body[data-skin="bento"] #bNext{background-position:-152px 0;}
-  body[data-skin="bento"] #bPrev:active{background-position:0 -30px;}
-  body[data-skin="bento"] #bPlay:active{background-position:-38px -30px;}
-  body[data-skin="bento"] #bPlay.is-playing:active{background-position:-76px -30px;}
-  body[data-skin="bento"] #bStop:active{background-position:-114px -30px;}
-  body[data-skin="bento"] #bNext:active{background-position:-152px -30px;}
   body[data-skin="imported"] .tbtns .btn{
     width:38px; height:30px; background-size:225px 60px;
   }
@@ -1303,7 +2125,7 @@ body{
     <div class="sheet-cab">
       <button class="sheet-cerrar" data-cerrar="reproduciendo" aria-label="Volver a la biblioteca">⌄</button>
       <span>Reproduciendo</span>
-      <button class="sheet-extra" data-abrir="ajustes" aria-label="Ajustes de sonido">⚙</button>
+      <button class="sheet-extra" data-abrir="ajustes" aria-label="Ajustes: apariencia y sonido">⚙</button>
     </div>
     <div class="titlebar">
       <span class="dots"><i></i><i></i><i></i></span>
@@ -1312,7 +2134,18 @@ body{
       <label class="skin-picker" title="Cambiar la apariencia del reproductor">
         <span>SKIN</span>
         <select id="skinSelect" aria-label="Skin visual">
-          <option value="ondaamp">OndaAmp</option>
+          <optgroup label="Colección OndaAmp">
+            <option value="ondaamp">OndaAmp Original</option>
+            <option value="rack">Studio Rack 1978</option>
+            <option value="neon">Neon Broadcast</option>
+            <option value="cassette">Cassette Club '86</option>
+            <option value="polar">Polar FM</option>
+            <option value="noir">Noir Gold</option>
+            <option value="hoshi">Hoshi Drive</option>
+            <option value="quantum">Quantum Field Lab</option>
+            <option value="horizon">Event Horizon</option>
+            <option value="glass">Glasswave</option>
+          </optgroup>
         </select>
       </label>
       <button class="btn skin-action" id="bImportSkin" title="Importar uno o varios skins .wsz" aria-label="Importar skins">＋</button>
@@ -1370,13 +2203,34 @@ body{
     </div>
   </div>
 
-  <!-- Envoltorio de los tres paneles de sonido. En escritorio usa
-       display:contents, así que es invisible para la rejilla y el diseño no
-       cambia; en móvil se convierte en una pantalla de Ajustes deslizable. -->
+  <!-- Envoltorio de los paneles de ajustes. En escritorio usa display:contents,
+       así que es invisible para la rejilla y el diseño no cambia; en móvil se
+       convierte en una pantalla de Ajustes deslizable. -->
   <div id="sheetAjustes">
   <div class="sheet-cab">
     <button class="sheet-cerrar" data-cerrar="ajustes" aria-label="Volver">⌄</button>
-    <span>Sonido</span>
+    <span>Ajustes</span>
+  </div>
+
+  <!-- ============ APARIENCIA ============ -->
+  <!-- Único camino para cambiar de skin en el teléfono: la barra de título,
+       donde vive el <select>, no se dibuja en móvil. Por eso el CSS lo abre
+       siempre en pantallas pequeñas aunque nazca plegado para escritorio. -->
+  <div class="panel closed" id="apPanel">
+    <div class="section-head" data-toggle="apPanel">
+      <h2>APARIENCIA</h2>
+      <span class="chev">▾</span>
+    </div>
+    <div class="section-body ap-body">
+      <div class="skin-grid" id="skinGrid"></div>
+      <div class="ap-pie">
+        <button class="btn" id="bImportSkin2" title="Añadir skins clásicos de Winamp (.wsz) desde tu teléfono">＋ Importar skin .wsz</button>
+      </div>
+      <p class="ap-nota">
+        La Colección OndaAmp viaja dentro de la app. Los skins clásicos de
+        Winamp los añades tú con ＋: se guardan solo en este teléfono.
+      </p>
+    </div>
   </div>
 
   <!-- ============ EQ ============ -->
@@ -1586,7 +2440,7 @@ body{
         <input class="find" id="find" type="text" placeholder="Buscar artista, álbum, canción…  ( / )">
         <button class="btn sm" id="bFold" title="Plegar o desplegar todos los grupos">⇕<span class="lbl-fold"> Plegar</span></button>
         <button class="btn sm" id="bIrActual" title="Ir a la canción que está sonando">🎯</button>
-        <button class="btn sm solo-movil" data-abrir="ajustes" title="Ajustes de sonido">⚙</button>
+        <button class="btn sm solo-movil" data-abrir="ajustes" title="Ajustes: apariencia y sonido">⚙</button>
         <button class="btn danger sm" id="bClear" title="Vaciar la biblioteca">🗑</button>
       </div>
       <div class="pl-restaurar" id="plRestaurar" style="display:none">
@@ -1660,7 +2514,7 @@ const state = {
   customPresets: {},
   view: "album",      // lista | album | carpeta
   closedGroups: {},   // clave de grupo -> true si está plegado
-  skin: "ondaamp",    // esta versión solo trae el tema propio (ver SKINS)
+  skin: "ondaamp",    // clave de SKINS, o el id de un .wsz importado
   fx: {               // restauración y realce (0-100 en las cantidades)
     nr:false, nrAmt:55,   // reductor de ruido / hiss
     dc:false, dcAmt:50,   // quita-clics
@@ -1679,14 +2533,34 @@ const state = {
 };
 let nextId = 1;
 
-/* Catálogo central: añadir un skin nuevo requiere registrarlo aquí, incluirlo
-   en el selector y definir su bloque body[data-skin="..."] en el CSS. */
-/* La versión publicada solo incluye el tema propio: los skins Zelda/Bento son
-   artwork de Winamp de terceros y no deben redistribuirse en un repositorio
-   público. Se pueden añadir en el propio teléfono con el importador de .wsz,
-   que los guarda localmente en IndexedDB sin publicarlos. */
+/* Catálogo central: añadir un skin nuevo requiere registrarlo aquí, definir su
+   bloque body[data-skin="..."] en el CSS y su muestra .skin-card[data-skin=…].
+   La rejilla de Apariencia y el <select> se construyen solos desde aquí.
+
+   Solo viaja la Colección OndaAmp, que es obra propia y va en CSS puro. Los
+   skins clásicos de Winamp (Zelda, Bento…) son artwork de terceros y no se
+   redistribuyen en un repositorio público: se añaden en el propio teléfono con
+   el importador de .wsz, que los guarda en IndexedDB sin publicarlos. */
 const SKINS = {
-  ondaamp: "OndaAmp",
+  ondaamp:  "OndaAmp Original",
+  rack:     "Studio Rack 1978",
+  neon:     "Neon Broadcast",
+  cassette: "Cassette Club '86",
+  polar:    "Polar FM",
+  noir:     "Noir Gold",
+  hoshi:    "Hoshi Drive",
+  quantum:  "Quantum Field Lab",
+  horizon:  "Event Horizon",
+  glass:    "Glasswave",
+};
+/* Skins de fondo claro: el navegador debe saberlo para los controles nativos
+   (barras de desplazamiento, menús) y para el color de la barra de estado. */
+const SKINS_CLAROS = ["cassette","polar","glass"];
+/* Color de la barra de estado de Android para cada skin (= su --bg) */
+const SKIN_TEMA = {
+  ondaamp:"#0f1216", rack:"#16130f", neon:"#070611", cassette:"#b9b2a3",
+  polar:"#dceaf1", noir:"#090909", hoshi:"#100d2b", quantum:"#071014",
+  horizon:"#030711", glass:"#dfe8f3",
 };
 
 const EQ_FREQS = [31, 62, 125, 250, 500, 1000, 2000, 4000, 8000, 16000];
@@ -1916,20 +2790,68 @@ function registerImportedSkin(record){
   const buttonUrl=URL.createObjectURL(new Blob([record.buttons],{type:"image/bmp"}));
   importedSkins.set(record.id,{...record,buttonUrl});
 }
+function skinsImportadosOrdenados(){
+  return [...importedSkins.values()].sort((a,b)=>a.name.localeCompare(b.name));
+}
 function refreshImportedSkinOptions(){
   const select=$("skinSelect");
   select.querySelector("#importedSkinOptions")?.remove();
-  if (!importedSkins.size) return;
-  const group=document.createElement("optgroup");
-  group.id="importedSkinOptions";
-  group.label="Importados";
-  [...importedSkins.values()].sort((a,b)=>a.name.localeCompare(b.name)).forEach(rec=>{
-    const option=document.createElement("option");
-    option.value=rec.id;
-    option.textContent=rec.author ? `${rec.name} · ${rec.author}` : rec.name;
-    group.appendChild(option);
-  });
-  select.appendChild(group);
+  if (importedSkins.size){
+    const group=document.createElement("optgroup");
+    group.id="importedSkinOptions";
+    group.label="Importados";
+    skinsImportadosOrdenados().forEach(rec=>{
+      const option=document.createElement("option");
+      option.value=rec.id;
+      option.textContent=rec.author ? `${rec.name} · ${rec.author}` : rec.name;
+      group.appendChild(option);
+    });
+    select.appendChild(group);
+  }
+  construirRejillaSkins();
+}
+
+/* La rejilla de Apariencia: una tarjeta por skin, con su muestra de color.
+   Es el selector real en el teléfono, donde la barra de título no se dibuja. */
+function construirRejillaSkins(){
+  const rejilla=$("skinGrid");
+  if (!rejilla) return;
+  rejilla.textContent="";
+  const tarjeta=(valor,nombre,rec)=>{
+    const b=document.createElement("button");
+    b.type="button";
+    b.className="skin-card";
+    b.dataset.skin=valor;
+    b.title=nombre;
+    const sw=document.createElement("span"); sw.className="sw";
+    const i=document.createElement("i"), lcd=document.createElement("b");
+    sw.append(i,lcd);
+    const nm=document.createElement("span"); nm.className="nm"; nm.textContent=nombre;
+    b.append(sw,nm);
+    if (rec){
+      // Los importados no tienen muestra en el CSS: se pinta con su paleta
+      b.classList.add("importada");
+      sw.style.background=rec.colors.bg;
+      sw.style.borderColor=rec.colors.line;
+      i.style.background=rec.colors.acc;
+      lcd.style.background=rec.colors.lcd;
+      const x=document.createElement("span");
+      x.className="quitar"; x.textContent="×";
+      x.title=`Eliminar ${rec.name}`;
+      x.addEventListener("click",e=>{ e.stopPropagation(); eliminarSkin(rec.id); });
+      b.appendChild(x);
+    }
+    b.addEventListener("click",()=>{ applySkin(valor,true); save(); });
+    return b;
+  };
+  Object.entries(SKINS).forEach(([valor,nombre])=> rejilla.appendChild(tarjeta(valor,nombre)));
+  skinsImportadosOrdenados().forEach(rec=> rejilla.appendChild(tarjeta(rec.id,rec.name,rec)));
+  marcarSkinActivo();
+}
+function marcarSkinActivo(){
+  const rejilla=$("skinGrid");
+  if (!rejilla) return;
+  [...rejilla.children].forEach(b=> b.classList.toggle("sel", b.dataset.skin===state.skin));
 }
 async function loadImportedSkins(){
   try{
@@ -4656,7 +5578,7 @@ if ("mediaSession" in navigator){
    Una app instalada vive en el teléfono, así que las novedades no llegan solas.
    Se compara la versión incrustada con la publicada en version.json (que el
    service worker nunca cachea) y, si difieren, se ofrece actualizar. */
-const APP_VERSION = "2.2";
+const APP_VERSION = "2.3";
 let verRemotaDatos = null;
 
 async function buscarActualizacion(silencioso){
@@ -4862,6 +5784,12 @@ const IMPORTED_STYLE_VARS = [
 function clearImportedSkinStyle(){
   IMPORTED_STYLE_VARS.forEach(name=>document.body.style.removeProperty(name));
 }
+/* La barra de estado de Android toma su color de <meta name="theme-color">:
+   sin esto, una skin clara deja una franja negra arriba y se ve rota. */
+function pintarBarraEstado(color){
+  const meta=document.querySelector('meta[name="theme-color"]');
+  if (meta && color) meta.setAttribute("content",color);
+}
 function applySkin(name, notify=false){
   const imported=importedSkins.get(name);
   if (imported){
@@ -4880,6 +5808,8 @@ function applySkin(name, notify=false){
     $("skinSelect").value=name;
     $("bRemoveSkin").hidden=false;
     document.documentElement.style.colorScheme="dark";
+    pintarBarraEstado(c.bg);
+    marcarSkinActivo();
     if (notify) toast(`Skin ${imported.name} activado`);
     return;
   }
@@ -4889,7 +5819,9 @@ function applySkin(name, notify=false){
   document.body.dataset.skin=skin;
   $("skinSelect").value=skin;
   $("bRemoveSkin").hidden=true;
-  document.documentElement.style.colorScheme = "dark";
+  document.documentElement.style.colorScheme = SKINS_CLAROS.includes(skin) ? "light" : "dark";
+  pintarBarraEstado(SKIN_TEMA[skin]);
+  marcarSkinActivo();
   if (notify) toast(`Skin ${SKINS[skin]} activado`);
 }
 
@@ -4898,31 +5830,38 @@ $("skinSelect").addEventListener("change", e=>{
   save();
 });
 $("bImportSkin").addEventListener("click",()=>$("skinIn").click());
+$("bImportSkin2").addEventListener("click",()=>$("skinIn").click());
 $("skinIn").addEventListener("change",async e=>{
   const files=[...(e.target.files||[])];
   e.target.value="";
   await importSkinFiles(files);
 });
-$("bRemoveSkin").addEventListener("click",async ()=>{
-  const record=importedSkins.get(state.skin);
+/* Se borra desde dos sitios: la × de la barra de título y la × de su tarjeta
+   en Apariencia, que es la única alcanzable en el teléfono. */
+async function eliminarSkin(id){
+  const record=importedSkins.get(id);
   if (!record) return;
   if (!confirm(`¿Eliminar el skin importado “${record.name}”?`)) return;
   try{
     await skinDbDelete(record.id);
     if (record.buttonUrl) URL.revokeObjectURL(record.buttonUrl);
     importedSkins.delete(record.id);
+    const era = state.skin===record.id;
     refreshImportedSkinOptions();
-    applySkin("ondaamp");
+    if (era) applySkin("ondaamp"); else marcarSkinActivo();
     save();
     toast(`Skin ${record.name} eliminado`);
   }catch(e){ toast("No pude eliminar el skin",true); }
-});
+}
+$("bRemoveSkin").addEventListener("click",()=> eliminarSkin(state.skin));
 
 /* ================= Init ================= */
 buildEqUI();
 fillPresetSelect();
 $("preset").value = "Plano";
 load();
+// Antes de aplicar la skin: así queda marcada aunque IndexedDB falle luego
+construirRejillaSkins();
 if (Object.prototype.hasOwnProperty.call(SKINS,state.skin)) applySkin(state.skin);
 else { pendingSkin=state.skin; applySkin("ondaamp"); }
 reflectAllUI();
