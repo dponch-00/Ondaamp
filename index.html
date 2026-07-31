@@ -202,6 +202,11 @@ input[type=range]::-moz-range-thumb{width:14px;height:14px;border-radius:50%;bac
 .vol-group .lbl{font-size:11px; color:var(--mut); letter-spacing:.08em; width:30px; text-align:right; flex-shrink:0;}
 .vol-group output{font:12px Consolas,monospace; color:var(--mut); width:40px; flex-shrink:0;}
 .mode-group{display:flex; gap:6px; flex-shrink:0;}
+/* Va con aleatorio y repetir porque es lo mismo: un modo de reproducción */
+.enlace-sel{
+  width:auto; max-width:130px; height:32px; padding:0 24px 0 9px;
+  font-size:11.5px; border-radius:8px; flex:0 0 auto;
+}
 
 /* ---------- Secciones ---------- */
 .section-head{
@@ -407,8 +412,9 @@ select:focus{border-color:var(--acc-dim);}
     background:var(--acc); border-color:var(--acc); color:var(--bg);
   }
   #deckPanel .btn.play-main svg{width:30px; height:30px;}
-  #deckPanel .mode-group{order:2; gap:10px;}
+  #deckPanel .mode-group{order:2; gap:10px; flex-wrap:wrap; justify-content:center;}
   #deckPanel .mode-group .btn{min-width:46px; height:44px; justify-content:center;}
+  #deckPanel .enlace-sel{height:44px; font-size:13px; padding:0 28px 0 12px;}
   #deckPanel .vol-group{order:3; flex:1 1 100%;}
 
   /* Pantalla de Sonido: los tres paneles en columna, ya desplegados */
@@ -2185,6 +2191,8 @@ body{
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M16.6 3H21v4.4l-1.8-1.8-3.5 3.5-1.4-1.4 3.5-3.5L16.6 3zM3 6h3.2c1.9 0 3.3.8 4.5 2.5l4.7 6.7c.8 1.2 1.7 1.8 3 1.8h.4L17 15.2l1.4-1.4L22 17.4 18.4 21 17 19.6l1.1-1.1c-1.7-.1-3-.9-4.1-2.4L9.3 9.4C8.4 8.1 7.5 7.5 6.2 7.5H3V6zm0 11h3.2c1.3 0 2.2-.6 3.1-1.9l1.2-1.7 1.2 1.7-1 1.4c-1.1 1.6-2.6 2.5-4.5 2.5H3v-2z"/></svg>
           </button>
           <button class="btn" id="bRep" title="Repetir: no / lista / una">🔁</button>
+          <select id="enlace" class="enlace-sel" aria-label="Enlace entre canciones"
+                  title="Cómo empalma una canción con la siguiente. «Sin pausa» encadena el disco sin huecos, para álbumes pensados para sonar de corrido; los fundidos solapan el final con el principio."></select>
           <button class="btn" id="bDemo" title="Groove de demostración para probar el ecualizador sin archivos">DEMO</button>
           <button class="btn" id="bMejora"
                   title="ON: mejora inteligente (auto-máster adaptado a cada canción). OFF: sonido fiel, sin ningún procesamiento.">✨<span class="hide-narrow"> Mejora</span></button>
@@ -2515,6 +2523,7 @@ const state = {
   view: "album",      // lista | album | carpeta
   closedGroups: {},   // clave de grupo -> true si está plegado
   skin: "ondaamp",    // clave de SKINS, o el id de un .wsz importado
+  enlace: "nopausa",  // clave de ENLACES: cómo empalma una pista con la siguiente
   fx: {               // restauración y realce (0-100 en las cantidades)
     nr:false, nrAmt:55,   // reductor de ruido / hiss
     dc:false, dcAmt:50,   // quita-clics
@@ -2578,6 +2587,17 @@ const PRESETS = {
   "Voz":              [-2,-1,0,2,4,4,3,1,0,-1],
   "Auriculares":      [4,3,1,0,-1,0,1,3,4,4],
   "Fiesta":           [6,5,0,0,0,0,0,0,5,6],
+  /* Correctivo para los Sony por Bluetooth, pensado sobre discos de rock
+     progresivo de los 70 (The Dark Side of the Moon como referencia).
+     Los Sony traen de fábrica una joroba de graves centrada en 60-120 Hz: se
+     rebaja para que el bajo tenga nota en vez de nube, pero se devuelve
+     extensión por debajo (el latido que abre el disco vive ahí). El recorte de
+     250-500 Hz destapa la mezcla, muy poblada de Hammond y guitarra grave; el
+     de 2 kHz evita que canse en 43 minutos seguidos y que la voz de The Great
+     Gig in the Sky se vuelva gritona. Arriba se recupera el aire que el máster
+     del 73 no tiene y los Sony además hunden hacia 5-7 kHz. La suma es
+     negativa: no roba margen al limitador. */
+  "Pink Floyd":       [2,-2,-3,-2,-1,0,-1,1,2,1],
 };
 
 /* ================= Importador de skins Winamp =================
@@ -3081,8 +3101,15 @@ registerProcessor('oa-restaurador', Restaurador);
 
 /* ================= Audio ================= */
 const AC = window.AudioContext || window.webkitAudioContext;
-const audioEl = new Audio();
-audioEl.preload = "auto";
+/* Dos elementos de audio que se turnan. Con uno solo, cambiar de pista obliga
+   a cargar y decodificar el archivo nuevo, y esas décimas de silencio parten en
+   dos un disco pensado para sonar seguido. Teniendo la siguiente ya cargada en
+   el otro elemento, enlazar es solo cruzar dos ganancias. */
+function nuevoDeck(){ const a = new Audio(); a.preload = "auto"; return a; }
+const decks = [nuevoDeck(), nuevoDeck()];
+let activo = 0;
+let audioEl = decks[0];        // apunta siempre al que está sonando
+let deckGain = [null, null];   // ganancias del cruce; nacen con el AudioContext
 let ctx=null, srcNode=null, preamp=null, filters=[], sBus=null, compIn=null,
     compWet=null, compDry=null, pan=null, master=null, analyser=null, noiseBuf=null;
 // Etapas de restauración y realce
@@ -3135,7 +3162,7 @@ async function cargarDsp(){
 function ensureCtx(){
   if (ctx) return;
   ctx = new AC({ latencyHint: "playback" });
-  srcNode = ctx.createMediaElementSource(audioEl);
+  srcNode = decks.map(a=> ctx.createMediaElementSource(a));
 
   // --- Limpieza previa: rumble subsónico y luego restaurador ---
   // Dos biquads en cascada (4.º orden): con uno solo la pendiente es tan suave
@@ -3146,7 +3173,16 @@ function ensureCtx(){
   rb2.type = "highpass"; rb2.frequency.value = 34; rb2.Q.value = 1.31;
   rb1.connect(rb2);
   fxRumble = wetDry(rb1, rb2);
-  srcNode.connect(fxRumble.input);
+  // Cada deck entra por su propia ganancia; ahí se hace el cruce entre pistas.
+  // De fxRumble en adelante la cadena es común, así que los efectos, el EQ y el
+  // analizador no se enteran de que la fuente ha cambiado.
+  deckGain = decks.map((_,i)=>{
+    const g = ctx.createGain();
+    g.gain.value = (i===activo) ? 1 : 0;
+    srcNode[i].connect(g);
+    g.connect(fxRumble.input);
+    return g;
+  });
 
   dspIn = ctx.createGain(); dspOut = ctx.createGain();
   dspWet = ctx.createGain(); dspDry = ctx.createGain();
@@ -4465,6 +4501,11 @@ async function playIndex(i, rememberHistory=true){
   ensureCtx();
   try{ await ctx.resume(); }catch(e){}
   stopDemo(true);
+  // Un salto a mano cancela el enlace en curso: puede pillar un cruce a medias
+  // y dejaría el deck de reserva sonando por debajo.
+  desarmarEnlace();
+  cruzando = false;
+  normalizarGanancias();
   if (rememberHistory && state.cur !== i && state.cur >= 0){
     const previous=state.list[state.cur];
     if (previous) state.history.push(previous.id);
@@ -4498,6 +4539,7 @@ function togglePlay(){
   else audioEl.pause();
 }
 function stop(){
+  desarmarEnlace();
   audioEl.pause();
   try{ audioEl.currentTime = 0; }catch(e){}
   updatePlayUI();
@@ -4544,23 +4586,184 @@ function prevTrack(){
   const it = pickNext(-1);
   if (it) playItem(it);
 }
-audioEl.addEventListener("ended", ()=>{
-  if (state.repeat==="one"){ audioEl.currentTime = 0; audioEl.play(); return; }
-  const it = pickNext(1);
-  if (it) playItem(it); else { updatePlayUI(); $("lcdState").textContent = "■ FIN DE LA LISTA"; }
+/* Los dos decks emiten eventos, pero solo interesa el que suena: el otro está
+   precargando la pista siguiente y sus avisos pisarían la pantalla. */
+const esActivo = e => e.target === audioEl;
+decks.forEach(a=>{
+  a.addEventListener("ended", e=>{
+    if (!esActivo(e)) return;                 // el que se apaga tras un cruce
+    if (state.repeat==="one"){ audioEl.currentTime = 0; audioEl.play(); return; }
+    const it = pickNext(1);
+    if (it) playItem(it); else { updatePlayUI(); $("lcdState").textContent = "■ FIN DE LA LISTA"; }
+  });
+  a.addEventListener("error", e=>{
+    if (!esActivo(e)){ desarmarEnlace(); return; }
+    const it = state.list[state.cur];
+    if (it){ it.bad = true; touchRow(it); toast(`Formato no soportado: ${it.name}`, true); }
+  });
+  a.addEventListener("play", e=>{ if (esActivo(e)) updatePlayUI(); });
+  a.addEventListener("pause", e=>{ if (esActivo(e)) updatePlayUI(); });
+  a.addEventListener("loadedmetadata", e=>{ if (esActivo(e)) reflejarDuracion(); });
 });
-audioEl.addEventListener("error", ()=>{
-  const it = state.list[state.cur];
-  if (it){ it.bad = true; touchRow(it); toast(`Formato no soportado: ${it.name}`, true); }
-});
-audioEl.addEventListener("play", updatePlayUI);
-audioEl.addEventListener("pause", updatePlayUI);
-audioEl.addEventListener("loadedmetadata", ()=>{
+/* Tras un cruce no llega ningún loadedmetadata —la pista ya estaba cargada—,
+   así que la duración se refresca también a mano desde cruzar(). */
+function reflejarDuracion(){
   const it = state.list[state.cur];
   if (it && (!it.dur || !isFinite(it.dur))){ it.dur = audioEl.duration; touchRow(it); refreshGroupStats(); updateStats(); }
   if (it) refreshInfoLine(it);
   $("tTot").textContent = fmtTime(audioEl.duration);
+}
+
+/* ================= Enlace entre canciones =================
+   Discos como The Dark Side of the Moon están mezclados para sonar de corrido:
+   cualquier hueco entre pistas rompe la ilusión. Aquí el deck inactivo carga la
+   pista siguiente con antelación y, llegado el final, se cruzan las ganancias
+   sobre el reloj del AudioContext.
+
+   Incluso «Sin pausa» cruza 60 ms. El navegador no deja arrancar un <audio> en
+   un instante exacto —hay unos milisegundos de margen—, y un cruce tan corto
+   tapa por igual un hueco o un solape sin que se perciba como fundido. Para un
+   silencio exacto al sample haría falta decodificar el disco entero en memoria,
+   que en el teléfono no cabe. */
+/* Las claves de los fundidos llevan "f" delante a propósito: una clave que sea
+   un entero ("2") JavaScript la ordena antes que las de texto, y el desplegable
+   saldría con los fundidos por encima de «Con pausa». */
+const ENLACES = {
+  off:     "Con pausa",
+  nopausa: "Sin pausa",
+  f2:      "Fundido 2 s",
+  f4:      "Fundido 4 s",
+  f8:      "Fundido 8 s",
+};
+const CRUCE_MINIMO = 0.06;
+/* Curvas de igual potencia. Con un fundido lineal las dos pistas suman menos
+   energía en el punto medio y se oye un bache de 3 dB justo en la unión. */
+const CURVA_SUBE = new Float32Array(64);
+const CURVA_BAJA = new Float32Array(64);
+for (let i=0;i<64;i++){
+  const x = i/63;
+  CURVA_SUBE[i] = Math.sin(x*Math.PI/2);
+  CURVA_BAJA[i] = Math.cos(x*Math.PI/2);
+}
+let enlaceArmado = null;   // {it, deck} pista ya cargada en el deck inactivo
+let cruzando = false;
+
+function segundosDeEnlace(){
+  if (state.enlace === "off") return 0;
+  if (state.enlace === "nopausa") return CRUCE_MINIMO;
+  const n = parseFloat(String(state.enlace).slice(1));
+  return isFinite(n) && n > 0 ? n : 0;
+}
+function desarmarEnlace(){
+  if (!enlaceArmado) return;
+  const otro = enlaceArmado.deck;
+  try{ otro.pause(); otro.removeAttribute("src"); otro.load(); }catch(e){}
+  enlaceArmado = null;
+}
+/* Devuelve las ganancias a 1 (activo) y 0 (reserva). Se llama al saltar de
+   pista a mano, que puede pillar un cruce a medias. */
+function normalizarGanancias(){
+  if (!ctx || !deckGain[0]) return;
+  const t = ctx.currentTime;
+  deckGain.forEach((g,i)=>{
+    g.gain.cancelScheduledValues(t);
+    g.gain.setValueAtTime(i===activo ? 1 : 0, t);
+  });
+}
+function armarEnlace(){
+  if (enlaceArmado || cruzando || state.repeat === "one") return;
+  const it = pickNext(1);
+  // Una pista pendiente de permiso no se puede precargar: exige un gesto del
+  // usuario, y pedirlo a mitad de canción sería peor que el hueco.
+  if (!it || it.pendiente || !it.url) return;
+  if (it === state.list[state.cur]) return;
+  const otro = decks[1-activo];
+  try{
+    otro.src = it.url;
+    otro.currentTime = 0;
+    otro.load();
+  }catch(e){ return; }
+  enlaceArmado = { it, deck: otro };
+}
+function cruzar(){
+  if (!enlaceArmado || cruzando || !ctx || !deckGain[0]) return;
+  const segs = segundosDeEnlace();
+  if (!segs) return;
+  const { it, deck } = enlaceArmado;
+  const i = state.list.indexOf(it);
+  if (i < 0){ desarmarEnlace(); return; }
+
+  cruzando = true;
+  enlaceArmado = null;
+  const viejo  = decks[activo];
+  const gViejo = deckGain[activo];
+  const gNuevo = deckGain[1-activo];
+
+  deck.muted = viejo.muted;
+  deck.play().catch(()=>{});
+
+  const t = ctx.currentTime;
+  gViejo.gain.cancelScheduledValues(t);
+  gNuevo.gain.cancelScheduledValues(t);
+  gViejo.gain.setValueCurveAtTime(CURVA_BAJA, t, segs);
+  gNuevo.gain.setValueCurveAtTime(CURVA_SUBE, t, segs);
+
+  // El relevo es inmediato para la interfaz: los atajos, la barra y el
+  // auto-máster deben mirar ya a la pista que entra.
+  const anterior = state.list[state.cur];
+  if (anterior) state.history.push(anterior.id);
+  activo = 1 - activo;
+  audioEl = deck;
+  state.cur = i;
+  if (state.shuffle && !state.shufflePlayed.includes(it.id)) state.shufflePlayed.push(it.id);
+  amReiniciar();
+  renderList();
+  setDisplay(it);
+  reflejarDuracion();
+  updatePlayUI();
+  const li = rowFor(it);
+  if (li) li.scrollIntoView({block:"nearest"});
+
+  setTimeout(()=>{
+    try{ viejo.pause(); viejo.removeAttribute("src"); viejo.load(); }catch(e){}
+    cruzando = false;
+    normalizarGanancias();
+  }, segs*1000 + 150);
+}
+function llenarEnlaceSelect(){
+  const sel = $("enlace");
+  if (!sel) return;
+  if (!sel.options.length){
+    Object.entries(ENLACES).forEach(([valor,texto])=>{
+      const o = document.createElement("option");
+      o.value = valor; o.textContent = texto;
+      sel.appendChild(o);
+    });
+  }
+  sel.value = state.enlace;
+  sel.classList.toggle("on", state.enlace !== "off");
+}
+$("enlace").addEventListener("change", e=>{
+  state.enlace = e.target.value;
+  desarmarEnlace();
+  llenarEnlaceSelect();
+  toast(`Enlace: ${ENLACES[state.enlace].toLowerCase()}`);
+  save();
 });
+
+/* Vigilancia fina: 250 ms (el ritmo de la barra) llegaría tarde a un cruce de
+   60 ms. Sale enseguida cuando no hay nada que enlazar. */
+setInterval(()=>{
+  if (cruzando || demo || state.cur < 0) return;
+  const segs = segundosDeEnlace();
+  if (!segs || audioEl.paused){ desarmarEnlace(); return; }
+  const dur = audioEl.duration, cur = audioEl.currentTime;
+  if (!isFinite(dur) || dur <= 0) return;
+  const restante = dur - cur;
+  // Margen amplio para cargar: en el teléfono abrir y decodificar tarda
+  if (restante <= segs + 10) armarEnlace();
+  if (restante <= segs + 0.05) cruzar();
+}, 50);
 
 /* ================= UI: display / transporte ================= */
 const playIcoPlay = '<path d="M7 4l13 8-13 8z"/>';
@@ -5578,7 +5781,7 @@ if ("mediaSession" in navigator){
    Una app instalada vive en el teléfono, así que las novedades no llegan solas.
    Se compara la versión incrustada con la publicada en version.json (que el
    service worker nunca cachea) y, si difieren, se ofrece actualizar. */
-const APP_VERSION = "2.3";
+const APP_VERSION = "2.4";
 let verRemotaDatos = null;
 
 async function buscarActualizacion(silencioso){
@@ -5719,7 +5922,7 @@ function save(){
         eq:state.eq, pre:state.pre, eqOn:state.eqOn, vol:state.vol, bal:state.bal,
         width:state.width, night:state.night, repeat:state.repeat, shuffle:state.shuffle,
         vis:state.vis, customPresets:state.customPresets, view:state.view,
-        skin:state.skin, fx:state.fx, am:state.am, v3:true,
+        skin:state.skin, enlace:state.enlace, fx:state.fx, am:state.am, v3:true,
         preset:$("preset").value,
         eqClosed:$("eqPanel").classList.contains("closed"),
         fxClosed:$("fxPanel").classList.contains("closed"),
@@ -5741,6 +5944,7 @@ function load(){
     customPresets: s.customPresets ?? {},
     view: ["lista","album","artista","carpeta"].includes(s.view) ? s.view : "album",
     skin: typeof s.skin==="string" ? s.skin : "ondaamp",
+    enlace: Object.prototype.hasOwnProperty.call(ENLACES, s.enlace) ? s.enlace : state.enlace,
     // Mezclar sobre los valores por omisión: así una versión guardada antigua
     // sigue cargando aunque le falten efectos añadidos después.
     fx: Object.assign({}, state.fx, (s.fx && typeof s.fx === "object") ? s.fx : {}),
@@ -5769,6 +5973,7 @@ function reflectAllUI(){
   updateShuffleUI();
   $("bRep").textContent = REP_ICONS[state.repeat];
   $("bRep").classList.toggle("on", state.repeat!=="off");
+  llenarEnlaceSelect();
   $("bEqOn").textContent = "EQ: " + (state.eqOn?"ON":"OFF");
   $("bEqOn").classList.toggle("on", state.eqOn);
   reflectEq();
