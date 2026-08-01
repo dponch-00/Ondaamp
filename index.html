@@ -3740,14 +3740,39 @@ function romanizarKana(txt){
    a mano los saludos fijos, que son los únicos que chirrían de verdad. */
 const ROMAJI_FIJOS = { "こんにちは":"konnichiwa", "こんばんは":"konbanwa" };
 
-/* Devuelve "" cuando no aporta nada: sin kana, con kanji, o si no cambió */
+/* Se transcribe por rachas, no el título entero, porque en la práctica casi
+   ningún título japonés es kana puro: lo normal es kanji y kana mezclados, y
+   justo el katakana suele ser el préstamo del inglés que interesa leer
+   (ペガサス, コスモ, サンクチュアリ).
+
+   · Katakana de 2 o más: casi siempre una palabra extranjera. Se transcribe.
+   · Hiragana de 3 o más: una palabra de verdad. Se transcribe.
+   · Lo más corto se deja como está. Son partículas (の, に) y terminaciones
+     verbales pegadas a un kanji; transcribirlas da engendros como "死no戒律"
+     o "燃eru", que estorban más de lo que ayudan.
+   · El kanji nunca se toca: su lectura no es deducible sin un diccionario de
+     decenas de miles de entradas. */
+const KATA_RACHA = /[ァ-ヺー]{2,}/g;
+const HIRA_RACHA = /[ぁ-ゖ]{3,}/g;
+
 function romaji(txt){
-  if (!txt) return "";
-  if (KANJI_RE.test(txt) || !KANA_RE.test(txt)) return "";
-  const fijo = ROMAJI_FIJOS[txt.trim()];
-  if (fijo) return fijo;
-  const r = romanizarKana(txt).replace(/\s+/g," ").trim();
-  return r && r !== txt ? r : "";
+  if (!txt || !KANA_RE.test(txt)) return "";
+  let hubo = false;
+  const paso = (s, re) => s.replace(re, m=>{
+    const r = ROMAJI_FIJOS[m] || romanizarKana(m);
+    if (r && r !== m) hubo = true;
+    return r || m;
+  });
+  // Primero el katakana: su salida ya es latina y no la repesca el paso siguiente
+  const out = paso(paso(txt, KATA_RACHA), HIRA_RACHA).replace(/\s+/g," ").trim();
+  return (hubo && out !== txt) ? out : "";
+}
+/* Para el rótulo grande solo sirve la transcripción que salió entera: un
+   título mitad kanji mitad latín duplicaría el largo del rótulo sin aclararlo.
+   En la lista sí se muestra la mezcla, que ahí tiene su propia línea. */
+function romajiEntero(txt){
+  const r = romaji(txt);
+  return (r && !KANJI_RE.test(r) && !KANA_RE.test(r)) ? r : "";
 }
 /* Versión sin macrones: los buscadores se teclean en ASCII */
 function sinMacrones(txt){
@@ -4995,7 +5020,7 @@ function setDisplay(it){
     return;
   }
   // La lectura latina se añade entre paréntesis para poder leer el título
-  const lat = romaji(it.title);
+  const lat = romajiEntero(it.title);
   const titulo = lat ? `${it.title} (${lat})` : it.title;
   const full = it.artist ? `${titulo} — ${it.artist}` : titulo;
   setMarquee(it.album ? `${full}  ·  ${it.album}` : full);
@@ -5964,7 +5989,7 @@ if ("mediaSession" in navigator){
    Una app instalada vive en el teléfono, así que las novedades no llegan solas.
    Se compara la versión incrustada con la publicada en version.json (que el
    service worker nunca cachea) y, si difieren, se ofrece actualizar. */
-const APP_VERSION = "2.6";
+const APP_VERSION = "2.7";
 let verRemotaDatos = null;
 
 async function buscarActualizacion(silencioso){

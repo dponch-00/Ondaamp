@@ -1,5 +1,5 @@
 {
-  "version": "2.6",
+  "version": "2.7",
   "fecha": "2026-08-01",
-  "notas": "Los títulos en japonés muestran debajo su lectura en alfabeto latino, y ahora puedes buscarlos escribiendo así: teclea «furawa» y aparece フラワーダンス. Todo se hace dentro de la app, sin internet. Los títulos con kanji se quedan como están."
+  "notas": "La lectura latina ahora funciona también en títulos que mezclan kanji con kana, que son casi todos: ペガサス幻想（ファンタジー）muestra «pegasasu幻想（fantajī）» y se encuentra escribiendo «pegasasu». Antes solo salía en títulos sin ningún kanji."
 }
