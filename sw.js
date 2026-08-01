@@ -2,7 +2,7 @@
    Guarda en caché el "esqueleto" de la app (HTML, iconos, manifiesto) para que
    abra sin internet. La música NUNCA pasa por aquí: vive en OPFS, el almacén
    privado del navegador, y se lee directamente. */
-const VERSION = "ondaamp-v2.4";
+const VERSION = "ondaamp-v2.5";
 const ESENCIALES = [
   "./",
   "./index.html",

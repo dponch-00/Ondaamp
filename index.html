@@ -4109,6 +4109,47 @@ async function libGet(k){
   });
 }
 
+/* ---------- Dónde abre el explorador ----------
+   Solo aplica en escritorio, que es donde hay selector de archivos del sistema.
+   Sin pistas arranca donde quiera el sistema —casi siempre el disco C:— y hay
+   que volver a navegar hasta la carpeta de música cada vez. Se guardan dos
+   cosas para evitarlo:
+
+   · un id de selector, que el navegador asocia por su cuenta a la última
+     carpeta usada con él, y
+   · el handle de la última carpeta autorizada, que sirve de punto de partida
+     la primera vez y si el navegador olvidara el id.
+
+   Si el navegador ya recuerda algo para el id, eso manda sobre startIn. */
+const PICKER_ID = "ondaamp-musica";
+let ultimaCarpeta = null;          // FileSystemDirectoryHandle
+
+async function cargarUltimaCarpeta(){
+  try{ ultimaCarpeta = (await libGet("ultimaCarpeta")) || null; }catch(e){ ultimaCarpeta = null; }
+}
+async function recordarCarpeta(dir){
+  if (!dir || dir.kind !== "directory") return;
+  ultimaCarpeta = dir;
+  // Los handles son clonables estructuralmente: IndexedDB los guarda tal cual
+  try{ await libSet("ultimaCarpeta", dir); }catch(e){}
+}
+function opcionesPicker(extra){
+  return Object.assign({ id: PICKER_ID, startIn: ultimaCarpeta || "music" }, extra||{});
+}
+/* Abre un selector reintentando sin punto de partida: si la carpeta recordada
+   ya no existe (un disco externo desconectado), startIn hace fallar la llamada
+   y sin este reintento el botón parecería roto. */
+async function abrirPicker(fn, extra){
+  try{
+    return await fn(opcionesPicker(extra));
+  }catch(e){
+    if (e && e.name === "AbortError") return null;      // el usuario canceló
+    try{
+      return await fn(Object.assign({ id: PICKER_ID }, extra||{}));
+    }catch(e2){ return null; }
+  }
+}
+
 let libT = 0;
 function guardarBiblioteca(){
   clearTimeout(libT);
@@ -4284,8 +4325,9 @@ function compactarOrigenes(){
    las vuelve a enlazar. Convierte N permisos sueltos en uno solo, para siempre. */
 async function adoptarCarpeta(){
   if (!window.showDirectoryPicker){ toast("Tu navegador no admite esto", true); return; }
-  let dir;
-  try{ dir = await showDirectoryPicker({mode:"read"}); }catch(e){ return; }
+  const dir = await abrirPicker(showDirectoryPicker, {mode:"read"});
+  if (!dir) return;
+  await recordarCarpeta(dir);
   toast("Explorando la carpeta…");
   const hallados = [];
   await recorrerDir(dir, dir.name, hallados, -1);
@@ -4390,14 +4432,12 @@ async function recorrerDir(dir, prefijo, out, rootIdx, prof){
 async function elegirArchivos(){
   if (MODO_COPIA){ $("fileIn").click(); return; }   // móvil: se copia a OPFS
   if (!window.showOpenFilePicker){ $("fileIn").click(); return; }
-  let handles;
-  try{
-    handles = await showOpenFilePicker({ multiple:true, types:[{
-      description:"Audio y álbumes en ZIP",
-      accept:{"audio/*":[".mp3",".flac",".wav",".ogg",".oga",".opus",".m4a",".aac",".weba",".webm"],
-              "application/zip":[".zip"]},
-    }]});
-  }catch(e){ return; }                       // el usuario canceló
+  const handles = await abrirPicker(showOpenFilePicker, { multiple:true, types:[{
+    description:"Audio y álbumes en ZIP",
+    accept:{"audio/*":[".mp3",".flac",".wav",".ogg",".oga",".opus",".m4a",".aac",".weba",".webm"],
+            "application/zip":[".zip"]},
+  }]});
+  if (!handles || !handles.length) return;   // el usuario canceló
   const files = [], sueltos = [];
   for (const h of handles){
     try{
@@ -4420,8 +4460,9 @@ async function elegirArchivos(){
 async function elegirCarpeta(){
   if (MODO_COPIA){ $("dirIn").click(); return; }    // móvil: se copia a OPFS
   if (!window.showDirectoryPicker){ $("dirIn").click(); return; }
-  let dir;
-  try{ dir = await showDirectoryPicker(); }catch(e){ return; }
+  const dir = await abrirPicker(showDirectoryPicker);
+  if (!dir) return;
+  await recordarCarpeta(dir);
   const idx = libRoots.push({kind:"directory", handle:dir, nombre:dir.name}) - 1;
   const files = [];
   toast("Explorando la carpeta…");
@@ -5684,6 +5725,7 @@ async function handleDrop(e){
         const idx = libRoots.push({kind:h.kind, handle:h, nombre:h.name}) - 1;
         if (h.kind === "directory"){
           carpetaSoltada = true;
+          await recordarCarpeta(h);   // arrastrar también enseña dónde vive la música
           await recorrerDir(h, h.name, porHandles, idx);
         } else {
           try{
@@ -5781,7 +5823,7 @@ if ("mediaSession" in navigator){
    Una app instalada vive en el teléfono, así que las novedades no llegan solas.
    Se compara la versión incrustada con la publicada en version.json (que el
    service worker nunca cachea) y, si difieren, se ofrece actualizar. */
-const APP_VERSION = "2.4";
+const APP_VERSION = "2.5";
 let verRemotaDatos = null;
 
 async function buscarActualizacion(silencioso){
@@ -6073,6 +6115,7 @@ reflectAllUI();
 renderList();
 updatePlayUI();
 loadImportedSkins();
+cargarUltimaCarpeta();  // para que el explorador abra donde guardas la música
 cargarBiblioteca();   // recupera la lista de la sesión anterior
 
 /* ---- Puesta a punto como app instalable ---- */

@@ -1,5 +1,5 @@
 {
-  "version": "2.4",
-  "fecha": "2026-07-31",
-  "notas": "Los discos ya suenan de corrido: el nuevo selector ENLACE, junto a aleatorio y repetir, encadena una canción con la siguiente sin hueco (o con fundido de 2, 4 u 8 segundos). Y un preset nuevo, «Pink Floyd», pensado para escuchar rock progresivo de los 70 por Bluetooth con auriculares Sony."
+  "version": "2.5",
+  "fecha": "2026-08-01",
+  "notas": "En escritorio, el explorador de archivos ya se abre en la última carpeta que autorizaste, en vez de empezar siempre en el disco C:. Si la carpeta ya no está —un disco externo desconectado—, abre igualmente en vez de fallar."
 }
