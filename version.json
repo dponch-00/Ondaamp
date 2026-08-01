@@ -1,5 +1,5 @@
 {
-  "version": "2.5",
+  "version": "2.6",
   "fecha": "2026-08-01",
-  "notas": "En escritorio, el explorador de archivos ya se abre en la última carpeta que autorizaste, en vez de empezar siempre en el disco C:. Si la carpeta ya no está —un disco externo desconectado—, abre igualmente en vez de fallar."
+  "notas": "Los títulos en japonés muestran debajo su lectura en alfabeto latino, y ahora puedes buscarlos escribiendo así: teclea «furawa» y aparece フラワーダンス. Todo se hace dentro de la app, sin internet. Los títulos con kanji se quedan como están."
 }

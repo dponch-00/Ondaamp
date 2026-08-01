@@ -611,6 +611,10 @@ select:focus{border-color:var(--acc-dim);}
 .pl-list li .tt{min-width:0;}
 .pl-list li .t1{white-space:nowrap; overflow:hidden; text-overflow:ellipsis; font-weight:500;}
 .pl-list li .t2{white-space:nowrap; overflow:hidden; text-overflow:ellipsis; color:var(--mut); font-size:11px;}
+.pl-list li .t3{
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+  color:var(--mut); font-size:10.5px; font-style:italic; opacity:.75;
+}
 .pl-list li .dur{font:11px Consolas,monospace; color:var(--mut);}
 .pl-list li .rm{
   border:none; background:none; color:var(--mut); cursor:pointer; font-size:14px;
@@ -3637,9 +3641,135 @@ function artistaCmp(a,b){
   return trackCmp(a,b);
 }
 /* Devuelve [{key, label, items}] ya ordenado, respetando el filtro activo */
+/* ================= Romanización de kana =================
+   Pasa hiragana y katakana a alfabeto latino (sistema Hepburn) para poder leer
+   y buscar títulos japoneses. Es una tabla, no un traductor: no hace falta red
+   ni diccionario, y nada sale del dispositivo.
+
+   Deliberadamente NO se romaniza el texto que lleva kanji. Un kanji no tiene
+   lectura deducible sin un diccionario de decenas de miles de entradas, y
+   convertir solo lo que se puede daría engendros como "君no名wa" que estorban
+   más de lo que ayudan. Así que se romaniza lo que sale entero —katakana puro,
+   que es donde viven los préstamos del inglés, e hiragana puro— y lo demás se
+   queda tal cual. */
+const KANJI_RE = /[㐀-䶿一-鿿豈-﫿]/;
+const KANA_RE  = /[ぁ-ゖァ-ヺー]/;
+
+/* Dígrafos primero: al recorrer el texto se prueban dos caracteres antes que
+   uno, o きょ saldría como "kiyo" en vez de "kyo". */
+const KANA2 = {
+  "きゃ":"kya","きゅ":"kyu","きょ":"kyo","しゃ":"sha","しゅ":"shu","しょ":"sho",
+  "ちゃ":"cha","ちゅ":"chu","ちょ":"cho","にゃ":"nya","にゅ":"nyu","にょ":"nyo",
+  "ひゃ":"hya","ひゅ":"hyu","ひょ":"hyo","みゃ":"mya","みゅ":"myu","みょ":"myo",
+  "りゃ":"rya","りゅ":"ryu","りょ":"ryo","ぎゃ":"gya","ぎゅ":"gyu","ぎょ":"gyo",
+  "じゃ":"ja","じゅ":"ju","じょ":"jo","ぢゃ":"ja","ぢゅ":"ju","ぢょ":"jo",
+  "びゃ":"bya","びゅ":"byu","びょ":"byo","ぴゃ":"pya","ぴゅ":"pyu","ぴょ":"pyo",
+  // Combinaciones que solo existen para transcribir sonidos extranjeros
+  "ふぁ":"fa","ふぃ":"fi","ふぇ":"fe","ふぉ":"fo","ふゅ":"fyu",
+  "うぃ":"wi","うぇ":"we","うぉ":"wo","いぇ":"ye",
+  "ゔぁ":"va","ゔぃ":"vi","ゔぇ":"ve","ゔぉ":"vo","ゔゅ":"vyu",
+  "てぃ":"ti","てゅ":"tyu","でぃ":"di","でゅ":"dyu","とぅ":"tu","どぅ":"du",
+  "しぇ":"she","ちぇ":"che","じぇ":"je",
+  "つぁ":"tsa","つぃ":"tsi","つぇ":"tse","つぉ":"tso",
+  "くぁ":"kwa","くぉ":"kwo","ぐぁ":"gwa",
+};
+const KANA1 = {
+  "あ":"a","い":"i","う":"u","え":"e","お":"o",
+  "か":"ka","き":"ki","く":"ku","け":"ke","こ":"ko",
+  "さ":"sa","し":"shi","す":"su","せ":"se","そ":"so",
+  "た":"ta","ち":"chi","つ":"tsu","て":"te","と":"to",
+  "な":"na","に":"ni","ぬ":"nu","ね":"ne","の":"no",
+  "は":"ha","ひ":"hi","ふ":"fu","へ":"he","ほ":"ho",
+  "ま":"ma","み":"mi","む":"mu","め":"me","も":"mo",
+  "や":"ya","ゆ":"yu","よ":"yo",
+  "ら":"ra","り":"ri","る":"ru","れ":"re","ろ":"ro",
+  "わ":"wa","ゐ":"i","ゑ":"e","を":"wo","ん":"n",
+  "が":"ga","ぎ":"gi","ぐ":"gu","げ":"ge","ご":"go",
+  "ざ":"za","じ":"ji","ず":"zu","ぜ":"ze","ぞ":"zo",
+  "だ":"da","ぢ":"ji","づ":"zu","で":"de","ど":"do",
+  "ば":"ba","び":"bi","ぶ":"bu","べ":"be","ぼ":"bo",
+  "ぱ":"pa","ぴ":"pi","ぷ":"pu","ぺ":"pe","ぽ":"po",
+  "ゔ":"vu","ゕ":"ka","ゖ":"ke",
+  "ぁ":"a","ぃ":"i","ぅ":"u","ぇ":"e","ぉ":"o",
+  "ゃ":"ya","ゅ":"yu","ょ":"yo","ゎ":"wa",
+  "・":" ","　":" ","、":", ","。":". ",
+};
+const LARGA = {a:"ā", i:"ī", u:"ū", e:"ē", o:"ō"};
+
+/* El katakana se pasa antes a hiragana restándole 0x60: los dos silabarios
+   están alineados en Unicode, así que basta una tabla en vez de dos. */
+function aHiragana(txt){
+  let out = "";
+  for (const ch of txt){
+    const c = ch.codePointAt(0);
+    out += (c >= 0x30A1 && c <= 0x30F6) ? String.fromCodePoint(c - 0x60) : ch;
+  }
+  return out;
+}
+function romanizarKana(txt){
+  const s = aHiragana(txt);
+  let out = "", i = 0, dobla = false;
+  while (i < s.length){
+    const par = s.slice(i, i+2);
+    let pieza = KANA2[par];
+    let salto = 2;
+    if (!pieza){ pieza = KANA1[s[i]]; salto = 1; }
+
+    if (s[i] === "っ"){ dobla = true; i += 1; continue; }   // sokuon
+    if (s[i] === "ー"){                                      // vocal larga
+      const ult = out.slice(-1).toLowerCase();
+      if (LARGA[ult]) out = out.slice(0, -1) + LARGA[ult];
+      i += 1; continue;
+    }
+    if (pieza === undefined){ out += s[i]; i += 1; dobla = false; continue; }
+
+    if (dobla){
+      // Hepburn escribe っち como "tchi", no "cchi"
+      out += pieza.startsWith("ch") ? "t" : pieza[0];
+      dobla = false;
+    }
+    // La ene ante vocal o "y" necesita apóstrofo, o "ん" + "あ" sería "na"
+    if (out.endsWith("n") && /^[aiueoy]/.test(pieza)) out += "'";
+    out += pieza;
+    i += salto;
+  }
+  return out;
+}
+/* La partícula は se pronuncia "wa", pero distinguirla de la は de "hana"
+   exigiría analizar gramática. Se transcribe carácter a carácter y se corrigen
+   a mano los saludos fijos, que son los únicos que chirrían de verdad. */
+const ROMAJI_FIJOS = { "こんにちは":"konnichiwa", "こんばんは":"konbanwa" };
+
+/* Devuelve "" cuando no aporta nada: sin kana, con kanji, o si no cambió */
+function romaji(txt){
+  if (!txt) return "";
+  if (KANJI_RE.test(txt) || !KANA_RE.test(txt)) return "";
+  const fijo = ROMAJI_FIJOS[txt.trim()];
+  if (fijo) return fijo;
+  const r = romanizarKana(txt).replace(/\s+/g," ").trim();
+  return r && r !== txt ? r : "";
+}
+/* Versión sin macrones: los buscadores se teclean en ASCII */
+function sinMacrones(txt){
+  return txt.replace(/[āīūēō]/g, c=> "aiueo"["āīūēō".indexOf(c)]);
+}
+/* Texto sobre el que busca la biblioteca: incluye el romaji, así que teclear
+   "furawa" encuentra フラワーダンス. Se cachea con clave de metadatos porque la
+   búsqueda se rehace en cada pulsación y romanizar la lista entera se notaría;
+   si las etiquetas se rellenan más tarde, la clave cambia y el caché se rehace. */
+function textoBuscable(it){
+  const clave = (it.title||"")+"|"+(it.artist||"")+"|"+(it.album||"");
+  if (it._bClave === clave) return it._buscable;
+  const campos = [it.title, it.artist, it.albumArtist, it.album, it.name, it.folder];
+  const enRomaji = [it.title, it.artist, it.albumArtist, it.album].map(romaji).filter(Boolean);
+  it._buscable = sinMacrones(campos.concat(enRomaji).filter(Boolean).join(" ").toLowerCase());
+  it._bClave = clave;
+  return it._buscable;
+}
+
 function buildGroups(){
-  const q = $("find").value.trim().toLowerCase();
-  const match = it => !q || (it.title+" "+it.artist+" "+(it.albumArtist||"")+" "+it.album+" "+it.name+" "+(it.folder||"")).toLowerCase().includes(q);
+  const q = sinMacrones($("find").value.trim().toLowerCase());
+  const match = it => !q || textoBuscable(it).includes(q);
   const visibles = state.list.filter(match);
   if (state.view === "lista") return [{key:"__all", label:null, items:visibles}];
   const map = new Map();
@@ -3862,6 +3992,14 @@ function buildRow(it, num, inGroup){
             : (it.artist || "");
   li.querySelector(".t2").textContent = sub;
   if (!sub) li.querySelector(".t2").remove();
+  // Lectura latina bajo el título: solo aparece si el kana se pudo transcribir
+  const lat = romaji(it.title || it.name);
+  if (lat){
+    const t3 = document.createElement("div");
+    t3.className = "t3";
+    t3.textContent = lat;
+    li.querySelector(".tt").appendChild(t3);
+  }
   li.addEventListener("click", e=>{
     if (e.target.classList.contains("rm")){ removeItem(it); return; }
     playItem(it);
@@ -4856,7 +4994,10 @@ function setDisplay(it){
     updatePlayUI();
     return;
   }
-  const full = it.artist ? `${it.title} — ${it.artist}` : it.title;
+  // La lectura latina se añade entre paréntesis para poder leer el título
+  const lat = romaji(it.title);
+  const titulo = lat ? `${it.title} (${lat})` : it.title;
+  const full = it.artist ? `${titulo} — ${it.artist}` : titulo;
   setMarquee(it.album ? `${full}  ·  ${it.album}` : full);
   refreshInfoLine(it);
   cov.innerHTML = it.picUrl ? `<img src="${it.picUrl}" alt="">` : "♫";
@@ -5823,7 +5964,7 @@ if ("mediaSession" in navigator){
    Una app instalada vive en el teléfono, así que las novedades no llegan solas.
    Se compara la versión incrustada con la publicada en version.json (que el
    service worker nunca cachea) y, si difieren, se ofrece actualizar. */
-const APP_VERSION = "2.5";
+const APP_VERSION = "2.6";
 let verRemotaDatos = null;
 
 async function buscarActualizacion(silencioso){
