@@ -417,8 +417,13 @@ select:focus{border-color:var(--acc-dim);}
   #deckPanel .enlace-sel{height:44px; font-size:13px; padding:0 28px 0 12px;}
   #deckPanel .vol-group{order:3; flex:1 1 100%;}
 
-  /* Pantalla de Sonido: los tres paneles en columna, ya desplegados */
+  /* Pantalla de Ajustes: los paneles en columna, ya desplegados */
   #sheetAjustes{padding-bottom:24px;}
+  /* Sin esto los paneles NO se desplazan: en un flex en columna los hijos se
+     encogen para caber en la altura disponible en vez de desbordar, así que
+     scrollHeight acaba igualando a clientHeight, el contenido queda apretujado
+     y lo que no cabe —el botón de actualizar— resulta inalcanzable. */
+  #sheetAjustes > *{flex:none;}
   #sheetAjustes .panel{
     border-radius:0; border-left:0; border-right:0; box-shadow:none;
     margin-bottom:10px;
@@ -472,6 +477,8 @@ select:focus{border-color:var(--acc-dim);}
 .ver-notas{
   font-size:11.5px; color:var(--mut); line-height:1.5;
   padding:8px 10px; border-radius:8px; display:none;
+  /* Techo con desplazamiento propio: por larga que sea la nota, no empuja */
+  max-height:120px; overflow-y:auto; overscroll-behavior:contain;
   background:color-mix(in srgb, var(--acc) 10%, transparent);
   border:1px solid var(--acc-dim);
 }
@@ -2500,11 +2507,14 @@ body{
         <span class="lbl">Publicada</span>
         <b id="verRemota">sin comprobar</b>
       </div>
-      <div class="ver-notas" id="verNotas"></div>
+      <!-- Los botones van ANTES de las notas a propósito: al revés, una nota
+           larga los empujaba fuera de la pantalla del teléfono y dejaba la app
+           sin forma de actualizarse. Lo importante primero. -->
       <div class="ver-acciones">
         <button class="btn" id="bBuscarAct">🔄 Buscar actualizaciones</button>
         <button class="btn" id="bAplicarAct" style="display:none">⬇ Actualizar ahora</button>
       </div>
+      <div class="ver-notas" id="verNotas"></div>
       <div class="fx-note">
         La app se guarda en el teléfono para funcionar sin internet, así que las
         novedades no llegan solas. Tu música y tus ajustes no se tocan al actualizar.
@@ -6081,7 +6091,7 @@ if ("mediaSession" in navigator){
    Una app instalada vive en el teléfono, así que las novedades no llegan solas.
    Se compara la versión incrustada con la publicada en version.json (que el
    service worker nunca cachea) y, si difieren, se ofrece actualizar. */
-const APP_VERSION = "2.8";
+const APP_VERSION = "2.9";
 let verRemotaDatos = null;
 
 async function buscarActualizacion(silencioso){
