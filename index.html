@@ -2124,6 +2124,86 @@ body{
   background-image:none !important;
   background-color:var(--panel2) !important;
 }
+
+/* ---------- Karaoke ----------
+   Pantalla completa en escritorio y en móvil: leer una letra mientras suena
+   pide toda la pantalla, no un panel más. Toma los colores de la skin activa,
+   así que Neon Broadcast y Polar FM se ven cada una como es. */
+#karaoke{
+  position:fixed; inset:0; z-index:80;
+  display:flex; flex-direction:column;
+  background:var(--bg); color:var(--txt);
+}
+#karaoke[hidden]{display:none;}
+.kar-cab{
+  display:flex; align-items:center; gap:10px; flex:none;
+  padding:10px 12px; border-bottom:1px solid var(--line);
+  background:var(--panel2);
+}
+.kar-cab .kar-tit{
+  flex:1; min-width:0; text-align:center; font-weight:600; font-size:14px;
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+}
+.kar-cerrar, .kar-extra{
+  width:40px; height:40px; flex:none; cursor:pointer;
+  background:none; border:0; color:var(--txt);
+  font-size:20px; line-height:1; border-radius:50%;
+}
+.kar-cerrar:hover, .kar-extra:hover{background:var(--velo, rgba(255,255,255,.10));}
+.kar-cuerpo{
+  flex:1; min-height:0; overflow-y:auto; scroll-behavior:smooth;
+  padding:38vh 18px;                 /* aire arriba y abajo: el verso vivo queda centrado */
+  text-align:center;
+}
+.kar-linea{
+  padding:9px 4px; cursor:pointer; border-radius:10px;
+  color:var(--mut); opacity:.55;
+  transition:opacity .25s, color .25s, transform .25s;
+}
+.kar-linea:hover{opacity:.8;}
+.kar-vacia{min-height:8px;}
+.kar-txt{font-size:20px; line-height:1.35; font-weight:600;}
+.kar-romaji{font-size:13px; font-style:italic; opacity:.7; margin-top:2px;}
+/* El verso en curso: color de acento, algo mayor y a plena opacidad */
+.kar-linea.act{
+  color:var(--acc); opacity:1; transform:scale(1.04);
+}
+.kar-linea.act .kar-txt{font-size:23px;}
+.kar-fuente{
+  margin-top:26px; font-size:11px; color:var(--mut); opacity:.7;
+  letter-spacing:.08em; text-transform:uppercase;
+}
+.kar-aviso{
+  color:var(--mut); font-size:14px; line-height:1.6; margin-bottom:14px;
+}
+/* Cartel de permiso: lo que se envía va delante, no detrás de un "aceptar" */
+.kar-permiso{
+  max-width:440px; margin:0 auto; text-align:left;
+  background:var(--panel); border:1px solid var(--line); border-radius:14px;
+  padding:18px 18px 16px;
+}
+.kar-permiso h3{font-size:15px; margin-bottom:9px;}
+.kar-permiso p{font-size:13px; line-height:1.55; color:var(--mut); margin-bottom:10px;}
+.kar-permiso .kar-envio{margin-bottom:5px; color:var(--txt);}
+.kar-permiso ul{
+  list-style:none; margin:0 0 10px; padding:9px 11px;
+  background:var(--lcdbg); border:1px solid var(--line); border-radius:9px;
+  font-size:12.5px; line-height:1.75; word-break:break-word;
+}
+.kar-permiso ul b{color:var(--acc); font-weight:600;}
+.kar-permiso .kar-nota{font-size:11.5px; opacity:.85;}
+.kar-botones{display:flex; gap:8px; margin-bottom:10px;}
+.kar-recordar{
+  display:flex; align-items:center; gap:7px;
+  font-size:12px; color:var(--mut); cursor:pointer;
+}
+.kar-recordar input{width:15px; height:15px; accent-color:var(--acc);}
+
+@media (max-width:760px){
+  .kar-cuerpo{padding:34vh 14px;}
+  .kar-txt{font-size:19px;}
+  .kar-linea.act .kar-txt{font-size:22px;}
+}
 </style>
 </head>
 <body data-skin="ondaamp">
@@ -2197,6 +2277,7 @@ body{
           <button class="btn" id="bRep" title="Repetir: no / lista / una">🔁</button>
           <select id="enlace" class="enlace-sel" aria-label="Enlace entre canciones"
                   title="Cómo empalma una canción con la siguiente. «Sin pausa» encadena el disco sin huecos, para álbumes pensados para sonar de corrido; los fundidos solapan el final con el principio."></select>
+          <button class="btn" id="bKaraoke" data-abrir="karaoke" title="Karaoke: la letra corriendo con la canción">🎤</button>
           <button class="btn" id="bDemo" title="Groove de demostración para probar el ecualizador sin archivos">DEMO</button>
           <button class="btn" id="bMejora"
                   title="ON: mejora inteligente (auto-máster adaptado a cada canción). OFF: sonido fiel, sin ningún procesamiento.">✨<span class="hide-narrow"> Mejora</span></button>
@@ -2502,6 +2583,14 @@ body{
   <input type="file" id="dirIn" webkitdirectory multiple hidden>
   <input type="file" id="skinIn" accept=".wsz,.zip,application/zip" multiple hidden>
 </div>
+<div id="karaoke" hidden>
+  <div class="kar-cab">
+    <button class="kar-cerrar" data-cerrar="karaoke" aria-label="Cerrar el karaoke">⌄</button>
+    <span class="kar-tit" id="karTitulo">—</span>
+    <button class="kar-extra" id="bKarBuscar" title="Buscar la letra en internet" aria-label="Buscar letra">🔎</button>
+  </div>
+  <div class="kar-cuerpo" id="karCuerpo"></div>
+</div>
 <div id="toasts"></div>
 
 <script>
@@ -2528,6 +2617,7 @@ const state = {
   closedGroups: {},   // clave de grupo -> true si está plegado
   skin: "ondaamp",    // clave de SKINS, o el id de un .wsz importado
   enlace: "nopausa",  // clave de ENLACES: cómo empalma una pista con la siguiente
+  letras: { auto:false },  // auto: buscar la letra en internet sin volver a preguntar
   fx: {               // restauración y realce (0-100 en las cantidades)
     nr:false, nrAmt:55,   // reductor de ruido / hiss
     dc:false, dcAmt:50,   // quita-clics
@@ -5024,6 +5114,8 @@ function setDisplay(it){
   const titulo = lat ? `${it.title} (${lat})` : it.title;
   const full = it.artist ? `${titulo} — ${it.artist}` : titulo;
   setMarquee(it.album ? `${full}  ·  ${it.album}` : full);
+  // El karaoke abierto debe seguir a la canción, venga de un salto o de un enlace
+  if (karAbierto) refrescarKaraoke();
   refreshInfoLine(it);
   cov.innerHTML = it.picUrl ? `<img src="${it.picUrl}" alt="">` : "♫";
   document.title = `▶ ${full} · OndaAmp`;
@@ -5989,7 +6081,7 @@ if ("mediaSession" in navigator){
    Una app instalada vive en el teléfono, así que las novedades no llegan solas.
    Se compara la versión incrustada con la publicada en version.json (que el
    service worker nunca cachea) y, si difieren, se ofrece actualizar. */
-const APP_VERSION = "2.7";
+const APP_VERSION = "2.8";
 let verRemotaDatos = null;
 
 async function buscarActualizacion(silencioso){
@@ -6058,7 +6150,9 @@ if ($("bAplicarAct")) $("bAplicarAct").addEventListener("click", aplicarActualiz
    Dos pantallas deslizables sobre la biblioteca: "Reproduciendo" y "Sonido".
    Se registran en el historial para que el botón atrás de Android las cierre
    en vez de salirse de la app, que es lo que espera cualquiera en un móvil. */
-const VISTAS = {reproduciendo:"vista-reproduciendo", ajustes:"vista-ajustes"};
+/* El karaoke entra aquí aunque sea pantalla completa también en escritorio:
+   así el botón atrás de Android lo cierra igual que a las otras. */
+const VISTAS = {reproduciendo:"vista-reproduciendo", ajustes:"vista-ajustes", karaoke:"vista-karaoke"};
 let vistaActual = null;
 function abrirVista(nombre){
   if (!VISTAS[nombre] || vistaActual === nombre) return;
@@ -6066,11 +6160,13 @@ function abrirVista(nombre){
   document.body.classList.add(VISTAS[nombre]);
   if (!vistaActual) history.pushState({oa:true}, "");   // una sola entrada
   vistaActual = nombre;
+  if (nombre === "karaoke") karAbrir(); else karCerrar();
 }
 function cerrarVistas(porHistorial){
   if (!vistaActual) return;
   Object.values(VISTAS).forEach(c=> document.body.classList.remove(c));
   vistaActual = null;
+  karCerrar();
   if (!porHistorial && history.state && history.state.oa) history.back();
 }
 window.addEventListener("popstate", ()=> cerrarVistas(true));
@@ -6130,7 +6226,7 @@ function save(){
         eq:state.eq, pre:state.pre, eqOn:state.eqOn, vol:state.vol, bal:state.bal,
         width:state.width, night:state.night, repeat:state.repeat, shuffle:state.shuffle,
         vis:state.vis, customPresets:state.customPresets, view:state.view,
-        skin:state.skin, enlace:state.enlace, fx:state.fx, am:state.am, v3:true,
+        skin:state.skin, enlace:state.enlace, letras:state.letras, fx:state.fx, am:state.am, v3:true,
         preset:$("preset").value,
         eqClosed:$("eqPanel").classList.contains("closed"),
         fxClosed:$("fxPanel").classList.contains("closed"),
@@ -6155,6 +6251,7 @@ function load(){
     enlace: Object.prototype.hasOwnProperty.call(ENLACES, s.enlace) ? s.enlace : state.enlace,
     // Mezclar sobre los valores por omisión: así una versión guardada antigua
     // sigue cargando aunque le falten efectos añadidos después.
+    letras: Object.assign({}, state.letras, (s.letras && typeof s.letras === "object") ? s.letras : {}),
     fx: Object.assign({}, state.fx, (s.fx && typeof s.fx === "object") ? s.fx : {}),
     am: Object.assign({}, state.am, (s.am && typeof s.am === "object") ? s.am : {}),
   });
@@ -6267,6 +6364,359 @@ async function eliminarSkin(id){
   }catch(e){ toast("No pude eliminar el skin",true); }
 }
 $("bRemoveSkin").addEventListener("click",()=> eliminarSkin(state.skin));
+
+/* ================= Letras y karaoke =================
+   Las letras llegan por tres vías, en este orden:
+
+   1. Incrustadas en el archivo (etiqueta LYRICS de FLAC o USLT de MP3).
+   2. Guardadas de una búsqueda anterior, en IndexedDB.
+   3. LRCLIB (lrclib.net), base pública y gratuita de letras sincronizadas.
+
+   La tercera es la única que sale a internet, y por eso NO se hace sola: la
+   primera vez se pide permiso explicando qué se envía. Se manda solo título,
+   artista, álbum y duración —nunca el archivo, ni nada del dispositivo— y la
+   respuesta se guarda para no volver a preguntar por esa canción.
+
+   Un LRC son marcas de tiempo delante de cada verso: [mm:ss.cc] texto. */
+const LETRAS_DB = "ondaamp.letras.v1", LETRAS_STORE = "letras";
+const LRCLIB = "https://lrclib.net/api";
+
+function letrasOpen(){
+  return new Promise((res,rej)=>{
+    const r = indexedDB.open(LETRAS_DB, 1);
+    r.onupgradeneeded = ()=> r.result.createObjectStore(LETRAS_STORE);
+    r.onsuccess = ()=> res(r.result);
+    r.onerror  = ()=> rej(r.error);
+  });
+}
+async function letrasGuardar(k,v){
+  const d = await letrasOpen();
+  return new Promise((res,rej)=>{
+    const t = d.transaction(LETRAS_STORE,"readwrite");
+    t.objectStore(LETRAS_STORE).put(v,k);
+    t.oncomplete = ()=>{ d.close(); res(); };
+    t.onerror    = ()=>{ d.close(); rej(t.error); };
+  });
+}
+async function letrasLeer(k){
+  const d = await letrasOpen();
+  return new Promise((res,rej)=>{
+    const q = d.transaction(LETRAS_STORE).objectStore(LETRAS_STORE).get(k);
+    q.onsuccess = ()=>{ d.close(); res(q.result); };
+    q.onerror   = ()=>{ d.close(); rej(q.error); };
+  });
+}
+/* La clave lleva la duración redondeada a 5 s: dos versiones de la misma
+   canción (single y TV size) no comparten letra sincronizada. */
+function claveLetra(it){
+  const dur = Math.round((it.dur||0)/5)*5;
+  return [(it.artist||"").toLowerCase().trim(),
+          (it.title ||it.name||"").toLowerCase().trim(), dur].join("|");
+}
+
+/* ---------- Formato LRC ---------- */
+function parsearLRC(txt){
+  if (!txt) return [];
+  const lineas = [];
+  let desfase = 0;
+  for (const cruda of String(txt).split(/\r?\n/)){
+    const off = cruda.match(/^\s*\[offset:\s*([+-]?\d+)\s*\]/i);
+    if (off){ desfase = parseInt(off[1],10)/1000; continue; }
+    // Una misma línea puede llevar varias marcas: los estribillos se escriben
+    // una sola vez con todos sus tiempos delante.
+    const marcas = [...cruda.matchAll(/\[(\d{1,3}):(\d{1,2}(?:[.:]\d{1,3})?)\]/g)];
+    if (!marcas.length) continue;
+    const texto = cruda.replace(/\[[^\]]*\]/g, "").trim();
+    for (const m of marcas){
+      const t = parseInt(m[1],10)*60 + parseFloat(m[2].replace(":","."));
+      if (isFinite(t)) lineas.push({ t: t + desfase, texto });
+    }
+  }
+  lineas.sort((a,b)=> a.t - b.t);
+  return lineas;
+}
+/* Texto suelto sin marcas: se muestra igual, pero sin resaltar el verso */
+function letraPlana(txt){
+  return String(txt||"").split(/\r?\n/).map(l=>({ t:null, texto:l.trim() }));
+}
+function pareceLRC(txt){ return /\[\d{1,3}:\d{1,2}/.test(String(txt||"")); }
+
+/* Normaliza a {sync:bool, lineas:[], fuente:string} */
+function armarLetra(txt, fuente){
+  if (!txt || !String(txt).trim()) return null;
+  return pareceLRC(txt)
+    ? { sync:true,  lineas: parsearLRC(txt), fuente }
+    : { sync:false, lineas: letraPlana(txt), fuente };
+}
+
+/* ---------- LRCLIB ----------
+   Se intenta primero la coincidencia exacta, que exige que la duración cuadre;
+   si falla se busca por campos y se elige a mano. El desempate por duración es
+   imprescindible: de "Pegasus Fantasy" hay versión de disco y versión de TV,
+   y la letra sincronizada de una no vale para la otra. */
+async function pedirLRCLIB(it){
+  const q = s => encodeURIComponent(s||"");
+  const dur = Math.round(it.dur||0);
+  const intentos = [
+    `${LRCLIB}/get?artist_name=${q(it.artist)}&track_name=${q(it.title||it.name)}&album_name=${q(it.album)}&duration=${dur}`,
+    `${LRCLIB}/get?artist_name=${q(it.artist)}&track_name=${q(it.title||it.name)}&duration=${dur}`,
+  ];
+  for (const url of intentos){
+    try{
+      const r = await fetch(url);
+      if (r.ok){
+        const d = await r.json();
+        const txt = d.syncedLyrics || d.plainLyrics;
+        if (d.instrumental) return { instrumental:true };
+        if (txt) return { txt, fuente:"LRCLIB" };
+      }
+    }catch(e){}
+  }
+  // Búsqueda difusa: el título o el artista pueden diferir en un guion o un
+  // espacio y aun así ser la misma canción.
+  try{
+    const r = await fetch(`${LRCLIB}/search?track_name=${q(it.title||it.name)}&artist_name=${q(it.artist)}`);
+    if (!r.ok) return null;
+    const lista = await r.json();
+    if (!Array.isArray(lista) || !lista.length) return null;
+    const conLetra = lista.filter(x=> x.syncedLyrics || x.plainLyrics);
+    if (!conLetra.length) return null;
+    conLetra.sort((a,b)=>{
+      // Primero las sincronizadas; entre iguales, la de duración más parecida
+      const s = (b.syncedLyrics?1:0) - (a.syncedLyrics?1:0);
+      if (s) return s;
+      return Math.abs((a.duration||0)-dur) - Math.abs((b.duration||0)-dur);
+    });
+    const mejor = conLetra[0];
+    // Más de 15 s de diferencia casi siempre es otra versión: mejor nada que
+    // una letra que va a ir descuadrada toda la canción.
+    if (dur && mejor.duration && Math.abs(mejor.duration - dur) > 15) return null;
+    return { txt: mejor.syncedLyrics || mejor.plainLyrics, fuente:"LRCLIB" };
+  }catch(e){ return null; }
+}
+
+/* ---------- Obtención por capas ---------- */
+let letraActual = null;      // {sync, lineas, fuente} de la pista en curso
+let letraDe = null;          // id de la pista a la que pertenece
+let letraBuscando = false;
+
+async function cargarLetra(it, permitirRed){
+  if (!it) return null;
+  // 1) Incrustada en el archivo
+  if (it.letra){
+    const l = armarLetra(it.letra, "archivo");
+    if (l) return l;
+  }
+  // 2) De una búsqueda anterior
+  const clave = claveLetra(it);
+  try{
+    const guardada = await letrasLeer(clave);
+    if (guardada){
+      if (guardada.vacia) return { vacia:true };
+      const l = armarLetra(guardada.txt, guardada.fuente||"guardada");
+      if (l) return l;
+    }
+  }catch(e){}
+  if (!permitirRed) return null;
+  // 3) Internet, solo con permiso
+  const res = await pedirLRCLIB(it);
+  if (!res || res.instrumental || !res.txt){
+    try{ await letrasGuardar(clave, { vacia:true, cuando:Date.now() }); }catch(e){}
+    return { vacia:true, instrumental: !!(res && res.instrumental) };
+  }
+  try{ await letrasGuardar(clave, { txt:res.txt, fuente:res.fuente, cuando:Date.now() }); }catch(e){}
+  return armarLetra(res.txt, res.fuente);
+}
+
+/* ---------- Pantalla de karaoke ---------- */
+let karAbierto = false, karRaf = 0, karActiva = -1;
+
+/* Abrir y cerrar los gestiona la navegación de vistas, que es quien lleva el
+   historial; aquí solo queda lo propio del karaoke. */
+function karAbrir(){
+  karAbierto = true;
+  $("karaoke").hidden = false;
+  refrescarKaraoke();
+  karLatir();
+}
+function karCerrar(){
+  if (!karAbierto) return;
+  karAbierto = false;
+  $("karaoke").hidden = true;
+  cancelAnimationFrame(karRaf);
+}
+/* Se pide la letra de la pista en curso. Si no hay y no se puede salir a la
+   red, se ofrece el permiso en vez de dejar la pantalla vacía. */
+async function refrescarKaraoke(){
+  const it = state.list[state.cur];
+  $("karTitulo").textContent = it ? (it.title || it.name) : "—";
+  if (!it){ karPintarAviso("No hay ninguna canción sonando."); return; }
+  if (letraDe === it.id && letraActual && !letraActual.vacia){ karPintarLetra(); return; }
+
+  letraActual = null; letraDe = it.id; karActiva = -1;
+  const local = await cargarLetra(it, false);
+  if (local && !local.vacia){ letraActual = local; karPintarLetra(); return; }
+
+  if (local && local.vacia){
+    karPintarAviso(local.instrumental
+      ? "LRCLIB dice que esta pista es instrumental."
+      : "No encontré letra para esta canción.", true);
+    return;
+  }
+  if (state.letras && state.letras.auto){ karBuscarEnRed(); return; }
+  karPedirPermiso(it);
+}
+function karPintarAviso(txt, conReintento){
+  const c = $("karCuerpo");
+  c.innerHTML = "";
+  const d = document.createElement("div");
+  d.className = "kar-aviso";
+  d.textContent = txt;
+  c.appendChild(d);
+  if (conReintento){
+    const b = document.createElement("button");
+    b.className = "btn"; b.textContent = "🔎 Buscar otra vez";
+    b.addEventListener("click", ()=> karBuscarEnRed(true));
+    c.appendChild(b);
+  }
+}
+/* El permiso se pide con lo que de verdad se envía delante, no escondido en un
+   "aceptar": es la única parte de OndaAmp que habla con un servidor. */
+function karPedirPermiso(it){
+  const c = $("karCuerpo");
+  c.innerHTML = "";
+  const caja = document.createElement("div");
+  caja.className = "kar-permiso";
+  const h = document.createElement("h3");
+  h.textContent = "Buscar la letra en internet";
+  const p = document.createElement("p");
+  p.textContent = "Esta canción no trae letra dentro del archivo. Puedo pedírsela a "
+    + "LRCLIB (lrclib.net), una base pública y gratuita de letras sincronizadas.";
+  const q = document.createElement("p");
+  q.className = "kar-envio";
+  q.textContent = "Se enviarán solo estos datos:";
+  const ul = document.createElement("ul");
+  [["Título", it.title || it.name], ["Artista", it.artist || "—"],
+   ["Álbum", it.album || "—"], ["Duración", (Math.round(it.dur||0)) + " s"]]
+    .forEach(([k,v])=>{
+      const li = document.createElement("li");
+      li.innerHTML = `<b>${k}:</b> `;
+      li.appendChild(document.createTextNode(v));
+      ul.appendChild(li);
+    });
+  const nota = document.createElement("p");
+  nota.className = "kar-nota";
+  nota.textContent = "Ni el archivo, ni tu biblioteca, ni ningún dato tuyo salen del dispositivo. "
+    + "La letra se guarda aquí para no volver a pedirla.";
+  const fila = document.createElement("div");
+  fila.className = "kar-botones";
+  const si = document.createElement("button");
+  si.className = "btn"; si.id = "bKarSi"; si.textContent = "Buscar letra";
+  si.addEventListener("click", ()=>{
+    if ($("karRecordar").checked){
+      state.letras = Object.assign({}, state.letras, {auto:true});
+      save();
+    }
+    karBuscarEnRed();
+  });
+  const no = document.createElement("button");
+  no.className = "btn"; no.textContent = "Ahora no";
+  no.addEventListener("click", ()=> karPintarAviso("Sin letra. Pulsa 🔎 arriba cuando quieras buscarla.", true));
+  fila.append(si, no);
+  const lbl = document.createElement("label");
+  lbl.className = "kar-recordar";
+  lbl.innerHTML = `<input type="checkbox" id="karRecordar"> Buscar sola la letra a partir de ahora`;
+  caja.append(h, p, q, ul, nota, fila, lbl);
+  c.appendChild(caja);
+}
+async function karBuscarEnRed(forzar){
+  const it = state.list[state.cur];
+  if (!it || letraBuscando) return;
+  letraBuscando = true;
+  karPintarAviso("Buscando la letra…");
+  if (forzar){ try{ await letrasGuardar(claveLetra(it), null); }catch(e){} }
+  try{
+    const l = await cargarLetra(it, true);
+    letraDe = it.id;
+    if (l && !l.vacia){ letraActual = l; karActiva = -1; karPintarLetra(); }
+    else karPintarAviso(l && l.instrumental
+      ? "LRCLIB dice que esta pista es instrumental."
+      : "No encontré letra para esta canción.", true);
+  }catch(e){
+    karPintarAviso("No pude conectar con LRCLIB. ¿Hay internet?", true);
+  }
+  letraBuscando = false;
+}
+/* Cada verso lleva debajo su lectura latina, pero solo si sale ENTERA. En un
+   título mezclar escrituras se tolera; en prosa cantada no: un verso como
+   「傷ついたままじゃいないと」daría "傷tsuitamamajainaito", que no se puede
+   cantar ni leer. Sin diccionario de kanji no hay lectura posible, así que más
+   vale enseñar el verso original limpio y que el resalte guíe. */
+function karPintarLetra(){
+  const c = $("karCuerpo");
+  c.innerHTML = "";
+  if (!letraActual || !letraActual.lineas.length){ karPintarAviso("Letra vacía.", true); return; }
+  const frag = document.createDocumentFragment();
+  letraActual.lineas.forEach((ln,i)=>{
+    const d = document.createElement("div");
+    d.className = "kar-linea" + (ln.texto ? "" : " kar-vacia");
+    d.dataset.i = i;
+    const t = document.createElement("div");
+    t.className = "kar-txt"; t.textContent = ln.texto || "♪";
+    d.appendChild(t);
+    const lat = romajiEntero(ln.texto);
+    if (lat){
+      const r = document.createElement("div");
+      r.className = "kar-romaji"; r.textContent = lat;
+      d.appendChild(r);
+    }
+    // Tocar un verso salta a su momento: es lo que uno espera de un karaoke
+    if (ln.t != null) d.addEventListener("click", ()=>{
+      try{ audioEl.currentTime = Math.max(0, ln.t); }catch(e){}
+    });
+    frag.appendChild(d);
+  });
+  c.appendChild(frag);
+  const pie = document.createElement("div");
+  pie.className = "kar-fuente";
+  pie.textContent = letraActual.sync
+    ? `Letra sincronizada · ${letraActual.fuente}`
+    : `Letra sin sincronizar · ${letraActual.fuente}`;
+  c.appendChild(pie);
+  karActiva = -1;
+  karSincronizar(true);
+}
+/* Busca el último verso ya empezado. La lista está ordenada por tiempo, así
+   que basta avanzar desde el actual en vez de recorrerla entera cada cuadro. */
+function karSincronizar(forzar){
+  if (!letraActual || !letraActual.sync) return;
+  const t = audioEl.currentTime;
+  const L = letraActual.lineas;
+  let i = karActiva;
+  if (i < 0 || t < (L[i] ? L[i].t : 0)) i = -1;
+  while (i+1 < L.length && L[i+1].t <= t) i++;
+  if (i === karActiva && !forzar) return;
+  karActiva = i;
+  const c = $("karCuerpo");
+  c.querySelectorAll(".kar-linea.act").forEach(e=> e.classList.remove("act"));
+  if (i < 0) return;
+  const el = c.querySelector(`.kar-linea[data-i="${i}"]`);
+  if (!el) return;
+  el.classList.add("act");
+  // Se centra el verso en curso; el navegador anima el desplazamiento
+  const destino = el.offsetTop - c.clientHeight/2 + el.offsetHeight/2;
+  c.scrollTo({ top: Math.max(0, destino), behavior: "smooth" });
+}
+function karLatir(){
+  if (!karAbierto) return;
+  karSincronizar(false);
+  karRaf = requestAnimationFrame(karLatir);
+}
+// En captura para adelantarse al Escape que limpia la búsqueda
+document.addEventListener("keydown", e=>{
+  if (e.key === "Escape" && karAbierto){ e.stopPropagation(); cerrarVistas(); }
+}, true);
+$("bKarBuscar").addEventListener("click", ()=> karBuscarEnRed(!!letraActual));
 
 /* ================= Init ================= */
 buildEqUI();

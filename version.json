@@ -1,5 +1,5 @@
 {
-  "version": "2.7",
-  "fecha": "2026-08-01",
-  "notas": "La lectura latina ahora funciona también en títulos que mezclan kanji con kana, que son casi todos: ペガサス幻想（ファンタジー）muestra «pegasasu幻想（fantajī）» y se encuentra escribiendo «pegasasu». Antes solo salía en títulos sin ningún kanji."
+  "version": "2.8",
+  "fecha": "2026-08-02",
+  "notas": "Nueva pantalla de karaoke: pulsa 🎤 y la letra corre con la canción, resaltando el verso que suena. Toca un verso para saltar ahí. Las letras se buscan en LRCLIB solo si tú lo autorizas, y se guardan en el teléfono para no volver a pedirlas."
 }

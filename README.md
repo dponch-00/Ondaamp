@@ -13,12 +13,38 @@ Esta es la versión **PWA**, instalable en Android desde el navegador.
 - **Restauración de audio**: reductor de ruido por sustracción espectral (para el *hiss* de cintas viejas), quita-clics de vinilo, filtro de rumble, refuerzo de graves psicoacústico, realce de aire y crossfeed para auriculares
 - **Biblioteca** agrupable por álbum, artista o carpeta, con búsqueda y carátulas
 - **Enlace entre canciones**: encadena el disco sin huecos, o con fundido de 2 a 8 segundos
+- **Karaoke** 🎤: la letra corriendo con la canción, resaltando el verso que suena
 - **10 skins** de la Colección OndaAmp, con importador de skins clásicos `.wsz`
 - **Funciona sin conexión** una vez instalada
 
+## Karaoke
+
+El botón 🎤 abre la letra a pantalla completa, con el verso que suena resaltado
+y centrado. Tocar cualquier verso salta a ese momento de la canción.
+
+Las letras se buscan por tres vías, en este orden: dentro del propio archivo
+(etiqueta `LYRICS` de FLAC o `USLT` de MP3), en lo guardado de búsquedas
+anteriores, y por último en [LRCLIB](https://lrclib.net), una base pública y
+gratuita de letras sincronizadas.
+
+> Esa última vía es **la única parte de OndaAmp que habla con un servidor**, y
+> por eso no se hace sola: la primera vez aparece un cartel que enseña
+> exactamente qué se va a enviar —título, artista, álbum y duración— antes de
+> enviarlo. Ni el archivo ni tu biblioteca salen del dispositivo. La letra se
+> guarda localmente para no volver a pedirla. Puedes marcar "buscar sola" si
+> prefieres no confirmar cada canción.
+
+Las letras en japonés se muestran tal cual: sin un diccionario de kanji no hay
+forma de transcribirlas, y media transcripción sería peor que ninguna. La
+lectura latina sí aparece en los versos escritos solo en kana.
+
 ## Privacidad
 
-No hay analítica, ni cuentas, ni peticiones a servidores externos. La música que añades se guarda en el almacén privado del propio navegador (OPFS), en tu dispositivo. Alojar la app en GitHub Pages solo sirve para poder instalarla: el archivo se descarga una vez y después funciona sin internet.
+No hay analítica ni cuentas. La música que añades se guarda en el almacén
+privado del propio navegador (OPFS), en tu dispositivo. Alojar la app en GitHub
+Pages solo sirve para poder instalarla: el archivo se descarga una vez y después
+funciona sin internet. La única petición externa posible es la búsqueda de
+letras, y siempre bajo tu autorización (ver arriba).
 
 ## Estructura
 
