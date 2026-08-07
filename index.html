@@ -6091,7 +6091,7 @@ if ("mediaSession" in navigator){
    Una app instalada vive en el teléfono, así que las novedades no llegan solas.
    Se compara la versión incrustada con la publicada en version.json (que el
    service worker nunca cachea) y, si difieren, se ofrece actualizar. */
-const APP_VERSION = "2.9";
+const APP_VERSION = "2.10";
 let verRemotaDatos = null;
 
 async function buscarActualizacion(silencioso){
@@ -6539,7 +6539,7 @@ async function cargarLetra(it, permitirRed){
 }
 
 /* ---------- Pantalla de karaoke ---------- */
-let karAbierto = false, karRaf = 0, karActiva = -1;
+let karAbierto = false, karTimer = 0, karActiva = -1;
 
 /* Abrir y cerrar los gestiona la navegación de vistas, que es quien lleva el
    historial; aquí solo queda lo propio del karaoke. */
@@ -6553,7 +6553,7 @@ function karCerrar(){
   if (!karAbierto) return;
   karAbierto = false;
   $("karaoke").hidden = true;
-  cancelAnimationFrame(karRaf);
+  clearInterval(karTimer); karTimer = 0;
 }
 /* Se pide la letra de la pista en curso. Si no hay y no se puede salir a la
    red, se ofrece el permiso en vez de dejar la pantalla vacía. */
@@ -6717,11 +6717,21 @@ function karSincronizar(forzar){
   const destino = el.offsetTop - c.clientHeight/2 + el.offsetHeight/2;
   c.scrollTo({ top: Math.max(0, destino), behavior: "smooth" });
 }
+/* Un temporizador, NO requestAnimationFrame. rAF solo se dispara mientras el
+   navegador está pintando la página: con el teléfono bloqueado, la app en
+   segundo plano o la ventana tapada deja de correr y la letra se queda clavada
+   en el verso donde estuviera. Escuchar música con la pantalla apagada es lo
+   normal, así que la sincronía no puede depender de que alguien esté mirando.
+   120 ms es imperceptible para un cambio de verso y sobra de sobra. */
 function karLatir(){
-  if (!karAbierto) return;
-  karSincronizar(false);
-  karRaf = requestAnimationFrame(karLatir);
+  clearInterval(karTimer);
+  karTimer = setInterval(()=>{ if (karAbierto) karSincronizar(false); }, 120);
 }
+/* Al volver del segundo plano el temporizador pudo ir ralentizado: se recoloca
+   de golpe en el verso que toca en vez de arrastrar el retraso. */
+document.addEventListener("visibilitychange", ()=>{
+  if (!document.hidden && karAbierto) karSincronizar(true);
+});
 // En captura para adelantarse al Escape que limpia la búsqueda
 document.addEventListener("keydown", e=>{
   if (e.key === "Escape" && karAbierto){ e.stopPropagation(); cerrarVistas(); }
