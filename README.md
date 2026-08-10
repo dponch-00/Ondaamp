@@ -14,7 +14,7 @@ Esta es la versión **PWA**, instalable en Android desde el navegador.
 - **Biblioteca** agrupable por álbum, artista o carpeta, con búsqueda y carátulas
 - **Enlace entre canciones**: encadena el disco sin huecos, o con fundido de 2 a 8 segundos
 - **Karaoke** 🎤: la letra corriendo con la canción, resaltando el verso que suena
-- **10 skins** de la Colección OndaAmp, con importador de skins clásicos `.wsz`
+- **13 skins** de la Colección OndaAmp, con importador de skins clásicos `.wsz`
 - **Funciona sin conexión** una vez instalada
 
 ## Karaoke
@@ -81,10 +81,11 @@ cruce mínimo tapa por igual un hueco o un solape sin oírse como fundido.
 
 ## Skins
 
-En **Ajustes ⚙ → Apariencia** eliges entre las diez skins de la **Colección OndaAmp**:
+En **Ajustes ⚙ → Apariencia** eliges entre las trece skins de la **Colección OndaAmp**:
 Original, Studio Rack 1978, Neon Broadcast, Cassette Club '86, Polar FM, Noir Gold,
-Hoshi Drive, Quantum Field Lab, Event Horizon y Glasswave. Son obra propia y van en
-CSS puro, así que no engordan la descarga ni se pixelan en pantallas de alta densidad.
+Hoshi Drive, Quantum Field Lab, Event Horizon, Glasswave y las tres de la familia
+neón — Outrun Sunset, Tokyo Rain y Aurora Boreal. Son obra propia y van en CSS puro,
+así que no engordan la descarga ni se pixelan en pantallas de alta densidad.
 
 Los skins clásicos de Winamp **no se incluyen** por ser artwork de terceros, pero la
 app trae un importador: con **＋ Importar skin .wsz** cargas los tuyos y se guardan

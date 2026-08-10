@@ -816,6 +816,15 @@ footer kbd{
 .skin-card[data-skin="glass"]    .sw{background:linear-gradient(#f2f7fd,#dfe8f3);border-color:#b3c3d8;}
 .skin-card[data-skin="glass"]    .sw i{background:#006ee6;}
 .skin-card[data-skin="glass"]    .sw b{background:#5b7ea8;}
+.skin-card[data-skin="outrun"]   .sw{background:linear-gradient(#5a1440,#1a0733);border-color:#6b2f8c;}
+.skin-card[data-skin="outrun"]   .sw i{background:#ff2e88;}
+.skin-card[data-skin="outrun"]   .sw b{background:#ffb43f;}
+.skin-card[data-skin="tokyo"]    .sw{background:linear-gradient(#0d1420,#02040a);border-color:#26405c;}
+.skin-card[data-skin="tokyo"]    .sw i{background:#22d3ee;}
+.skin-card[data-skin="tokyo"]    .sw b{background:#ff2e63;}
+.skin-card[data-skin="aurora"]   .sw{background:linear-gradient(#122040,#030711);border-color:#2c4a6e;}
+.skin-card[data-skin="aurora"]   .sw i{background:#34d399;}
+.skin-card[data-skin="aurora"]   .sw b{background:#a78bfa;}
 
 
 /* ---------- Studio Rack 1978 ----------
@@ -1968,6 +1977,314 @@ body[data-skin="glass"]{--velo:rgba(0,0,0,.10); --velo-mezcla:white;}
 }
 
 
+
+/* ---------- Outrun Sunset ----------
+   La familia Neon llevada al atardecer: mismo esqueleto de cabina, pero el
+   violeta frío se cambia por naranja y magenta, y la rejilla se tumba en el
+   horizonte en vez de cubrir la pantalla. */
+body[data-skin="outrun"]{
+  --bg:#0d0420;--panel:#1b0a33;--panel2:#25103f;--line:#6b2f8c;
+  --txt:#ffeef8;--mut:#c79ad2;--acc:#ff2e88;--acc-dim:#8d1a4c;
+  --amber:#ffb43f;--lcd:#ffd88a;--lcd-dim:#b0794a;--lcdbg:#160525;
+  --danger:#ff5c5c;--radius:18px;--deck-h:112px;
+  background:
+    radial-gradient(circle at 50% 78%,rgba(255,120,40,.30),transparent 46%),
+    radial-gradient(circle at 12% 6%,rgba(255,46,136,.24),transparent 38%),
+    linear-gradient(180deg,#1a0733 0%,#2b0b3d 42%,#5a1440 70%,#0b0318 100%);
+  font-family:"Segoe UI",system-ui,sans-serif;
+}
+/* Rejilla en perspectiva pegada abajo: el suelo del atardecer */
+body[data-skin="outrun"]::before{
+  content:"";position:fixed;inset:auto 0 0 0;height:34vh;pointer-events:none;opacity:.34;
+  background-image:
+    linear-gradient(rgba(255,140,60,.55) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(255,140,60,.35) 1px,transparent 1px);
+  background-size:100% 26px, 44px 100%;
+  mask-image:linear-gradient(to bottom,transparent,#000 62%);
+}
+body[data-skin="outrun"] .app{width:min(1320px,100%);gap:12px;}
+body[data-skin="outrun"] .panel{
+  border:1px solid rgba(255,110,180,.42);border-radius:18px;
+  background:linear-gradient(145deg,rgba(48,16,68,.96),rgba(14,4,26,.98));
+  box-shadow:0 18px 46px rgba(0,0,0,.55),inset 0 1px rgba(255,255,255,.09),0 0 24px rgba(255,46,136,.14);
+}
+body[data-skin="outrun"] .titlebar{
+  min-height:42px;padding:8px 14px;border-color:#7a3596;
+  background:linear-gradient(90deg,rgba(255,180,63,.18),transparent 40%,rgba(255,46,136,.14));
+}
+body[data-skin="outrun"] .titlebar .dots i{background:#7a3596;}
+body[data-skin="outrun"] .titlebar .dots i:first-child{background:#ff2e88;box-shadow:0 0 10px #ff2e88;}
+body[data-skin="outrun"] .titlebar .dots i:nth-child(2){background:#ffb43f;box-shadow:0 0 8px #ffb43f;}
+body[data-skin="outrun"] .titlebar .dots i:nth-child(3){background:#ff7a3d;box-shadow:0 0 8px #ff7a3d;}
+body[data-skin="outrun"] .titlebar b{font-size:0;}
+body[data-skin="outrun"] .titlebar b::after{
+  content:"ONDA // OUTRUN";
+  font:800 13px/1 "Segoe UI",sans-serif;letter-spacing:.24em;color:#fff;
+  text-shadow:0 0 14px #ff2e88,0 0 26px rgba(255,180,63,.5);
+}
+body[data-skin="outrun"] .titlebar .hide-narrow::after{content:" / SUNSET DRIVE";}
+body[data-skin="outrun"] .titlebar .tag{
+  color:#ffd88a;background:rgba(20,5,34,.8);border:1px solid #7a3596;border-radius:20px;
+}
+body[data-skin="outrun"] .skin-picker{color:#c79ad2;}
+body[data-skin="outrun"] .skin-picker select,
+body[data-skin="outrun"] .enlace-sel{
+  color:#ffeef8;background:#22093a;border:1px solid #6b2f8c;border-radius:10px;
+}
+body[data-skin="outrun"] .display{
+  padding:14px;border:1px solid rgba(255,110,180,.30);border-radius:14px;
+  background:linear-gradient(160deg,rgba(255,46,136,.07),rgba(12,3,22,.92));
+  box-shadow:inset 0 0 34px rgba(255,120,40,.10);
+}
+body[data-skin="outrun"] .cover{
+  border-radius:14px;border:1px solid rgba(255,140,80,.45);
+  box-shadow:0 0 22px rgba(255,46,136,.30);
+}
+body[data-skin="outrun"].is-playing .cover{animation:outrunLatido 3.4s ease-in-out infinite;}
+@keyframes outrunLatido{50%{box-shadow:0 0 34px rgba(255,180,63,.55);}}
+body[data-skin="outrun"] .lcd-title{color:#ffd88a;text-shadow:0 0 14px rgba(255,180,63,.5);}
+body[data-skin="outrun"] .lcd-time{color:#ff2e88;text-shadow:0 0 18px rgba(255,46,136,.6);}
+body[data-skin="outrun"] .lcd-info{color:#c79ad2;}
+body[data-skin="outrun"] canvas#vis{
+  height:78px;border-radius:12px;border:1px solid rgba(255,110,180,.26);
+  background:linear-gradient(180deg,rgba(43,11,61,.6),rgba(10,3,20,.9));
+}
+body[data-skin="outrun"] .tbtns .btn{
+  border-radius:50%;width:44px;height:44px;justify-content:center;
+  color:#ffeef8;border:1px solid rgba(255,110,180,.5);
+  background:linear-gradient(160deg,#3a1152,#1a0629);
+}
+body[data-skin="outrun"] .tbtns .btn:hover{box-shadow:0 0 16px rgba(255,46,136,.5);}
+body[data-skin="outrun"] .tbtns #bPlay{
+  background:linear-gradient(160deg,#ff2e88,#ff7a3d);border-color:#ffb43f;color:#1a0629;
+  box-shadow:0 0 26px rgba(255,46,136,.55);
+}
+body[data-skin="outrun"] .btn{
+  color:#ffeef8;border-color:#6b2f8c;border-radius:11px;
+  background:linear-gradient(160deg,#2c0f47,#180627);
+}
+body[data-skin="outrun"] .btn.on{color:#160525;background:linear-gradient(160deg,#ffb43f,#ff2e88);border-color:#ffb43f;}
+body[data-skin="outrun"] .section-head{
+  border-color:#5b2578;
+  background:linear-gradient(90deg,rgba(255,46,136,.14),transparent 55%);
+}
+body[data-skin="outrun"] .section-head h2{color:#ffb9dd;letter-spacing:.2em;}
+body[data-skin="outrun"] .pl-list li.cur .t1{color:#ff2e88;}
+body[data-skin="outrun"] .pl-list li:hover{background:rgba(255,46,136,.09);}
+body[data-skin="outrun"] .pl-stats{color:#c79ad2;background:#1b0a33;border-color:#5b2578;}
+body[data-skin="outrun"] footer{color:#a074b5;}
+
+/* ---------- Tokyo Rain ----------
+   La misma cabina bajo lluvia nocturna: negro casi puro, cian y rosa de
+   rótulo, y regueros verticales cayendo por el fondo. */
+body[data-skin="tokyo"]{
+  --bg:#05070c;--panel:#0d1420;--panel2:#131c2b;--line:#26405c;
+  --txt:#e8f6ff;--mut:#7f9dba;--acc:#22d3ee;--acc-dim:#0e6b7d;
+  --amber:#ff2e63;--lcd:#8ef0ff;--lcd-dim:#4a7f96;--lcdbg:#03060b;
+  --danger:#ff2e63;--radius:16px;--deck-h:112px;
+  background:
+    radial-gradient(circle at 82% 8%,rgba(255,46,99,.22),transparent 34%),
+    radial-gradient(circle at 10% 88%,rgba(34,211,238,.18),transparent 36%),
+    linear-gradient(160deg,#070c14,#02040a 78%);
+  font-family:"Segoe UI",system-ui,sans-serif;
+}
+/* Lluvia: rayas verticales finas, muy tenues, cayendo despacio */
+body[data-skin="tokyo"]::before{
+  content:"";position:fixed;inset:-40% 0;pointer-events:none;opacity:.30;
+  background-image:repeating-linear-gradient(96deg,
+    rgba(150,220,255,.30) 0 1px,transparent 1px 7px);
+  animation:tokyoLluvia 1.5s linear infinite;
+}
+@keyframes tokyoLluvia{to{transform:translateY(22%);}}
+body[data-skin="tokyo"] .app{width:min(1320px,100%);gap:12px;}
+body[data-skin="tokyo"] .panel{
+  border:1px solid rgba(52,120,160,.5);border-radius:16px;
+  background:linear-gradient(145deg,rgba(16,26,40,.97),rgba(4,7,13,.98));
+  box-shadow:0 18px 46px rgba(0,0,0,.6),inset 0 1px rgba(255,255,255,.06),0 0 20px rgba(34,211,238,.10);
+}
+body[data-skin="tokyo"] .titlebar{
+  min-height:42px;padding:8px 14px;border-color:#26405c;
+  background:linear-gradient(90deg,rgba(255,46,99,.16),transparent 42%,rgba(34,211,238,.10));
+}
+body[data-skin="tokyo"] .titlebar .dots i{background:#2b4a66;}
+body[data-skin="tokyo"] .titlebar .dots i:first-child{background:#ff2e63;box-shadow:0 0 10px #ff2e63;}
+body[data-skin="tokyo"] .titlebar .dots i:nth-child(2){background:#22d3ee;box-shadow:0 0 8px #22d3ee;}
+body[data-skin="tokyo"] .titlebar .dots i:nth-child(3){background:#7dd3fc;box-shadow:0 0 8px #7dd3fc;}
+body[data-skin="tokyo"] .titlebar b{font-size:0;}
+body[data-skin="tokyo"] .titlebar b::after{
+  content:"オンダ // TOKYO RAIN";
+  font:800 13px/1 "Segoe UI",sans-serif;letter-spacing:.16em;color:#fff;
+  text-shadow:0 0 12px #ff2e63,0 0 22px rgba(34,211,238,.45);
+}
+body[data-skin="tokyo"] .titlebar .hide-narrow::after{content:" / 深夜放送";letter-spacing:.1em;}
+body[data-skin="tokyo"] .titlebar .tag{
+  color:#8ef0ff;background:rgba(3,6,11,.85);border:1px solid #26405c;border-radius:6px;
+}
+body[data-skin="tokyo"] .skin-picker{color:#7f9dba;}
+body[data-skin="tokyo"] .skin-picker select,
+body[data-skin="tokyo"] .enlace-sel{
+  color:#e8f6ff;background:#0d1622;border:1px solid #26405c;border-radius:8px;
+}
+body[data-skin="tokyo"] .display{
+  padding:14px;border:1px solid rgba(52,120,160,.34);border-radius:12px;
+  background:linear-gradient(160deg,rgba(34,211,238,.06),rgba(3,6,11,.94));
+  box-shadow:inset 0 0 30px rgba(0,0,0,.65);
+}
+body[data-skin="tokyo"] .cover{
+  border-radius:10px;border:1px solid rgba(255,46,99,.4);
+  box-shadow:0 0 20px rgba(255,46,99,.26);
+}
+body[data-skin="tokyo"].is-playing .cover{animation:tokyoNeon 2.8s ease-in-out infinite;}
+@keyframes tokyoNeon{50%{box-shadow:0 0 30px rgba(34,211,238,.5);border-color:rgba(34,211,238,.55);}}
+body[data-skin="tokyo"] .lcd-title{color:#8ef0ff;text-shadow:0 0 12px rgba(34,211,238,.55);}
+body[data-skin="tokyo"] .lcd-time{color:#ff2e63;text-shadow:0 0 16px rgba(255,46,99,.6);}
+body[data-skin="tokyo"] .lcd-info{color:#7f9dba;}
+body[data-skin="tokyo"] canvas#vis{
+  height:78px;border-radius:10px;border:1px solid rgba(52,120,160,.3);
+  background:linear-gradient(180deg,rgba(13,22,34,.7),rgba(2,4,8,.92));
+}
+body[data-skin="tokyo"] .tbtns .btn{
+  border-radius:9px;width:44px;height:44px;justify-content:center;
+  color:#e8f6ff;border:1px solid rgba(52,120,160,.55);
+  background:linear-gradient(160deg,#16233a,#080e18);
+}
+body[data-skin="tokyo"] .tbtns .btn:hover{box-shadow:0 0 15px rgba(34,211,238,.45);}
+body[data-skin="tokyo"] .tbtns #bPlay{
+  background:linear-gradient(160deg,#22d3ee,#0e7490);border-color:#7dd3fc;color:#03060b;
+  box-shadow:0 0 24px rgba(34,211,238,.5);
+}
+body[data-skin="tokyo"] .btn{
+  color:#e8f6ff;border-color:#26405c;border-radius:8px;
+  background:linear-gradient(160deg,#111c2c,#070c14);
+}
+body[data-skin="tokyo"] .btn.on{color:#03060b;background:linear-gradient(160deg,#22d3ee,#7dd3fc);border-color:#22d3ee;}
+body[data-skin="tokyo"] .section-head{
+  border-color:#22384f;
+  background:linear-gradient(90deg,rgba(255,46,99,.12),transparent 55%);
+}
+body[data-skin="tokyo"] .section-head h2{color:#9fd8ee;letter-spacing:.2em;}
+body[data-skin="tokyo"] .pl-list li.cur .t1{color:#22d3ee;}
+body[data-skin="tokyo"] .pl-list li:hover{background:rgba(34,211,238,.08);}
+body[data-skin="tokyo"] .pl-stats{color:#7f9dba;background:#0d1420;border-color:#22384f;}
+body[data-skin="tokyo"] footer{color:#5d7a94;}
+
+/* ---------- Aurora Boreal ----------
+   El lado tranquilo de la familia: mismos resplandores, pero verdes y violetas
+   ondeando despacio sobre azul de medianoche. Sin estridencias. */
+body[data-skin="aurora"]{
+  --bg:#050b18;--panel:#0b1730;--panel2:#122040;--line:#2c4a6e;
+  --txt:#e6f7ff;--mut:#8fb3c9;--acc:#34d399;--acc-dim:#157050;
+  --amber:#a78bfa;--lcd:#7dd3fc;--lcd-dim:#457e9c;--lcdbg:#03070f;
+  --danger:#fb7185;--radius:20px;--deck-h:112px;
+  background:
+    radial-gradient(ellipse 70% 40% at 30% -5%,rgba(52,211,153,.26),transparent 60%),
+    radial-gradient(ellipse 60% 35% at 78% 8%,rgba(167,139,250,.22),transparent 62%),
+    linear-gradient(180deg,#071127,#030711 76%);
+  font-family:"Segoe UI",system-ui,sans-serif;
+}
+/* Velo de aurora que ondea muy lento por arriba */
+body[data-skin="aurora"]::before{
+  content:"";position:fixed;inset:0 -20% auto -20%;height:56vh;pointer-events:none;opacity:.30;
+  background:
+    radial-gradient(ellipse 40% 60% at 25% 20%,rgba(52,211,153,.42),transparent 70%),
+    radial-gradient(ellipse 34% 55% at 62% 12%,rgba(125,211,252,.34),transparent 70%),
+    radial-gradient(ellipse 30% 50% at 85% 26%,rgba(167,139,250,.34),transparent 70%);
+  filter:blur(26px);
+  animation:auroraOndea 17s ease-in-out infinite alternate;
+  mask-image:linear-gradient(to bottom,#000,transparent 88%);
+}
+@keyframes auroraOndea{
+  50%{transform:translateX(5%) scaleY(1.16);}
+  to {transform:translateX(-4%) scaleY(.92);}
+}
+body[data-skin="aurora"] .app{width:min(1320px,100%);gap:12px;}
+body[data-skin="aurora"] .panel{
+  border:1px solid rgba(70,130,180,.42);border-radius:20px;
+  background:linear-gradient(145deg,rgba(16,32,62,.95),rgba(4,9,20,.97));
+  box-shadow:0 18px 46px rgba(0,0,0,.5),inset 0 1px rgba(255,255,255,.07),0 0 26px rgba(52,211,153,.10);
+}
+body[data-skin="aurora"] .titlebar{
+  min-height:42px;padding:8px 14px;border-color:#2c4a6e;
+  background:linear-gradient(90deg,rgba(52,211,153,.14),transparent 44%,rgba(167,139,250,.12));
+}
+body[data-skin="aurora"] .titlebar .dots i{background:#2c4a6e;}
+body[data-skin="aurora"] .titlebar .dots i:first-child{background:#34d399;box-shadow:0 0 10px #34d399;}
+body[data-skin="aurora"] .titlebar .dots i:nth-child(2){background:#7dd3fc;box-shadow:0 0 8px #7dd3fc;}
+body[data-skin="aurora"] .titlebar .dots i:nth-child(3){background:#a78bfa;box-shadow:0 0 8px #a78bfa;}
+body[data-skin="aurora"] .titlebar b{font-size:0;}
+body[data-skin="aurora"] .titlebar b::after{
+  content:"ONDA // AURORA";
+  font:800 13px/1 "Segoe UI",sans-serif;letter-spacing:.24em;color:#fff;
+  text-shadow:0 0 14px #34d399,0 0 26px rgba(167,139,250,.45);
+}
+body[data-skin="aurora"] .titlebar .hide-narrow::after{content:" / NORTHERN SIGNAL";}
+body[data-skin="aurora"] .titlebar .tag{
+  color:#7dd3fc;background:rgba(3,7,15,.8);border:1px solid #2c4a6e;border-radius:20px;
+}
+body[data-skin="aurora"] .skin-picker{color:#8fb3c9;}
+body[data-skin="aurora"] .skin-picker select,
+body[data-skin="aurora"] .enlace-sel{
+  color:#e6f7ff;background:#0c1a35;border:1px solid #2c4a6e;border-radius:12px;
+}
+body[data-skin="aurora"] .display{
+  padding:14px;border:1px solid rgba(70,130,180,.3);border-radius:16px;
+  background:linear-gradient(160deg,rgba(52,211,153,.06),rgba(3,7,15,.92));
+  box-shadow:inset 0 0 34px rgba(0,0,0,.5);
+}
+body[data-skin="aurora"] .cover{
+  border-radius:16px;border:1px solid rgba(125,211,252,.4);
+  box-shadow:0 0 22px rgba(52,211,153,.24);
+}
+body[data-skin="aurora"].is-playing .cover{animation:auroraRespira 5.5s ease-in-out infinite;}
+@keyframes auroraRespira{50%{box-shadow:0 0 34px rgba(167,139,250,.45);}}
+body[data-skin="aurora"] .lcd-title{color:#7dd3fc;text-shadow:0 0 14px rgba(125,211,252,.45);}
+body[data-skin="aurora"] .lcd-time{color:#34d399;text-shadow:0 0 18px rgba(52,211,153,.5);}
+body[data-skin="aurora"] .lcd-info{color:#8fb3c9;}
+body[data-skin="aurora"] canvas#vis{
+  height:78px;border-radius:14px;border:1px solid rgba(70,130,180,.26);
+  background:linear-gradient(180deg,rgba(18,32,64,.6),rgba(3,7,15,.9));
+}
+body[data-skin="aurora"] .tbtns .btn{
+  border-radius:50%;width:44px;height:44px;justify-content:center;
+  color:#e6f7ff;border:1px solid rgba(70,130,180,.5);
+  background:linear-gradient(160deg,#15274a,#08111f);
+}
+body[data-skin="aurora"] .tbtns .btn:hover{box-shadow:0 0 16px rgba(52,211,153,.42);}
+body[data-skin="aurora"] .tbtns #bPlay{
+  background:linear-gradient(160deg,#34d399,#7dd3fc);border-color:#a7f3d0;color:#03070f;
+  box-shadow:0 0 26px rgba(52,211,153,.45);
+}
+body[data-skin="aurora"] .btn{
+  color:#e6f7ff;border-color:#2c4a6e;border-radius:12px;
+  background:linear-gradient(160deg,#102845,#070f1e);
+}
+body[data-skin="aurora"] .btn.on{color:#03070f;background:linear-gradient(160deg,#34d399,#a78bfa);border-color:#34d399;}
+body[data-skin="aurora"] .section-head{
+  border-color:#24405f;
+  background:linear-gradient(90deg,rgba(52,211,153,.12),transparent 55%);
+}
+body[data-skin="aurora"] .section-head h2{color:#a5d8e8;letter-spacing:.2em;}
+body[data-skin="aurora"] .pl-list li.cur .t1{color:#34d399;}
+body[data-skin="aurora"] .pl-list li:hover{background:rgba(52,211,153,.08);}
+body[data-skin="aurora"] .pl-stats{color:#8fb3c9;background:#0b1730;border-color:#24405f;}
+body[data-skin="aurora"] footer{color:#6f92a8;}
+
+@media (max-width:799px){
+  body[data-skin="outrun"]{--deck-h:82px;}
+  body[data-skin="tokyo"]{--deck-h:82px;}
+  body[data-skin="aurora"]{--deck-h:82px;}
+  body[data-skin="outrun"] canvas#vis,
+  body[data-skin="tokyo"] canvas#vis,
+  body[data-skin="aurora"] canvas#vis{height:56px;}
+}
+@media (prefers-reduced-motion:reduce){
+  body[data-skin="outrun"].is-playing .cover,
+  body[data-skin="tokyo"].is-playing .cover,
+  body[data-skin="aurora"].is-playing .cover,
+  body[data-skin="tokyo"]::before,
+  body[data-skin="aurora"]::before{animation:none;}
+}
+
 /* ---------- Skins .wsz importados ----------
    Los colores se inyectan como variables y el único bitmap empleado es el
    sprite funcional CBUTTONS.BMP. */
@@ -2139,7 +2456,12 @@ body{
 #karaoke{
   position:fixed; inset:0; z-index:80;
   display:flex; flex-direction:column;
-  background:var(--bg); color:var(--txt);
+  /* Translúcido a propósito: la letra se lee encima del reproductor, que sigue
+     ahí detrás desenfocado, en vez de mandarte a otra pantalla. */
+  background:color-mix(in srgb, var(--bg) 68%, transparent);
+  backdrop-filter:blur(22px) saturate(125%);
+  -webkit-backdrop-filter:blur(22px) saturate(125%);
+  color:var(--txt);
 }
 #karaoke[hidden]{display:none;}
 .kar-cab{
@@ -2151,31 +2473,58 @@ body{
   flex:1; min-width:0; text-align:center; font-weight:600; font-size:14px;
   white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
 }
-.kar-cerrar, .kar-extra{
+/* Cerrar con aspecto de botón y no de adorno: es la única salida del karaoke
+   y hay que verla a la primera. */
+.kar-cerrar{
+  display:flex; align-items:center; gap:6px; flex:none; cursor:pointer;
+  height:36px; padding:0 13px;
+  color:var(--txt); background:color-mix(in srgb, var(--panel) 80%, transparent);
+  border:1px solid var(--line); border-radius:20px;
+  font:600 13px/1 inherit; letter-spacing:.04em;
+}
+.kar-extra{
   width:40px; height:40px; flex:none; cursor:pointer;
   background:none; border:0; color:var(--txt);
   font-size:20px; line-height:1; border-radius:50%;
 }
 .kar-cerrar:hover, .kar-extra:hover{background:var(--velo, rgba(255,255,255,.10));}
 .kar-cuerpo{
-  flex:1; min-height:0; overflow-y:auto; scroll-behavior:smooth;
+  flex:1; min-height:0; overflow-y:auto; overflow-x:hidden; scroll-behavior:smooth;
   padding:38vh 18px;                 /* aire arriba y abajo: el verso vivo queda centrado */
   text-align:center;
 }
 .kar-linea{
   padding:9px 4px; cursor:pointer; border-radius:10px;
-  color:var(--mut); opacity:.55;
-  transition:opacity .25s, color .25s, transform .25s;
+  /* Ancho contenido: al crecer un 26% el verso activo se saldría por los lados
+     y sacaría barra horizontal. 76% deja justo el margen que necesita. */
+  max-width:min(720px, 76%); margin-inline:auto;
+  color:var(--mut); opacity:.42;
+  /* Se anima con transform, no con font-size: escalar lo hace la tarjeta
+     gráfica y sale suave; animar el tamaño de letra rehace el diseño en cada
+     cuadro y se ve a tirones. */
+  transform:scale(.86); transform-origin:center;
+  transition:opacity .32s ease, color .32s ease,
+             transform .38s cubic-bezier(.22,.9,.28,1.06);
+  will-change:transform, opacity;
 }
-.kar-linea:hover{opacity:.8;}
+.kar-linea:hover{opacity:.7;}
 .kar-vacia{min-height:8px;}
-.kar-txt{font-size:20px; line-height:1.35; font-weight:600;}
+.kar-txt{font-size:24px; line-height:1.32; font-weight:600;}
 .kar-romaji{font-size:13px; font-style:italic; opacity:.7; margin-top:2px;}
-/* El verso en curso: color de acento, algo mayor y a plena opacidad */
+/* El verso en curso crece de golpe y se enciende con el color del skin */
 .kar-linea.act{
-  color:var(--acc); opacity:1; transform:scale(1.04);
+  color:var(--acc); opacity:1; transform:scale(1.26);
 }
-.kar-linea.act .kar-txt{font-size:23px;}
+.kar-linea.act .kar-txt{
+  text-shadow:0 0 26px color-mix(in srgb, var(--acc) 42%, transparent);
+}
+/* El de antes y el de después quedan a media luz: dan contexto sin competir */
+.kar-linea.act + .kar-linea{opacity:.6; transform:scale(.94);}
+@media (prefers-reduced-motion:reduce){
+  .kar-linea{transition:opacity .2s, color .2s; transform:none;}
+  .kar-linea.act{transform:none;}
+  .kar-linea.act .kar-txt{font-size:30px;}
+}
 .kar-fuente{
   margin-top:26px; font-size:11px; color:var(--mut); opacity:.7;
   letter-spacing:.08em; text-transform:uppercase;
@@ -2242,6 +2591,9 @@ body{
             <option value="quantum">Quantum Field Lab</option>
             <option value="horizon">Event Horizon</option>
             <option value="glass">Glasswave</option>
+            <option value="outrun">Outrun Sunset</option>
+            <option value="tokyo">Tokyo Rain</option>
+            <option value="aurora">Aurora Boreal</option>
           </optgroup>
         </select>
       </label>
@@ -2595,7 +2947,8 @@ body{
 </div>
 <div id="karaoke" hidden>
   <div class="kar-cab">
-    <button class="kar-cerrar" data-cerrar="karaoke" aria-label="Cerrar el karaoke">⌄</button>
+    <button class="kar-cerrar" data-cerrar="karaoke" title="Cerrar y volver al visualizador (Esc)"
+            aria-label="Cerrar el karaoke y volver al visualizador">✕<span class="hide-narrow">Cerrar</span></button>
     <span class="kar-tit" id="karTitulo">—</span>
     <button class="kar-extra" id="bKarBuscar" title="Buscar la letra en internet" aria-label="Buscar letra">🔎</button>
   </div>
@@ -2665,6 +3018,9 @@ const SKINS = {
   quantum:  "Quantum Field Lab",
   horizon:  "Event Horizon",
   glass:    "Glasswave",
+  outrun:   "Outrun Sunset",
+  tokyo:    "Tokyo Rain",
+  aurora:   "Aurora Boreal",
 };
 /* Skins de fondo claro: el navegador debe saberlo para los controles nativos
    (barras de desplazamiento, menús) y para el color de la barra de estado. */
@@ -2674,6 +3030,7 @@ const SKIN_TEMA = {
   ondaamp:"#0f1216", rack:"#16130f", neon:"#070611", cassette:"#b9b2a3",
   polar:"#dceaf1", noir:"#090909", hoshi:"#100d2b", quantum:"#071014",
   horizon:"#030711", glass:"#dfe8f3",
+  outrun:"#0d0420", tokyo:"#05070c", aurora:"#050b18",
 };
 
 const EQ_FREQS = [31, 62, 125, 250, 500, 1000, 2000, 4000, 8000, 16000];
@@ -6091,7 +6448,7 @@ if ("mediaSession" in navigator){
    Una app instalada vive en el teléfono, así que las novedades no llegan solas.
    Se compara la versión incrustada con la publicada en version.json (que el
    service worker nunca cachea) y, si difieren, se ofrece actualizar. */
-const APP_VERSION = "2.10";
+const APP_VERSION = "2.11";
 let verRemotaDatos = null;
 
 async function buscarActualizacion(silencioso){
