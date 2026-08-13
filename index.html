@@ -2895,6 +2895,7 @@ body{
         <input class="find" id="find" type="text" placeholder="Buscar artista, álbum, canción…  ( / )">
         <button class="btn sm" id="bFold" title="Plegar o desplegar todos los grupos">⇕<span class="lbl-fold"> Plegar</span></button>
         <button class="btn sm" id="bIrActual" title="Ir a la canción que está sonando">🎯</button>
+        <button class="btn sm" id="bServidor" title="Servidor de casa: reproduce por WiFi la música del PC, sin copiarla al teléfono">🏠</button>
         <button class="btn sm solo-movil" data-abrir="ajustes" title="Ajustes: apariencia y sonido">⚙</button>
         <button class="btn danger sm" id="bClear" title="Vaciar la biblioteca">🗑</button>
       </div>
@@ -2980,6 +2981,7 @@ const state = {
   closedGroups: {},   // clave de grupo -> true si está plegado
   skin: "ondaamp",    // clave de SKINS, o el id de un .wsz importado
   enlace: "nopausa",  // clave de ENLACES: cómo empalma una pista con la siguiente
+  servidor: "",       // direccion del servidor de casa, si se uso alguno
   letras: { auto:false },  // auto: buscar la letra en internet sin volver a preguntar
   fx: {               // restauración y realce (0-100 en las cantidades)
     nr:false, nrAmt:55,   // reductor de ruido / hiss
@@ -3566,7 +3568,11 @@ const AC = window.AudioContext || window.webkitAudioContext;
    a cargar y decodificar el archivo nuevo, y esas décimas de silencio parten en
    dos un disco pensado para sonar seguido. Teniendo la siguiente ya cargada en
    el otro elemento, enlazar es solo cruzar dos ganancias. */
-function nuevoDeck(){ const a = new Audio(); a.preload = "auto"; return a; }
+/* crossOrigin antes de tocar src, y siempre: el audio que llega de otro origen
+   sin permiso CORS entra "manchado" y createMediaElementSource devuelve
+   silencio, así que con el EQ puesto no se oiría nada. El servidor de casa
+   manda las cabeceras; para blobs locales este atributo es inofensivo. */
+function nuevoDeck(){ const a = new Audio(); a.crossOrigin = "anonymous"; a.preload = "auto"; return a; }
 const decks = [nuevoDeck(), nuevoDeck()];
 let activo = 0;
 let audioEl = decks[0];        // apunta siempre al que está sonando
@@ -4780,7 +4786,8 @@ let libArt = {};      // espejo en memoria de las carátulas guardadas (artKey -
 async function hacerGuardado(){
   if (!window.indexedDB) return false;
   try{
-    const pistas = state.list.map(it=>({
+    // Las remotas no se guardan: viven en el PC y se recuperan reconectando
+    const pistas = state.list.filter(it=> !it.remoto).map(it=>({
       name:it.name, relPath:it.relPath||it.name, rootIdx:it.rootIdx ?? -1,
       title:it.title, artist:it.artist, albumArtist:it.albumArtist, album:it.album,
       year:it.year, track:it.track, disc:it.disc, dur:it.dur, sr:it.sr, bits:it.bits,
@@ -5188,6 +5195,9 @@ async function playIndex(i, rememberHistory=true){
   amReiniciar();
   renderList();
   setDisplay(it);
+  // De una pista remota solo se conocía lo que dice su ruta; ahora que suena,
+  // se leen sus etiquetas de verdad y aparece la carátula.
+  asegurarMetaRemota(it);
   const li = rowFor(it);
   if (li) li.scrollIntoView({block:"nearest"});
 }
@@ -6448,7 +6458,7 @@ if ("mediaSession" in navigator){
    Una app instalada vive en el teléfono, así que las novedades no llegan solas.
    Se compara la versión incrustada con la publicada en version.json (que el
    service worker nunca cachea) y, si difieren, se ofrece actualizar. */
-const APP_VERSION = "2.11";
+const APP_VERSION = "2.12";
 let verRemotaDatos = null;
 
 async function buscarActualizacion(silencioso){
@@ -6593,7 +6603,7 @@ function save(){
         eq:state.eq, pre:state.pre, eqOn:state.eqOn, vol:state.vol, bal:state.bal,
         width:state.width, night:state.night, repeat:state.repeat, shuffle:state.shuffle,
         vis:state.vis, customPresets:state.customPresets, view:state.view,
-        skin:state.skin, enlace:state.enlace, letras:state.letras, fx:state.fx, am:state.am, v3:true,
+        skin:state.skin, enlace:state.enlace, letras:state.letras, servidor:state.servidor, fx:state.fx, am:state.am, v3:true,
         preset:$("preset").value,
         eqClosed:$("eqPanel").classList.contains("closed"),
         fxClosed:$("fxPanel").classList.contains("closed"),
@@ -6616,6 +6626,7 @@ function load(){
     view: ["lista","album","artista","carpeta"].includes(s.view) ? s.view : "album",
     skin: typeof s.skin==="string" ? s.skin : "ondaamp",
     enlace: Object.prototype.hasOwnProperty.call(ENLACES, s.enlace) ? s.enlace : state.enlace,
+    servidor: typeof s.servidor === "string" ? s.servidor : "",
     // Mezclar sobre los valores por omisión: así una versión guardada antigua
     // sigue cargando aunque le falten efectos añadidos después.
     letras: Object.assign({}, state.letras, (s.letras && typeof s.letras === "object") ? s.letras : {}),
@@ -7095,6 +7106,178 @@ document.addEventListener("keydown", e=>{
 }, true);
 $("bKarBuscar").addEventListener("click", ()=> karBuscarEnRed(!!letraActual));
 
+/* ================= Servidor de casa =================
+   Reproduce por WiFi la carpeta de música del PC sin copiar nada al teléfono.
+   El PC corre servidor-media.cjs, que publica un índice y sirve los archivos
+   con soporte de rangos.
+
+   Hay dos formas de llegar y las dos acaban aquí:
+
+   · Abriendo http://<ip-del-pc>:8080 en el móvil. La página y la música
+     comparten origen, así que no hay contenido mixto ni CORS de por medio. Es
+     el camino seguro, y además se detecta solo (ver buscarServidorPropio).
+   · Desde la app instalada en https, escribiendo la dirección a mano. Depende
+     de que el navegador permita el acceso a la red local; Chrome 142 lo pide
+     como permiso. Si tu Chrome no lo permite, usa el primero. */
+
+/* Finge ser un File para los lectores de etiquetas. parseFLAC y parseID3 solo
+   usan .slice(a,b).arrayBuffer(), así que pidiendo rangos por HTTP funcionan
+   tal cual: se leen unos kilobytes en vez de descargar un FLAC de 40 MB. */
+class ArchivoRemoto {
+  constructor(url, size, name){ this.url = url; this.size = size; this.name = name; }
+  slice(ini, fin){
+    const url = this.url, tope = this.size;
+    const desde = Math.max(0, ini|0);
+    const hasta = Math.min(tope, fin === undefined ? tope : (fin|0)) - 1;
+    return {
+      async arrayBuffer(){
+        if (hasta < desde) return new ArrayBuffer(0);
+        const r = await fetch(url, {headers:{Range:`bytes=${desde}-${hasta}`}});
+        if (!r.ok && r.status !== 206 && r.status !== 200) throw new Error("rango "+r.status);
+        return await r.arrayBuffer();
+      }
+    };
+  }
+}
+
+const CARPETA_RUIDO = /\s*[\(\[][^\)\]]*[\)\]]\s*|\s*\b(flac|mp3|wav|24bit|16bit|\d{2,3}khz|vinyl|remaster(ed)?|deluxe|web|cd\s*\d+)\b\s*/gi;
+/* Nombres presentables a partir de la ruta, para que la lista sirva desde el
+   primer segundo. Las etiquetas de verdad llegan después. */
+function tituloDeArchivo(nombre){
+  return nombre.replace(/\.[^.]+$/, "")            // extensión
+               .replace(/^\s*\d{1,3}\s*[-._)]\s*/, "")  // "07 - ", "07. ", "07_"
+               .trim() || nombre;
+}
+function pistaDeArchivo(nombre){
+  const m = /^\s*(\d{1,3})\s*[-._)]/.exec(nombre);
+  return m ? parseInt(m[1],10) : 0;
+}
+function artistaDeCarpeta(raiz){
+  const m = /^(.+?)\s+-\s+/.exec(raiz);            // "Artista - Álbum (año)"
+  return m ? m[1].trim() : "";
+}
+function albumDeCarpeta(raiz){
+  const m = /^.+?\s+-\s+(.+)$/.exec(raiz);
+  return (m ? m[1] : raiz).replace(CARPETA_RUIDO, " ").replace(/\s{2,}/g," ").trim() || raiz;
+}
+
+let servidorBase = "";          // sin barra final
+const normalizarBase = s => String(s||"").trim().replace(/\/+$/, "");
+
+/* Si la app la está sirviendo el propio servidor de casa, se conecta sola: es
+   el caso de abrir http://<ip>:8080 en el móvil y no tener que escribir nada. */
+async function buscarServidorPropio(){
+  if (!location.protocol.startsWith("http")) return false;
+  try{
+    const r = await fetch("api/salud", {cache:"no-store"});
+    if (!r.ok) return false;
+    const d = await r.json();
+    return !!(d && d.app === "OndaAmp");
+  }catch(e){ return false; }
+}
+
+async function conectarServidor(base, silencioso){
+  base = normalizarBase(base);
+  if (!base) return false;
+  let datos;
+  try{
+    const r = await fetch(base + "/api/indice", {cache:"no-store"});
+    if (!r.ok) throw new Error("HTTP " + r.status);
+    datos = await r.json();
+  }catch(e){
+    if (!silencioso) toast("No pude conectar con el servidor. ¿Está encendido y en la misma WiFi?", true);
+    return false;
+  }
+  if (!datos || !Array.isArray(datos.pistas) || !datos.pistas.length){
+    if (!silencioso) toast("El servidor respondió, pero no encontró música", true);
+    return false;
+  }
+  servidorBase = base;
+  state.servidor = base;
+
+  // Fuera las remotas anteriores; las locales del usuario no se tocan
+  for (let i = state.list.length - 1; i >= 0; i--){
+    if (state.list[i].remoto){
+      if (state.list[i].picUrl) URL.revokeObjectURL(state.list[i].picUrl);
+      state.list.splice(i,1);
+    }
+  }
+  state.cur = -1;
+
+  for (const p of datos.pistas){
+    const partes = p.r.split("/");
+    const nombre = partes[partes.length-1];
+    const carpeta = partes.slice(0,-1).join("/");
+    const raiz = partes[0] || "";
+    state.list.push({
+      id: nextId++, remoto: true,
+      file: new ArchivoRemoto(base + "/media/" + encodeURI(p.r), p.t, nombre),
+      url: base + "/media/" + encodeURI(p.r),
+      name: nombre,
+      title: tituloDeArchivo(nombre),
+      artist: artistaDeCarpeta(raiz), albumArtist: "",
+      album: albumDeCarpeta(partes.length > 2 ? partes[partes.length-2] : raiz),
+      year:"", track: pistaDeArchivo(nombre), disc:0,
+      folder: carpeta, dur:0, sr:0, bits:0, picUrl:"", bad:false, metaReady:false,
+      relPath: p.r, rootIdx:-1, pendiente:false, pic:null, artKey:"", opfsName:"",
+      tam: p.t,
+    });
+  }
+  if (state.view === "lista"){ state.view = "carpeta"; reflectViews(); }
+  renderList(); updateStats(); actualizarRestaurar();
+  toast(`${datos.pistas.length} pistas desde el servidor de casa`);
+  leerEtiquetasRemotas();
+  return true;
+}
+
+/* Etiquetas de las remotas: solo la primera pista de cada carpeta, y de cuatro
+   en cuatro. Con 2000 pistas, leerlas todas serían miles de peticiones; con la
+   primera de cada álbum basta para tener carátula y datos reales, y el resto
+   se completa al reproducir. */
+let etiquetasEnCurso = false;
+async function leerEtiquetasRemotas(){
+  if (etiquetasEnCurso) return;
+  etiquetasEnCurso = true;
+  const porCarpeta = new Map();
+  state.list.forEach(it=>{ if (it.remoto && !it.metaReady && !porCarpeta.has(it.folder)) porCarpeta.set(it.folder, it); });
+  const cola = [...porCarpeta.values()];
+  let vivos = 0, hechos = 0;
+  await new Promise(res=>{
+    const siguiente = ()=>{
+      if (!cola.length && !vivos) return res();
+      while (vivos < 4 && cola.length){
+        const it = cola.shift(); vivos++;
+        readMeta(it).catch(()=>{}).then(()=>{
+          vivos--; if (++hechos % 12 === 0) renderList();
+          siguiente();
+        });
+      }
+    };
+    siguiente();
+  });
+  renderList(); updateStats();
+  etiquetasEnCurso = false;
+}
+/* Al reproducir se leen las etiquetas de esa pista si aún no se habían leído:
+   así la carátula y los datos del archivo aparecen sin haber pedido nada antes. */
+async function asegurarMetaRemota(it){
+  if (!it || !it.remoto || it.metaReady) return;
+  try{ await readMeta(it); setDisplay(it); touchRow(it); }catch(e){}
+}
+
+async function pedirServidor(){
+  const sugerida = state.servidor || servidorBase ||
+    (location.protocol.startsWith("http") ? location.origin : "http://192.168.1.10:8080");
+  const r = prompt(
+    "Dirección del servidor de casa\n\n" +
+    "En el PC, dentro de la carpeta pwa:\n    node servidor-media.cjs\n\n" +
+    "Te dirá una dirección como http://192.168.1.10:8080",
+    sugerida);
+  if (r === null) return;
+  toast("Conectando…");
+  if (await conectarServidor(r)) save();
+}
+
 /* ================= Init ================= */
 buildEqUI();
 fillPresetSelect();
@@ -7110,6 +7293,15 @@ updatePlayUI();
 loadImportedSkins();
 cargarUltimaCarpeta();  // para que el explorador abra donde guardas la música
 cargarBiblioteca();   // recupera la lista de la sesión anterior
+
+$("bServidor").addEventListener("click", pedirServidor);
+/* Si la propia app la sirve el servidor de casa, se conecta sola: abrir
+   http://<ip-del-pc>:8080 en el móvil basta. Si no, se reintenta la última
+   dirección usada, en silencio para no molestar cuando no estás en casa. */
+(async function(){
+  if (await buscarServidorPropio()){ await conectarServidor(location.origin, true); return; }
+  if (state.servidor) await conectarServidor(state.servidor, true);
+})();
 
 /* ---- Puesta a punto como app instalable ---- */
 if ("serviceWorker" in navigator && location.protocol.startsWith("http")){

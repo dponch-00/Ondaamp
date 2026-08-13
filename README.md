@@ -17,6 +17,35 @@ Esta es la versión **PWA**, instalable en Android desde el navegador.
 - **13 skins** de la Colección OndaAmp, con importador de skins clásicos `.wsz`
 - **Funciona sin conexión** una vez instalada
 
+## Servidor de casa
+
+Para oír en el móvil toda la biblioteca del PC sin copiar nada. En el PC, dentro
+de esta carpeta:
+
+```bash
+node servidor-media.cjs
+```
+
+Lee `F:\Flac Music` por omisión; para otra carpeta, pásala como argumento
+(`node servidor-media.cjs "D:\Mi musica"`). Al arrancar te dice la dirección.
+
+En el móvil, **abre esa dirección en Chrome** (algo como `http://192.168.1.10:8080`)
+y la biblioteca aparece sola: el servidor sirve la app y la música por el mismo
+puerto, así que comparten origen y no hay nada que configurar. También puedes
+escribir la dirección desde la app instalada con el botón 🏠, aunque eso depende
+de que tu navegador permita el acceso a la red local (Chrome 142 lo pide como
+permiso; si no funciona, usa la dirección directa).
+
+Los archivos se sirven **con soporte de rangos**, así que puedes arrastrar la
+barra de progreso en un FLAC de 40 MB sin esperar a que se descargue. Las
+etiquetas y la carátula se leen pidiendo solo los primeros kilobytes de cada
+pista, no el archivo entero.
+
+> El servidor **solo lee** y solo escucha en tu red local: nada se sube a
+> ningún sitio y nada sale de casa. Necesita el PC encendido y estar en la misma
+> WiFi. La música no se copia al teléfono; si quieres oírla fuera de casa, añádela
+> como siempre con ➕ o 📁.
+
 ## Karaoke
 
 El botón 🎤 abre la letra a pantalla completa, con el verso que suena resaltado
@@ -55,6 +84,7 @@ letras, y siempre bajo tu autorización (ver arriba).
 | `sw.js` | Service worker: hace que funcione sin conexión |
 | `icon-*.png` | Iconos de la app |
 | `servir.cjs` | Servidor local para pruebas (`node servir.cjs`) |
+| `servidor-media.cjs` | Servidor de casa: publica tu carpeta de música en la red local |
 | `_generar-iconos.cjs` | Genera los iconos por código, sin dependencias |
 | `LEEME-telefono.md` | Guía de instalación en Android |
 
