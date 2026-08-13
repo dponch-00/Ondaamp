@@ -7266,12 +7266,15 @@ async function asegurarMetaRemota(it){
 }
 
 async function pedirServidor(){
+  // Sin ejemplo inventado: cada red usa un rango distinto y copiar un
+  // 192.168.1.x que no es el tuyo solo hace perder el tiempo.
   const sugerida = state.servidor || servidorBase ||
-    (location.protocol.startsWith("http") ? location.origin : "http://192.168.1.10:8080");
+    (location.protocol.startsWith("http") ? location.origin : "http://");
   const r = prompt(
     "Dirección del servidor de casa\n\n" +
     "En el PC, dentro de la carpeta pwa:\n    node servidor-media.cjs\n\n" +
-    "Te dirá una dirección como http://192.168.1.10:8080",
+    "Al arrancar imprime la dirección exacta de ESTE PC.\n" +
+    "Cópiala tal cual, incluido el puerto.",
     sugerida);
   if (r === null) return;
   toast("Conectando…");

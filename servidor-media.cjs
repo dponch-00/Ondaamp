@@ -185,5 +185,15 @@ http.createServer((req,res)=>{
   console.log(`\n  OndaAmp servido en:`);
   console.log(`    En este PC:      http://localhost:${PUERTO}`);
   ips.forEach(ip=> console.log(`    En tu teléfono:  http://${ip}:${PUERTO}   (misma WiFi)`));
+  console.log(`\n  Copia la dirección tal cual: cada red usa un rango distinto.`);
+  // El fallo número uno al estrenar esto: responde en el PC pero no en el
+  // teléfono. Windows bloquea las conexiones entrantes mientras no exista una
+  // regla, y no avisa de nada; parece que el servidor no funciona.
+  if (process.platform === "win32"){
+    console.log(`\n  Si el móvil no conecta, es el cortafuegos de Windows.`);
+    console.log(`  Una vez, en PowerShell COMO ADMINISTRADOR:`);
+    console.log(`    New-NetFirewallRule -DisplayName "OndaAmp servidor de casa" \``);
+    console.log(`      -Direction Inbound -Protocol TCP -LocalPort ${PUERTO} -Action Allow -Profile Private`);
+  }
   console.log(`\n  Ctrl+C para detener.\n`);
 });
