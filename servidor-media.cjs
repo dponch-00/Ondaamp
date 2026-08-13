@@ -145,6 +145,36 @@ http.createServer((req,res)=>{
     res.end(req.method === "HEAD" ? undefined : cuerpo);
     return;
   }
+  /* Página con el código a pantalla completa. Los bloques del QR de la
+     terminal dependen de la fuente y la codificación de la consola; esto se ve
+     nítido siempre. Se abre en el PC y se escanea desde el móvil. */
+  if (ruta === "/qr"){
+    const ip = (Object.values(os.networkInterfaces()).flat()
+                 .find(i=> i && i.family === "IPv4" && !i.internal) || {}).address;
+    const destino = `http://${ip || "localhost"}:${PUERTO}`;
+    let svg = "";
+    try{
+      const m = require("./_qr.cjs").generar(destino);
+      const L = m.length, q = 4, T = L + q*2;
+      let celdas = "";
+      for (let y=0;y<L;y++) for (let x=0;x<L;x++)
+        if (m[y][x]) celdas += `<rect x="${x+q}" y="${y+q}" width="1" height="1"/>`;
+      svg = `<svg viewBox="0 0 ${T} ${T}" width="320" height="320" shape-rendering="crispEdges"
+              xmlns="http://www.w3.org/2000/svg"><rect width="${T}" height="${T}" fill="#fff"/>
+              <g fill="#000">${celdas}</g></svg>`;
+    }catch(e){ svg = `<p>No pude dibujar el código: ${e.message}</p>`; }
+    res.writeHead(200, {"Content-Type":TIPOS[".html"], "Cache-Control":"no-cache"});
+    res.end(`<!doctype html><meta charset="utf-8"><title>OndaAmp · conectar el móvil</title>
+      <body style="margin:0;min-height:100vh;display:grid;place-items:center;gap:18px;
+                   background:#0f1216;color:#e6edf5;font:16px system-ui,sans-serif;text-align:center">
+      <div><h1 style="font-size:19px;font-weight:600;margin-bottom:14px">Apunta la cámara del móvil</h1>
+      ${svg}
+      <p style="margin-top:14px;font:15px Consolas,monospace;color:#38e08c">${destino}</p>
+      <p style="margin-top:6px;font-size:13px;color:#8fa0b3;max-width:34ch">
+        Tenéis que estar en la misma WiFi. Si no conecta, falta la regla del
+        cortafuegos que indica la terminal.</p></div></body>`);
+    return;
+  }
   if (ruta === "/api/salud"){
     res.writeHead(200, {"Content-Type":TIPOS[".json"]});
     res.end(JSON.stringify({ok:true, app:"OndaAmp", raiz:path.basename(MUSICA),
@@ -185,6 +215,19 @@ http.createServer((req,res)=>{
   console.log(`\n  OndaAmp servido en:`);
   console.log(`    En este PC:      http://localhost:${PUERTO}`);
   ips.forEach(ip=> console.log(`    En tu teléfono:  http://${ip}:${PUERTO}   (misma WiFi)`));
+
+  // Para no teclear nada en el móvil: se apunta la cámara y listo
+  if (ips.length){
+    const destino = `http://${ips[0]}:${PUERTO}`;
+    try{
+      const qr = require("./_qr.cjs");
+      console.log(`\n  O apunta la cámara del móvil a este código:\n`);
+      console.log(qr.aTerminal(destino));
+      console.log(`  ${destino}`);
+    }catch(e){
+      console.log(`\n  (no pude dibujar el código QR: ${e.message})`);
+    }
+  }
   console.log(`\n  Copia la dirección tal cual: cada red usa un rango distinto.`);
   // El fallo número uno al estrenar esto: responde en el PC pero no en el
   // teléfono. Windows bloquea las conexiones entrantes mientras no exista una
