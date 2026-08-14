@@ -246,5 +246,10 @@ http.createServer((req,res)=>{
     console.log(`      -Protocol TCP -LocalPort ${PUERTO} -Action Allow -Profile Private`);
     console.log(`  ─────────────────────────────────────────────────────────`);
   }
-  console.log(`\n  Ctrl+C para detener.\n`);
+  console.log(`\n  Ctrl+C para detener. Deja esta ventana abierta.\n`);
+
+  // Se abre solo la página del QR: es lo primero que hace falta ver
+  if (process.platform === "win32" && !process.env.SIN_ABRIR){
+    require("child_process").exec(`start "" "http://localhost:${PUERTO}/qr"`, ()=>{});
+  }
 });
