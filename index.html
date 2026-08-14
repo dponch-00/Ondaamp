@@ -7379,6 +7379,7 @@ async function abrirEscaner(){
   v.srcObject = escStream;
   try{ await v.play(); }catch(e){}
   $("escaner").hidden = false;
+  escCuadros = 0; escUltimoFallo = ""; escProbando = false;
   escNota("Apunta al código que muestra el PC.");
   escMirar();
 }
@@ -7396,13 +7397,37 @@ function urlDeServidor(txt){
   if (u.protocol !== "http:" && u.protocol !== "https:") return null;
   return u.origin;
 }
-let escProbando = false;
+let escProbando = false, escCuadros = 0, escUltimoFallo = "";
+const escLienzo = document.createElement("canvas");
+const escCtx = escLienzo.getContext("2d", {willReadFrequently:true});
+
+/* Se analiza un fotograma copiado a un canvas, no el <video> directamente:
+   varias versiones de Chrome en Android fallan al detectar sobre el elemento
+   de vídeo y no devuelven nada, sin dar error. Si el canvas tampoco cuela, se
+   reintenta con el vídeo antes de rendirse. */
+async function escDetectar(v){
+  if (v.videoWidth && v.videoHeight){
+    if (escLienzo.width !== v.videoWidth){ escLienzo.width = v.videoWidth; escLienzo.height = v.videoHeight; }
+    escCtx.drawImage(v, 0, 0, escLienzo.width, escLienzo.height);
+    try{ return await escDetector.detect(escLienzo); }catch(e){ escUltimoFallo = "canvas: "+e.name; }
+  }
+  try{ return await escDetector.detect(v); }catch(e){ escUltimoFallo = "vídeo: "+e.name; }
+  return [];
+}
 async function escMirar(){
   if (!escStream) return;
   const v = $("escVideo");
   if (!escProbando && v && v.readyState >= 2){
-    try{
-      const marcas = await escDetector.detect(v);
+    {
+      escCuadros++;
+      const marcas = await escDetectar(v);
+      // Si tras unos segundos no aparece nada, se dice qué mirar en vez de
+      // dejar la pantalla muda como si no pasara nada
+      if (escCuadros === 90){
+        escNota(escUltimoFallo
+          ? "El lector de códigos falla (" + escUltimoFallo + "). Usa ⌨ para escribir la dirección."
+          : "No veo el código. Acércate, sube el brillo del monitor y que quepa entero en el recuadro.", true);
+      }
       const cruda = marcas && marcas.length ? marcas[0].rawValue : null;
       const base = cruda ? urlDeServidor(cruda) : null;
       if (cruda && !base) escNota("Ese código no es una dirección de servidor.", true);
@@ -7415,7 +7440,7 @@ async function escMirar(){
         // Un respiro antes de reintentar, o se repetiría el aviso sin parar
         setTimeout(()=>{ escProbando = false; }, 2500);
       }
-    }catch(e){}
+    }
   }
   escBucle = requestAnimationFrame(escMirar);
 }
