@@ -157,19 +157,31 @@ function aplicarMascara(M, idx){
     if (!M.reservado[y][x] && f(x,y)) s.m[y][x] ^= 1;
   return s;
 }
-/* Información de formato: nivel L (01) + máscara, con BCH y XOR 0x5412 */
+/* Información de formato: nivel L (01) + máscara, con BCH y XOR 0x5412.
+
+   Los 15 bits se recorren del más significativo al menos significativo por dos
+   caminos fijos del estándar, aquí escritos casilla a casilla como (fila,
+   columna). La versión anterior los recorría AL REVÉS y además pisaba el
+   módulo oscuro con un bit de la segunda copia: mi lector de prueba, que leía
+   con la misma convención equivocada, daba el visto bueno a códigos que
+   ninguna cámara real aceptaba. La lección quedó aprendida: un códec se valida
+   contra una implementación independiente, no contra sí mismo. */
 function ponerFormato(M, mascara){
   let v = (0b01 << 3) | mascara;
   let resto = v << 10;
   for (let i=4;i>=0;i--) if (resto & (1<<(i+10))) resto ^= 0b10100110111 << i;
   const bits = ((v<<10) | resto) ^ 0b101010000010010;
-  const leer = i => (bits >> i) & 1;
-  for (let i=0;i<=5;i++)  M.m[8][i] = leer(i);
-  M.m[8][7] = leer(6); M.m[8][8] = leer(7); M.m[7][8] = leer(8);
-  for (let i=9;i<=14;i++) M.m[14-i][8] = leer(i);
-  for (let i=0;i<=7;i++)  M.m[M.lado-1-i][8] = leer(i);
-  for (let i=8;i<=14;i++) M.m[8][M.lado-15+i] = leer(i);
-  M.m[M.lado-8][8] = 1;                       // módulo oscuro
+  const L = M.lado;
+  const camino1 = [[8,0],[8,1],[8,2],[8,3],[8,4],[8,5],[8,7],[8,8],[7,8],
+                   [5,8],[4,8],[3,8],[2,8],[1,8],[0,8]];
+  const camino2 = [[L-1,8],[L-2,8],[L-3,8],[L-4,8],[L-5,8],[L-6,8],[L-7,8],
+                   [8,L-8],[8,L-7],[8,L-6],[8,L-5],[8,L-4],[8,L-3],[8,L-2],[8,L-1]];
+  for (let k=0;k<15;k++){
+    const bit = (bits >> (14-k)) & 1;
+    const [f1,c1] = camino1[k]; M.m[f1][c1] = bit;
+    const [f2,c2] = camino2[k]; M.m[f2][c2] = bit;
+  }
+  M.m[L-8][8] = 1;                            // módulo oscuro, fuera del camino
 }
 /* Penalización estándar: se elige la máscara que menos "grumos" deja, porque
    un QR con zonas uniformes grandes se lee peor. */
@@ -237,4 +249,19 @@ function aTerminal(texto, margen = 2){
   return salida.join("\n");
 }
 
-module.exports = { generar, aTerminal, __polGenerador: polGenerador };
+/* Con máscara impuesta, solo para las pruebas: así se validan las ocho */
+function __generarConMascara(texto, mascara){
+  const largo = Buffer.from(texto, "utf8").length;
+  const version = [1,2,3,4].find(v => largo <= CAP[v].datos - 2);
+  if (!version) throw new Error("texto demasiado largo para este generador");
+  const palabras = codificar(texto, version);
+  const lado = 17 + 4*version;
+  const base = nuevaMatriz(lado);
+  armazon(base, version);
+  volcarDatos(base, palabras);
+  const cand = aplicarMascara(base, mascara);
+  ponerFormato(cand, mascara);
+  return cand.m;
+}
+
+module.exports = { generar, aTerminal, __polGenerador: polGenerador, __generarConMascara };
