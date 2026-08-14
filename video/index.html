@@ -1,0 +1,1526 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0f0f0f">
+<title>OndaVideo</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href='data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><rect x="1" y="4" width="22" height="16" rx="4" fill="%23ff3d3d"/><path d="M10 8.5v7l6-3.5z" fill="white"/></svg>'>
+<style>
+/* ---------- Base ---------- */
+:root{
+  --fondo:#0f0f0f; --capa:#212121; --capa2:#2b2b2b; --borde:#303030;
+  --texto:#f1f1f1; --texto2:#aaaaaa; --rojo:#ff3d3d; --rojoVivo:#f00;
+  --chipBg:#272727; --chipTxt:#f1f1f1;
+  --altoBarra:56px; --altoChips:52px;
+}
+*{box-sizing:border-box; -webkit-tap-highlight-color:transparent}
+html,body{margin:0; padding:0; background:var(--fondo); color:var(--texto);
+  font:400 14px/1.45 Roboto,"Segoe UI",system-ui,-apple-system,sans-serif;
+  overscroll-behavior-y:contain}
+button{font:inherit; color:inherit; background:none; border:0; cursor:pointer; padding:0}
+input{font:inherit}
+a{color:inherit; text-decoration:none}
+svg{display:block; fill:currentColor}
+.oculto{display:none !important}
+
+/* ---------- Barra superior ---------- */
+header{position:sticky; top:0; z-index:40; height:var(--altoBarra); background:var(--fondo);
+  display:flex; align-items:center; gap:8px; padding:0 12px}
+.logo{display:flex; align-items:center; gap:7px; font-weight:700; font-size:19px;
+  letter-spacing:-.4px; user-select:none; cursor:pointer; flex:0 0 auto}
+.logo svg{width:30px; height:30px}
+.logo small{font-weight:400; color:var(--texto2); font-size:11px; margin-left:2px; align-self:flex-start; margin-top:4px}
+#zonaBusqueda{flex:1; display:flex; justify-content:center; min-width:0}
+#cajaBusqueda{display:flex; align-items:center; width:min(560px,100%);
+  background:#121212; border:1px solid var(--borde); border-radius:999px; overflow:hidden}
+#cajaBusqueda:focus-within{border-color:#1c62b9}
+#buscador{flex:1; min-width:0; background:none; border:0; outline:0; color:var(--texto);
+  padding:9px 4px 9px 16px; font-size:15px}
+#buscador::placeholder{color:#8a8a8a}
+#bLimpiar{padding:6px; margin-right:2px; color:var(--texto2); border-radius:50%}
+#bLimpiar:hover{background:var(--capa)}
+.bLupa{background:var(--capa); padding:8px 18px; border-left:1px solid var(--borde)}
+.bIcono{width:40px; height:40px; border-radius:50%; display:flex; align-items:center;
+  justify-content:center; flex:0 0 auto}
+.bIcono:hover{background:var(--capa)}
+.bIcono svg{width:22px; height:22px}
+#bBuscarMovil{display:none}
+#estadoPunto{width:8px; height:8px; border-radius:50%; background:#666; position:absolute;
+  right:6px; top:6px; border:2px solid var(--fondo)}
+#bAjustes{position:relative}
+#estadoPunto.ok{background:#3ddc84}
+#estadoPunto.mal{background:var(--rojo)}
+
+/* En pantallas estrechas: lupa que despliega el buscador a pantalla completa */
+@media (max-width:640px){
+  #zonaBusqueda{display:none}
+  #bBuscarMovil{display:flex}
+  body.buscando #zonaBusqueda{display:flex; position:fixed; inset:0 0 auto 0; z-index:60;
+    height:var(--altoBarra); background:var(--fondo); align-items:center; padding:8px 12px 8px 4px; gap:4px}
+  body.buscando #zonaBusqueda::before{content:""}
+}
+
+/* ---------- Chips ---------- */
+#chips{position:sticky; top:var(--altoBarra); z-index:39; background:var(--fondo);
+  display:flex; gap:8px; padding:8px 12px 12px; overflow-x:auto; scrollbar-width:none}
+#chips::-webkit-scrollbar{display:none}
+.chip{flex:0 0 auto; background:var(--chipBg); color:var(--chipTxt); border-radius:8px;
+  padding:6px 12px; font-size:14px; font-weight:500; white-space:nowrap}
+.chip.activo{background:#f1f1f1; color:#0f0f0f}
+
+/* ---------- Portada ---------- */
+main{padding:4px 0 40px; max-width:2000px; margin:0 auto}
+.seccion{margin:0 0 24px}
+.seccion h2{font-size:17px; font-weight:700; margin:10px 16px 12px; display:flex; align-items:center; gap:10px}
+.seccion h2 .verTodo{margin-left:auto; font-size:13px; font-weight:500; color:#3ea6ff; padding:4px 8px; border-radius:8px}
+.seccion h2 .verTodo:hover{background:rgba(62,166,255,.15)}
+.fila{display:flex; gap:12px; overflow-x:auto; padding:0 16px 6px; scroll-snap-type:x proximity; scrollbar-width:thin}
+.fila .tarjeta{flex:0 0 280px; scroll-snap-align:start}
+.rejilla{display:grid; grid-template-columns:repeat(auto-fill,minmax(300px,1fr)); gap:20px 16px; padding:0 16px}
+@media (max-width:640px){
+  .rejilla{grid-template-columns:1fr; gap:20px; padding:0}
+  .rejilla .tarjeta .miniatura{border-radius:0}
+  .rejilla .tarjeta .datos{padding:0 12px}
+  .fila .tarjeta{flex-basis:240px}
+}
+
+/* Tarjeta de vídeo */
+.tarjeta{cursor:pointer; user-select:none}
+.miniatura{position:relative; aspect-ratio:16/9; border-radius:12px; overflow:hidden;
+  background:linear-gradient(135deg,#1c2733,#101318)}
+.miniatura img{width:100%; height:100%; object-fit:cover; display:block}
+.miniatura .letras{position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+  font-size:38px; font-weight:800; color:rgba(255,255,255,.14); letter-spacing:2px; text-transform:uppercase}
+.miniatura .dur{position:absolute; right:6px; bottom:6px; background:rgba(0,0,0,.8); color:#fff;
+  font-size:12px; font-weight:500; padding:1px 5px; border-radius:4px}
+.miniatura .visto{position:absolute; left:6px; bottom:6px; background:rgba(0,0,0,.8); color:#fff;
+  font-size:11px; padding:2px 6px; border-radius:4px; display:flex; align-items:center; gap:4px}
+.miniatura .visto svg{width:12px; height:12px}
+.miniatura .barra{position:absolute; left:0; right:0; bottom:0; height:4px; background:rgba(255,255,255,.25)}
+.miniatura .barra i{display:block; height:100%; background:var(--rojoVivo)}
+.miniatura .noCompat{position:absolute; left:6px; top:6px; background:rgba(0,0,0,.75); color:#ffd47f;
+  font-size:11px; padding:2px 6px; border-radius:4px}
+.tarjeta .datos{display:flex; gap:10px; margin-top:10px}
+.avatar{flex:0 0 34px; width:34px; height:34px; border-radius:50%; display:flex; align-items:center;
+  justify-content:center; font-size:14px; font-weight:700; color:#fff}
+.tarjeta .titulo{font-size:15px; font-weight:500; line-height:1.35; max-height:2.7em; overflow:hidden;
+  display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical}
+.tarjeta .meta{color:var(--texto2); font-size:13px; margin-top:3px}
+.tarjeta .meta .sello{border:1px solid var(--texto2); border-radius:3px; font-size:10.5px; padding:0 3px; margin-right:4px; vertical-align:1px}
+
+/* ---------- Pantallas de estado ---------- */
+.pantalla{min-height:60vh; display:flex; flex-direction:column; align-items:center; justify-content:center;
+  text-align:center; padding:32px 20px; gap:14px}
+.pantalla .emoji{font-size:56px}
+.pantalla h2{margin:0; font-size:20px}
+.pantalla p{margin:0; color:var(--texto2); max-width:440px}
+.pantalla .pasos{text-align:left; color:var(--texto2); background:var(--capa); border-radius:12px;
+  padding:14px 18px; max-width:440px}
+.pantalla .pasos b{color:var(--texto)}
+.campoServidor{display:flex; gap:8px; width:min(420px,100%)}
+.campoServidor input{flex:1; background:#121212; border:1px solid var(--borde); border-radius:10px;
+  color:var(--texto); padding:10px 14px; outline:0}
+.campoServidor input:focus{border-color:#3ea6ff}
+.botonAzul{background:#3ea6ff; color:#0f0f0f; font-weight:600; border-radius:10px; padding:10px 18px}
+.botonAzul:active{transform:scale(.97)}
+.botonGris{background:var(--capa); border-radius:10px; padding:10px 16px; font-weight:500}
+.botonGris:hover{background:var(--capa2)}
+
+/* ---------- Vista de reproducción ---------- */
+#verVista{position:fixed; inset:0; z-index:50; background:var(--fondo); overflow-y:auto; overscroll-behavior:contain}
+body.viendo{overflow:hidden}
+.lienzo{position:sticky; top:0; z-index:10; background:#000; width:100%; aspect-ratio:16/9;
+  max-height:min(56.25vw,78vh); display:flex; align-items:center; justify-content:center; overflow:hidden}
+.lienzo video{width:100%; height:100%; background:#000}
+.lienzo.pantallaCompleta{max-height:none}
+
+/* Contenido bajo el vídeo */
+#verContenido{padding:14px 16px 40px}
+#verTitulo{font-size:18px; font-weight:700; line-height:1.35; margin:0}
+#verMeta{color:var(--texto2); font-size:13.5px; margin:6px 0 12px}
+#verAcciones{display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-bottom:18px}
+.accion{display:flex; align-items:center; gap:7px; background:var(--capa); border-radius:999px;
+  padding:8px 14px; font-size:13.5px; font-weight:500; white-space:nowrap}
+.accion:hover{background:var(--capa2)}
+.accion svg{width:18px; height:18px}
+.accion.encendida{background:#f1f1f1; color:#0f0f0f}
+#verSiguiente h3{font-size:15px; margin:0 0 10px}
+.itemSig{display:flex; gap:10px; margin-bottom:12px; cursor:pointer; border-radius:10px}
+.itemSig .miniatura{flex:0 0 168px; width:168px; border-radius:8px}
+.itemSig .miniatura .letras{font-size:20px}
+.itemSig .st{font-size:14px; font-weight:500; line-height:1.3; max-height:2.6em; overflow:hidden;
+  display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical}
+.itemSig .sm{color:var(--texto2); font-size:12.5px; margin-top:3px}
+.itemSig.actual{background:#1f2a38; padding:6px; margin-left:-6px}
+
+@media (min-width:1000px){
+  #verVista{padding:20px 24px; display:grid; grid-template-columns:minmax(0,1fr) 402px; gap:24px;
+    align-content:start}
+  .lienzo{position:relative; top:auto; border-radius:14px; max-height:calc(100vh - 160px)}
+  #verContenido{padding:14px 0}
+  #columnaVideo{min-width:0}
+  #verSiguiente{padding-top:2px}
+}
+
+/* Controles del reproductor */
+.controles{position:absolute; inset:0; z-index:5; opacity:1; transition:opacity .22s; color:#fff}
+.controles.escondidos{opacity:0; pointer-events:none}
+.controles .sombraArriba{position:absolute; inset:0 0 auto 0; height:90px;
+  background:linear-gradient(rgba(0,0,0,.6),transparent)}
+.controles .sombraAbajo{position:absolute; inset:auto 0 0 0; height:110px;
+  background:linear-gradient(transparent,rgba(0,0,0,.75))}
+.cArriba{position:absolute; top:0; left:0; right:0; display:flex; align-items:center; gap:4px; padding:6px 8px}
+.cArriba .tituloFs{flex:1; min-width:0; font-size:14px; font-weight:500; white-space:nowrap;
+  overflow:hidden; text-overflow:ellipsis; opacity:.95; padding:0 6px}
+.cCentro{position:absolute; inset:0; display:flex; align-items:center; justify-content:center; gap:52px; pointer-events:none}
+.cCentro button{pointer-events:auto; width:58px; height:58px; border-radius:50%;
+  background:rgba(0,0,0,.45); display:flex; align-items:center; justify-content:center; position:relative}
+.cCentro button:active{background:rgba(0,0,0,.7)}
+.cCentro svg{width:34px; height:34px}
+.cCentro .salto svg{width:26px; height:26px}
+.cCentro .salto b{position:absolute; font-size:9px; font-weight:700; letter-spacing:.5px}
+#bGiraDer svg{transform:scaleX(-1)}
+.cAbajo{position:absolute; left:0; right:0; bottom:0; padding:0 12px 6px}
+.cTiempo{display:flex; align-items:center; gap:10px; font-size:12.5px; padding:0 2px 2px}
+.cTiempo b{font-weight:500}
+.cTiempo span{color:#ddd}
+.cBarraZona{padding:8px 0; cursor:pointer; touch-action:none}
+.cBarra{position:relative; height:3.5px; background:rgba(255,255,255,.3); border-radius:2px}
+.cBarraZona:hover .cBarra,.cBarraZona.arrastrando .cBarra{height:5.5px}
+.cBuf{position:absolute; left:0; top:0; bottom:0; background:rgba(255,255,255,.45); border-radius:2px}
+.cProg{position:absolute; left:0; top:0; bottom:0; background:var(--rojoVivo); border-radius:2px}
+.cBola{position:absolute; top:50%; width:14px; height:14px; border-radius:50%; background:var(--rojoVivo);
+  transform:translate(-50%,-50%) scale(0); transition:transform .12s}
+.cBarraZona:hover .cBola,.cBarraZona.arrastrando .cBola{transform:translate(-50%,-50%) scale(1)}
+.cGlobo{position:absolute; bottom:22px; transform:translateX(-50%); background:rgba(0,0,0,.85);
+  padding:3px 8px; border-radius:5px; font-size:12px; display:none; white-space:nowrap}
+.cBarraZona.arrastrando .cGlobo{display:block}
+.cBotones{display:flex; align-items:center; gap:2px}
+.cBotones .bIcono{width:42px; height:38px; border-radius:8px; color:#fff}
+.cBotones .bIcono:hover{background:rgba(255,255,255,.12)}
+.cBotones .espacio{flex:1}
+.cBotones .vel{font-size:13px; font-weight:600; width:auto; padding:0 10px}
+#vol{width:64px; accent-color:#fff; cursor:pointer}
+@media (pointer:coarse){ .cSoloRaton{display:none !important} }
+@media (pointer:fine){ .cCentro{display:none} }
+.ccActivo{position:relative}
+.ccActivo::after{content:""; position:absolute; left:10px; right:10px; bottom:5px; height:2.5px;
+  background:var(--rojoVivo); border-radius:2px}
+
+/* Menús del reproductor */
+.menuFlotante{position:absolute; right:12px; bottom:64px; z-index:8; background:rgba(28,28,28,.98);
+  border-radius:12px; min-width:200px; max-height:min(320px,60%); overflow-y:auto; padding:8px 0;
+  box-shadow:0 6px 24px rgba(0,0,0,.5)}
+.menuFlotante h4{margin:2px 16px 8px; font-size:12px; color:var(--texto2); font-weight:500;
+  text-transform:uppercase; letter-spacing:.06em}
+.menuFlotante button{display:flex; width:100%; align-items:center; gap:10px; padding:9px 16px;
+  font-size:14px; color:#eee; text-align:left}
+.menuFlotante button:hover{background:rgba(255,255,255,.08)}
+.menuFlotante button.elegido{color:#fff; font-weight:600}
+.menuFlotante button.elegido::before{content:"✓"; font-size:13px}
+.menuFlotante button:not(.elegido)::before{content:""; width:13px}
+
+/* Ondas del doble toque */
+.onda{position:absolute; top:50%; width:44%; aspect-ratio:1; border-radius:50%;
+  background:rgba(255,255,255,.18); display:flex; flex-direction:column; align-items:center;
+  justify-content:center; gap:4px; color:#fff; font-size:13px; font-weight:600;
+  transform:translateY(-50%) scale(.4); opacity:0; pointer-events:none; z-index:6}
+.onda.izq{left:-10%} .onda.der{right:-10%}
+.onda.activa{animation:ondaAni .6s ease-out}
+@keyframes ondaAni{0%{opacity:0; transform:translateY(-50%) scale(.4)} 25%{opacity:1}
+  100%{opacity:0; transform:translateY(-50%) scale(1)}}
+.onda .flechas{display:flex; gap:2px}
+.onda .flechas i{border:6px solid transparent; border-left-color:#fff; border-right-width:0; display:block}
+.onda.izq .flechas i{transform:rotate(180deg)}
+
+/* Capa central de aviso / error / siguiente */
+.capaAviso{position:absolute; inset:0; z-index:7; background:rgba(0,0,0,.88); color:#fff;
+  display:flex; flex-direction:column; align-items:center; justify-content:center; gap:12px;
+  text-align:center; padding:20px}
+.capaAviso h3{margin:0; font-size:17px}
+.capaAviso p{margin:0; color:#bbb; font-size:13.5px; max-width:460px}
+.capaAviso .anillo{position:relative; width:64px; height:64px; border-radius:50%; cursor:pointer;
+  display:flex; align-items:center; justify-content:center}
+.capaAviso .anillo svg.icoPlay{width:30px; height:30px; z-index:1}
+.capaAviso .anillo svg.aro{position:absolute; inset:0; width:64px; height:64px}
+.capaAviso .aro circle{fill:none; stroke-width:3.5}
+.capaAviso .aro .fondoAro{stroke:rgba(255,255,255,.25)}
+.capaAviso .aro .frenteAro{stroke:#fff; stroke-linecap:round;
+  stroke-dasharray:189; transition:stroke-dashoffset .25s linear; transform:rotate(-90deg); transform-origin:center}
+.capaAviso .mini{width:min(320px,70%); border-radius:10px}
+
+/* Aviso de reanudar */
+#chipReanudar{position:absolute; left:12px; bottom:64px; z-index:8; background:rgba(0,0,0,.85);
+  border-radius:10px; padding:8px 12px; display:flex; gap:10px; align-items:center; font-size:13px; color:#fff}
+#chipReanudar button{color:#3ea6ff; font-weight:600}
+
+/* ---------- Panel de ajustes ---------- */
+#fondoOscuro{position:fixed; inset:0; z-index:70; background:rgba(0,0,0,.5)}
+#panelAjustes{position:fixed; z-index:71; background:#1c1c1c; overflow-y:auto;
+  inset:auto 0 0 0; max-height:82vh; border-radius:16px 16px 0 0; padding:8px 20px 28px}
+@media (min-width:700px){
+  #panelAjustes{inset:0 0 0 auto; width:400px; max-height:none; border-radius:16px 0 0 16px; padding-top:14px}
+}
+#panelAjustes h2{font-size:17px; display:flex; align-items:center; gap:8px; margin:10px 0 4px}
+#panelAjustes h2 button{margin-left:auto}
+#panelAjustes section{border-top:1px solid #2e2e2e; padding:14px 0; display:grid; gap:10px}
+#panelAjustes section:first-of-type{border-top:0}
+#panelAjustes h3{margin:0; font-size:12px; color:var(--texto2); text-transform:uppercase; letter-spacing:.08em; font-weight:600}
+#panelAjustes .linea{display:flex; align-items:center; gap:10px; font-size:14px}
+#panelAjustes .linea .mut{color:var(--texto2); font-size:12.5px}
+.interruptor{margin-left:auto; width:40px; height:22px; border-radius:999px; background:#555; position:relative; transition:background .15s}
+.interruptor::after{content:""; position:absolute; top:2px; left:2px; width:18px; height:18px; border-radius:50%;
+  background:#fff; transition:left .15s}
+.interruptor.si{background:#3ea6ff}
+.interruptor.si::after{left:20px}
+#estadoServidor{font-size:13px; color:var(--texto2); line-height:1.6}
+#estadoServidor b{color:var(--texto)}
+
+/* ---------- Toast ---------- */
+#toasts{position:fixed; left:50%; bottom:24px; transform:translateX(-50%); z-index:90;
+  display:flex; flex-direction:column; gap:8px; align-items:center; width:max-content; max-width:92vw}
+.toast{background:#f1f1f1; color:#0f0f0f; border-radius:10px; padding:10px 16px; font-size:13.5px;
+  box-shadow:0 4px 16px rgba(0,0,0,.4); animation:toastIn .25s; max-width:92vw}
+.toast.malo{background:#5c1a1a; color:#ffd6d6}
+@keyframes toastIn{from{opacity:0; transform:translateY(8px)} to{opacity:1}}
+
+::selection{background:#3ea6ff55}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo" id="bInicio" title="Portada">
+    <svg viewBox="0 0 24 24"><rect x="1" y="4" width="22" height="16" rx="5" fill="#ff3d3d"/><path d="M10 8.4v7.2l6.2-3.6z" fill="#fff"/></svg>
+    OndaVideo<small>de casa</small>
+  </div>
+  <div id="zonaBusqueda">
+    <button class="bIcono" id="bCerrarBusqueda" style="display:none"><svg viewBox="0 0 24 24"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg></button>
+    <div id="cajaBusqueda">
+      <input id="buscador" type="search" placeholder="Buscar en tus películas" autocomplete="off" enterkeyhint="search">
+      <button id="bLimpiar" title="Limpiar" style="display:none"><svg viewBox="0 0 24 24" width="18" height="18"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg></button>
+      <button class="bLupa" title="Buscar"><svg viewBox="0 0 24 24" width="20" height="20"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg></button>
+    </div>
+  </div>
+  <button class="bIcono" id="bBuscarMovil" title="Buscar"><svg viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg></button>
+  <button class="bIcono" id="bAjustes" title="Ajustes">
+    <svg viewBox="0 0 24 24"><path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/></svg>
+    <span id="estadoPunto"></span>
+  </button>
+</header>
+
+<div id="chips"></div>
+
+<main id="inicio"></main>
+
+<!-- Vista de reproducción -->
+<div id="verVista" class="oculto">
+  <div id="columnaVideo">
+    <div class="lienzo" id="lienzo">
+      <video id="reproductor" playsinline crossorigin="anonymous"></video>
+      <div class="onda izq" id="ondaIzq"><div class="flechas"><i></i><i></i><i></i></div><span>10 s</span></div>
+      <div class="onda der" id="ondaDer"><div class="flechas"><i></i><i></i><i></i></div><span>10 s</span></div>
+
+      <div class="controles" id="controles">
+        <div class="sombraArriba"></div><div class="sombraAbajo"></div>
+        <div class="cArriba">
+          <button class="bIcono" id="bAtras" title="Volver"><svg viewBox="0 0 24 24"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg></button>
+          <div class="tituloFs" id="tituloFs"></div>
+        </div>
+        <div class="cCentro">
+          <button class="salto" id="bGiraIzq" title="−10 s"><svg viewBox="0 0 24 24"><path d="M12 5V1L7 6l5 5V7c3.31 0 6 2.69 6 6s-2.69 6-6 6-6-2.69-6-6H4c0 4.42 3.58 8 8 8s8-3.58 8-8-3.58-8-8-8z"/></svg><b>10</b></button>
+          <button id="bPlayCentro"><svg viewBox="0 0 24 24" id="icoPlayCentro"><path d="M8 5v14l11-7z"/></svg></button>
+          <button class="salto" id="bGiraDer" title="+10 s"><svg viewBox="0 0 24 24"><path d="M12 5V1L7 6l5 5V7c3.31 0 6 2.69 6 6s-2.69 6-6 6-6-2.69-6-6H4c0 4.42 3.58 8 8 8s8-3.58 8-8-3.58-8-8-8z"/></svg><b>10</b></button>
+        </div>
+        <div class="cAbajo">
+          <div class="cTiempo"><b id="tAhora">0:00</b><span>/</span><span id="tTotal">0:00</span></div>
+          <div class="cBarraZona" id="zonaBarra">
+            <div class="cBarra">
+              <div class="cBuf" id="cBuf"></div>
+              <div class="cProg" id="cProg"></div>
+              <div class="cBola" id="cBola"></div>
+              <div class="cGlobo" id="cGlobo">0:00</div>
+            </div>
+          </div>
+          <div class="cBotones">
+            <button class="bIcono cSoloRaton" id="bPlay" title="Reproducir (k)"><svg viewBox="0 0 24 24" id="icoPlay"><path d="M8 5v14l11-7z"/></svg></button>
+            <button class="bIcono cSoloRaton" id="bSilencio" title="Silencio (m)"><svg viewBox="0 0 24 24" id="icoVol"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/></svg></button>
+            <input type="range" id="vol" class="cSoloRaton" min="0" max="1" step="0.02" title="Volumen">
+            <div class="espacio"></div>
+            <button class="bIcono vel" id="bVelocidad" title="Velocidad">1×</button>
+            <button class="bIcono" id="bCC" title="Subtítulos (c)"><svg viewBox="0 0 24 24"><path d="M19 4H5c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm-8 7H9.5v-.5h-2v3h2V13H11v1c0 .55-.45 1-1 1H7c-.55 0-1-.45-1-1v-4c0-.55.45-1 1-1h3c.55 0 1 .45 1 1v1zm7 0h-1.5v-.5h-2v3h2V13H18v1c0 .55-.45 1-1 1h-3c-.55 0-1-.45-1-1v-4c0-.55.45-1 1-1h3c.55 0 1 .45 1 1v1z"/></svg></button>
+            <button class="bIcono" id="bPip" title="Imagen en imagen (i)"><svg viewBox="0 0 24 24"><path d="M19 11h-8v6h8v-6zm4 8V4.98C23 3.88 22.1 3 21 3H3c-1.1 0-2 .88-2 1.98V19c0 1.1.9 2 2 2h18c1.1 0 2-.9 2-2zm-2 .02H3V4.97h18v14.05z"/></svg></button>
+            <button class="bIcono" id="bPantalla" title="Pantalla completa (f)"><svg viewBox="0 0 24 24" id="icoPantalla"><path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"/></svg></button>
+          </div>
+        </div>
+      </div>
+
+      <div class="menuFlotante oculto" id="menuVelocidad"></div>
+      <div class="menuFlotante oculto" id="menuCC"></div>
+      <div id="chipReanudar" class="oculto"></div>
+      <div class="capaAviso oculto" id="capaAviso"></div>
+    </div>
+    <div id="verContenido">
+      <h1 id="verTitulo"></h1>
+      <div id="verMeta"></div>
+      <div id="verAcciones"></div>
+      <div id="verSiguiente"></div>
+    </div>
+  </div>
+</div>
+
+<div id="fondoOscuro" class="oculto"></div>
+<div id="panelAjustes" class="oculto"></div>
+<div id="toasts"></div>
+
+<script>
+"use strict";
+/* ================================================================
+   OndaVideo — tus películas locales con cara de YouTube.
+   Un solo archivo. El servidor de casa (pwa/servidor-media.cjs) pone
+   el índice en /api/indice y los archivos en /media/<carpeta>/<ruta>;
+   aquí se hace todo lo demás: portada, miniaturas, reproductor.
+   ================================================================ */
+
+const $  = s => document.querySelector(s);
+const $$ = s => [...document.querySelectorAll(s)];
+const esc = s => String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+
+/* ---------- Estado ---------- */
+let base = "";                 // dirección del servidor de casa
+let indice = null;             // respuesta cruda de /api/indice
+let videos = [];               // modelo de la app
+let porId = new Map();
+let colecciones = [];          // [{nombre, items}]
+let chipActivo = "todo";
+let busqueda = "";
+let actual = null;             // vídeo abierto
+let scrollGuardado = 0;
+
+const ajustes = Object.assign(
+  { servidor:"", autoplay:true, vol:1, silencio:false, subs:"" },
+  leerJson(localStorage.getItem("ondavideo.ajustes")) || {});
+const progreso = leerJson(localStorage.getItem("ondavideo.progreso")) || {};
+
+function leerJson(t){ try{ return JSON.parse(t); }catch(e){ return null; } }
+function guardarAjustes(){ try{ localStorage.setItem("ondavideo.ajustes", JSON.stringify(ajustes)); }catch(e){} }
+let progresoTimer = 0;
+function guardarProgresoDisco(){
+  clearTimeout(progresoTimer);
+  progresoTimer = setTimeout(()=>{ try{ localStorage.setItem("ondavideo.progreso", JSON.stringify(progreso)); }catch(e){} }, 400);
+}
+
+/* ---------- Utilidades ---------- */
+function fmtDur(s){
+  if (!isFinite(s) || s <= 0) return "";
+  s = Math.round(s);
+  const h = Math.floor(s/3600), m = Math.floor(s%3600/60), x = s%60;
+  return h ? `${h}:${String(m).padStart(2,"0")}:${String(x).padStart(2,"0")}` : `${m}:${String(x).padStart(2,"0")}`;
+}
+function fmtTam(b){
+  if (b >= 950*1024*1024) return (b/1073741824).toFixed(1).replace(".",",") + " GB";
+  return Math.round(b/1048576) + " MB";
+}
+function fmtFecha(ms){
+  if (!ms) return "";
+  const d = (Date.now()-ms)/86400000;
+  if (d < 1) return "hoy";
+  if (d < 2) return "ayer";
+  if (d < 30) return `hace ${Math.floor(d)} días`;
+  if (d < 365) return `hace ${Math.floor(d/30)} ${d<60?"mes":"meses"}`;
+  return `hace ${Math.floor(d/365)} ${d<730?"año":"años"}`;
+}
+const sinAcentos = s => s.normalize("NFD").replace(/[̀-ͯ]/g,"").toLowerCase();
+const codificarRuta = r => encodeURI(r).replace(/#/g,"%23").replace(/\?/g,"%3F");
+function urlMedia(c, r){ return base + "/media/" + c + "/" + codificarRuta(r); }
+const esTactil = matchMedia("(pointer:coarse)").matches;
+
+function toast(msg, malo){
+  const t = document.createElement("div");
+  t.className = "toast" + (malo ? " malo" : "");
+  t.textContent = msg;
+  $("#toasts").appendChild(t);
+  setTimeout(()=>{ t.style.opacity="0"; t.style.transition="opacity .3s"; setTimeout(()=>t.remove(), 320); }, malo ? 5200 : 3200);
+}
+
+/* ---------- Limpieza de nombres ----------
+   "Avatar.Fire.And.Ash.2025.1080p.WEBRip.x264.AAC5.1-[YTS.BZ].mp4"
+   pasa a: título "Avatar Fire And Ash", año 2025, calidad 1080p. */
+const CORTE = /^(48\dp|72\dp|108\dp|216\dp|4k|uhd|bluray|blu-ray|b[dr]rip|webrip|web-?dl|hdrip|dvdrip|dvdscr|hdtv|camrip|x26[45].*|h\.?26[45].*|hevc|avc|av1|aac[\d.]*.*|ac-?3|eac3|dts(-hd)?|dd[p+]?[\d.]*|\d+(mb|gb)|\d+bit|hdr10?\+?|sdr|remux|proper|repack|extended|unrated|imax|multi(-audio|-sub)?|dual(-audio)?|eng-sub|hcsubbed|subbed|vose|castellano|spanish|latino|batch|pseudo|bd|web|hc)$/i;
+
+function analizarNombre(crudo, esCarpeta){
+  let s = crudo;
+  if (!esCarpeta) s = s.replace(/\.[a-z0-9]{2,4}$/i, "");   // fuera la extensión
+  const original = s;
+  let anio = "", serie = "";
+
+  s = s.replace(/\[[^\]]*\]/g, " ")            // [YTS.MX] [1080p] [AnimeRG]…
+       .replace(/【[^】]*】/g, " ")
+       .replace(/www\.[^\s]+/gi, " ")
+       .replace(/_/g, " ");
+  // Estilo con puntos: si apenas hay espacios y abundan los puntos, son separadores
+  if ((s.match(/ /g)||[]).length <= 1 && (s.match(/\./g)||[]).length >= 2) s = s.replace(/\./g, " ");
+
+  const partes = s.split(/\s+/).filter(Boolean);
+  const titulo = [];
+  for (const p0 of partes){
+    const p = p0.replace(/[,;:]+$/,"");
+    const mAnio = /^\(?((19|20)\d{2})\)?$/.exec(p);
+    if (mAnio){ anio = mAnio[1]; break; }
+    const mSerie = /^s(\d{1,2})[\s.]?e(\d{1,3})$/i.exec(p);
+    if (mSerie){ serie = `T${+mSerie[1]} · E${+mSerie[2]}`; break; }
+    if (CORTE.test(p)) break;
+    titulo.push(p0);
+  }
+  let limpio = titulo.join(" ")
+    .replace(/\((?!\d{4}\))[^)]*\)/g, " ")     // paréntesis decorativos (el año ya se extrajo)
+    .replace(/[-–—\s]+$/,"").replace(/^[-–—\s]+/,"")
+    .replace(/\s{2,}/g," ").trim();
+  if (!limpio) limpio = original.replace(/\[[^\]]*\]/g," ").replace(/\s{2,}/g," ").trim() || crudo;
+
+  // La serie puede venir en medio: "…S01E04…" pegado a otro texto
+  if (!serie){
+    const m = /s(\d{1,2})[\s.]?e(\d{1,3})/i.exec(original);
+    if (m) serie = `T${+m[1]} · E${+m[2]}`;
+  }
+  const calidad = /2160p|4k/i.test(original) ? "4K" :
+                  /1080p/i.test(original) ? "1080p" :
+                  /720p/i.test(original) ? "720p" : "";
+  const hevc = /x265|hevc|h\.?265/i.test(original);
+  return { titulo: limpio, anio, serie, calidad, hevc };
+}
+
+/* ---------- Conexión con el servidor de casa ---------- */
+function normalizarBase(t){
+  t = String(t||"").trim().replace(/\/+$/,"");
+  if (!t) return "";
+  if (!/^https?:\/\//i.test(t)) t = "http://" + t;
+  if (!/:\d+$/.test(t.replace(/^https?:\/\//,"")) && !/^https:/i.test(t)) t += ":8080";
+  return t;
+}
+async function probarBase(b){
+  try{
+    const r = await fetch(b + "/api/salud", {cache:"no-store"});
+    if (!r.ok) return false;
+    const d = await r.json();
+    return !!(d && d.ok);
+  }catch(e){ return false; }
+}
+async function conectar(mostrarError){
+  const candidatos = [];
+  const param = new URLSearchParams(location.search).get("servidor");
+  if (param) candidatos.push(normalizarBase(param));
+  if (location.protocol.startsWith("http")) candidatos.push(location.origin);
+  if (ajustes.servidor) candidatos.push(normalizarBase(ajustes.servidor));
+  candidatos.push("http://localhost:8080");
+  for (const b of [...new Set(candidatos)].filter(Boolean)){
+    if (await probarBase(b)){
+      base = b;
+      ajustes.servidor = b; guardarAjustes();
+      $("#estadoPunto").className = "ok";
+      await cargarIndice(false);
+      return true;
+    }
+  }
+  base = "";
+  $("#estadoPunto").className = "mal";
+  if (mostrarError) toast("No encuentro el servidor de casa", true);
+  pantallaSinServidor();
+  return false;
+}
+async function cargarIndice(refrescar){
+  try{
+    const r = await fetch(base + "/api/indice" + (refrescar ? "?refrescar=1" : ""), {cache:"no-store"});
+    indice = await r.json();
+  }catch(e){
+    pantallaSinServidor();
+    return;
+  }
+  construirModelo();
+  renderChips();
+  renderInicio();
+  // Si la URL traía un vídeo (#/v/…), ábrelo ahora que hay índice
+  renderRuta();
+}
+
+/* ---------- Modelo: vídeos, colecciones y subtítulos ---------- */
+function construirModelo(){
+  videos = []; porId = new Map();
+  const vids = (indice && indice.videos) || [];
+  const subs = (indice && indice.subs) || [];
+
+  // Subtítulos por carpeta (en minúsculas para emparejar sin sustos)
+  const subsPorDir = new Map();
+  for (const s of subs){
+    const dir = s.r.includes("/") ? s.r.slice(0, s.r.lastIndexOf("/")) : "";
+    const clave = s.c + "|" + dir.toLowerCase();
+    if (!subsPorDir.has(clave)) subsPorDir.set(clave, []);
+    subsPorDir.get(clave).push(s);
+  }
+
+  // ¿Cuántos vídeos tiene cada carpeta raíz? (colección vs. película suelta)
+  const porRaiz = new Map();
+  for (const v of vids){
+    const raiz = v.r.includes("/") ? v.r.split("/")[0] : "";
+    const clave = v.c + "|" + raiz;
+    porRaiz.set(clave, (porRaiz.get(clave)||0) + 1);
+  }
+
+  for (const v of vids){
+    const nombre = v.r.split("/").pop();
+    const raiz = v.r.includes("/") ? v.r.split("/")[0] : "";
+    const enColeccion = raiz && porRaiz.get(v.c + "|" + raiz) > 1;
+    const deArchivo = analizarNombre(nombre, false);
+    let info = deArchivo;
+    if (!enColeccion && raiz){
+      // La carpeta suele tener mejor nombre… salvo que el del archivo diga mucho más
+      const deCarpeta = analizarNombre(raiz, true);
+      if (deCarpeta.titulo.length >= 3 && deArchivo.titulo.length <= deCarpeta.titulo.length * 2)
+        info = Object.assign({}, deArchivo, {titulo:deCarpeta.titulo, anio:deCarpeta.anio||deArchivo.anio});
+    }
+    let col;
+    if (enColeccion) col = analizarNombre(raiz, true).titulo || raiz;
+    else col = info.serie ? "Series" : "Películas";
+
+    const dir = v.r.includes("/") ? v.r.slice(0, v.r.lastIndexOf("/")) : "";
+    const cerca = (subsPorDir.get(v.c + "|" + dir.toLowerCase()) || [])
+      .concat(subsPorDir.get(v.c + "|" + (dir ? dir + "/subs" : "subs").toLowerCase()) || []);
+    const baseNombre = nombre.replace(/\.[a-z0-9]{2,4}$/i,"").toLowerCase();
+    const propios = cerca.filter(s => s.r.split("/").pop().toLowerCase().startsWith(baseNombre));
+    const listaSubs = (propios.length && cerca.length > propios.length ? propios.concat(cerca.filter(s=>!propios.includes(s))) : cerca)
+      .map(s => ({ c:s.c, r:s.r, etiqueta: etiquetaSub(s.r.split("/").pop(), baseNombre), lang: langSub(s.r.split("/").pop()) }));
+
+    const id = v.c + "/" + v.r;
+    const modelo = {
+      id, c:v.c, r:v.r, t:v.t, m:v.m||0, nombre,
+      titulo: info.titulo, anio: info.anio, serie: info.serie,
+      calidad: info.calidad, hevc: info.hevc,
+      col, dur: 0, subs: listaSubs,
+    };
+    videos.push(modelo); porId.set(id, modelo);
+  }
+
+  // Colecciones (carpetas con más de un vídeo), de mayor a menor
+  const mapa = new Map();
+  for (const v of videos){
+    if (v.col === "Películas" || v.col === "Series") continue;
+    if (!mapa.has(v.col)) mapa.set(v.col, []);
+    mapa.get(v.col).push(v);
+  }
+  colecciones = [...mapa.entries()].map(([nombre, items]) => {
+    items.sort((a,b)=> a.titulo.localeCompare(b.titulo, "es", {numeric:true}));
+    return {nombre, items};
+  }).sort((a,b)=> b.items.length - a.items.length);
+}
+
+function etiquetaSub(nombre, baseVideo){
+  const s = nombre.replace(/\.(srt|vtt)$/i,"");
+  const b = sinAcentos(s);
+  let idioma = "";
+  if (/(^|[^a-z])(lat|419|latin)/.test(b)) idioma = "Español (Latino)";
+  else if (/(^|[^a-z])(spa|spanish|esp|castellano|es)([^a-z]|$)/.test(b)) idioma = "Español";
+  else if (/(^|[^a-z])(eng|english|en)([^a-z]|$)/.test(b)) idioma = "Inglés";
+  else if (/(^|[^a-z])(fre|french|fra|fr)([^a-z]|$)/.test(b)) idioma = "Francés";
+  else if (/(^|[^a-z])(ger|german|deu|de)([^a-z]|$)/.test(b)) idioma = "Alemán";
+  else if (/(^|[^a-z])(ita|italian|it)([^a-z]|$)/.test(b)) idioma = "Italiano";
+  else if (/(^|[^a-z])(por|portuguese|pt|bra)([^a-z]|$)/.test(b)) idioma = "Portugués";
+  else if (/(^|[^a-z])(jap|japanese|jpn|ja)([^a-z]|$)/.test(b)) idioma = "Japonés";
+  let extra = "";
+  if (/sdh|(^|[^a-z])hi([^a-z]|$)/.test(b)) extra = " (SDH)";
+  else if (/forced|forzad/.test(b)) extra = " (forzados)";
+  if (idioma) return idioma + extra;
+  if (baseVideo && sinAcentos(s).startsWith(baseVideo)) return "Subtítulos" + extra;
+  return s.length > 26 ? "Subtítulos" + extra : s + extra;
+}
+function langSub(nombre){
+  const b = sinAcentos(nombre);
+  if (/(^|[^a-z])(spa|spanish|esp|castellano|lat|419|latin|es)([^a-z]|$)/.test(b)) return "es";
+  if (/(^|[^a-z])(eng|english|en)([^a-z]|$)/.test(b)) return "en";
+  if (/(^|[^a-z])(fre|french|fra|fr)([^a-z]|$)/.test(b)) return "fr";
+  if (/(^|[^a-z])(por|pt)([^a-z]|$)/.test(b)) return "pt";
+  if (/(^|[^a-z])(jap|jpn|ja)([^a-z]|$)/.test(b)) return "ja";
+  return "es";
+}
+
+/* ---------- Progreso ---------- */
+function progresoDe(id){ return progreso[id] || null; }
+function esVisto(id){ const p = progreso[id]; return !!(p && p.f); }
+function fraccion(id){
+  const p = progreso[id];
+  if (!p || !p.d) return 0;
+  return Math.min(1, p.t / p.d);
+}
+function anotarProgreso(v, t, d){
+  if (!d || !isFinite(d)) return;
+  const ya = progreso[v.id] || {};
+  progreso[v.id] = { t:Math.floor(t), d:Math.round(d), f: (t/d > .95 || ya.f) ? 1 : 0, w: Date.now() };
+  guardarProgresoDisco();
+}
+function continuarViendo(){
+  return videos
+    .filter(v => { const p = progreso[v.id]; return p && !p.f && p.t >= 60; })
+    .sort((a,b)=> progreso[b.id].w - progreso[a.id].w);
+}
+
+/* ---------- Miniaturas (las hace el navegador y se guardan) ---------- */
+let bdMinis = null;
+function abrirBD(){
+  return new Promise(res=>{
+    const pet = indexedDB.open("ondavideo", 1);
+    pet.onupgradeneeded = ()=> pet.result.createObjectStore("miniaturas");
+    pet.onsuccess = ()=>{ bdMinis = pet.result; res(); };
+    pet.onerror = ()=> res();
+  });
+}
+function miniLeer(id){
+  return new Promise(res=>{
+    if (!bdMinis) return res(null);
+    try{
+      const p = bdMinis.transaction("miniaturas").objectStore("miniaturas").get(id);
+      p.onsuccess = ()=> res(p.result || null);
+      p.onerror = ()=> res(null);
+    }catch(e){ res(null); }
+  });
+}
+function miniGuardar(id, dato){
+  try{ bdMinis.transaction("miniaturas","readwrite").objectStore("miniaturas").put(dato, id); }catch(e){}
+}
+function miniBorrarTodo(){
+  return new Promise(res=>{
+    if (!bdMinis) return res();
+    const p = bdMinis.transaction("miniaturas","readwrite").objectStore("miniaturas").clear();
+    p.onsuccess = p.onerror = ()=> res();
+  });
+}
+
+const colaMinis = [];
+let minisActivas = 0;
+function pedirMiniatura(v){
+  if (v._miniPedida) return;
+  v._miniPedida = true;
+  colaMinis.push(v);
+  rodarMinis();
+}
+async function rodarMinis(){
+  while (minisActivas < 2 && colaMinis.length){
+    const v = colaMinis.shift();
+    minisActivas++;
+    procesarMini(v).finally(()=>{ minisActivas--; rodarMinis(); });
+  }
+}
+async function procesarMini(v){
+  const guardada = await miniLeer(v.id);
+  if (guardada && guardada.tam === v.t){
+    v.dur = guardada.dur || v.dur || 0;
+    if (guardada.img){ pintarMini(v, guardada); return; }
+    // Un error guardado no es para siempre: puede haber sido un tropiezo
+    // (pestaña oculta, red lenta). Se reintenta una vez por sesión.
+  }
+  const hecho = await generarMini(v);
+  if (hecho){ miniGuardar(v.id, hecho); pintarMini(v, hecho); }
+}
+function generarMini(v){
+  return new Promise(res=>{
+    const vid = document.createElement("video");
+    let listo = false;
+    const terminar = dato => {
+      if (listo) return; listo = true;
+      clearTimeout(reloj);
+      vid.onloadedmetadata = vid.onseeked = vid.onerror = null;
+      vid.removeAttribute("src"); try{ vid.load(); }catch(e){}
+      res(dato);
+    };
+    const reloj = setTimeout(()=> terminar({tam:v.t, dur:v.dur||0, err:1}), 30000);
+    vid.crossOrigin = "anonymous"; vid.preload = "metadata"; vid.muted = true;
+    vid.onerror = ()=> terminar({tam:v.t, dur:0, err:1});
+    vid.onloadedmetadata = ()=>{
+      v.dur = vid.duration || 0;
+      const destino = v.dur > 90 ? Math.min(v.dur * .2, 1200) : v.dur * .4;
+      try{ vid.currentTime = destino; }catch(e){ terminar({tam:v.t, dur:v.dur, err:1}); }
+    };
+    vid.onseeked = ()=>{
+      let dibujado = false;
+      const dibujar = ()=>{
+        if (dibujado || listo) return;
+        dibujado = true;
+        try{
+          const c = document.createElement("canvas");
+          c.width = 400; c.height = 225;
+          const g = c.getContext("2d");
+          const escala = Math.max(400/vid.videoWidth, 225/vid.videoHeight);
+          const w = vid.videoWidth*escala, h = vid.videoHeight*escala;
+          g.drawImage(vid, (400-w)/2, (225-h)/2, w, h);
+          terminar({tam:v.t, dur:v.dur, img:c.toDataURL("image/jpeg", .72)});
+        }catch(e){ terminar({tam:v.t, dur:v.dur, err:1}); }
+      };
+      // rVFC da el fotograma exacto, pero no dispara en pestañas ocultas: plan B
+      if (vid.requestVideoFrameCallback){ vid.requestVideoFrameCallback(()=>dibujar()); setTimeout(dibujar, 1200); }
+      else setTimeout(dibujar, 60);
+    };
+    vid.src = urlMedia(v.c, v.r);
+  });
+}
+function pintarMini(v, dato){
+  for (const caja of $$(`[data-mini="${CSS.escape(v.id)}"]`)){
+    const durEl = caja.querySelector(".dur");
+    if (durEl && v.dur) durEl.textContent = fmtDur(v.dur);
+    if (dato.img && !caja.querySelector("img")){
+      const im = new Image();
+      im.src = dato.img; im.alt = "";
+      caja.prepend(im);
+      const letras = caja.querySelector(".letras"); if (letras) letras.remove();
+    }
+    if (dato.err && !dato.img && !caja.querySelector(".noCompat") && !caja.querySelector("img")){
+      const et = document.createElement("span");
+      et.className = "noCompat"; et.textContent = "⚠ formato difícil";
+      caja.appendChild(et);
+    }
+  }
+}
+const observador = new IntersectionObserver(entradas=>{
+  for (const e of entradas){
+    if (!e.isIntersecting) continue;
+    const v = porId.get(e.target.dataset.mini);
+    observador.unobserve(e.target);
+    if (v) pedirMiniatura(v);
+  }
+}, {rootMargin:"300px"});
+
+/* ---------- Portada ---------- */
+const COLORES = ["#7c4dff","#e91e63","#009688","#3f51b5","#f57c00","#5d4037","#00838f","#c2185b"];
+function colorDe(nombre){
+  let h = 0; for (const ch of nombre) h = (h*31 + ch.charCodeAt(0)) >>> 0;
+  return COLORES[h % COLORES.length];
+}
+function tarjeta(v, horizontal){
+  const el = document.createElement("div");
+  el.className = "tarjeta";
+  const barra = fraccion(v.id);
+  const visto = esVisto(v.id);
+  const sellos = [v.calidad && `<span class="sello">${v.calidad}</span>`, v.hevc && `<span class="sello">x265</span>`].filter(Boolean).join("");
+  el.innerHTML = `
+    <div class="miniatura" data-mini="${esc(v.id)}">
+      <div class="letras">${esc(v.titulo.slice(0,12))}</div>
+      <span class="dur">${v.dur ? fmtDur(v.dur) : ""}</span>
+      ${visto ? '<span class="visto"><svg viewBox="0 0 24 24"><path d="M9 16.17 4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>Visto</span>' : ""}
+      ${barra > 0.005 && !visto ? `<div class="barra"><i style="width:${(barra*100).toFixed(1)}%"></i></div>` : ""}
+      ${visto ? `<div class="barra"><i style="width:100%"></i></div>` : ""}
+    </div>
+    <div class="datos">
+      ${horizontal ? "" : `<div class="avatar" style="background:${colorDe(v.col)}">${esc(v.col.slice(0,1))}</div>`}
+      <div>
+        <div class="titulo">${esc(v.titulo)}${v.serie ? " — " + esc(v.serie) : ""}</div>
+        <div class="meta">${sellos}${esc(v.col)}${v.anio ? " · " + v.anio : ""}${v.m ? " · " + fmtFecha(v.m) : ""}</div>
+      </div>
+    </div>`;
+  el.onclick = ()=>{ location.hash = "#/v/" + encodeURIComponent(v.id); };
+  observador.observe(el.querySelector(".miniatura"));
+  return el;
+}
+function seccion(titulo, items, opciones){
+  const o = opciones || {};
+  const s = document.createElement("section");
+  s.className = "seccion";
+  const h = document.createElement("h2");
+  h.innerHTML = esc(titulo) + (o.chip ? ` <button class="verTodo">Ver todo</button>` : "");
+  if (o.chip) h.querySelector(".verTodo").onclick = ()=> ponerChip(o.chip);
+  s.appendChild(h);
+  const cont = document.createElement("div");
+  cont.className = o.fila ? "fila" : "rejilla";
+  for (const v of items) cont.appendChild(tarjeta(v, o.fila));
+  s.appendChild(cont);
+  return s;
+}
+function renderChips(){
+  const z = $("#chips"); z.innerHTML = "";
+  const lista = [["todo","Todo"], ["Películas","Películas"]];
+  for (const c of colecciones) lista.push([c.nombre, c.nombre]);
+  if (videos.some(v=>v.col==="Series")) lista.push(["Series","Series"]);
+  if (videos.some(v=>esVisto(v.id))) lista.push(["vistos","✓ Vistos"]);
+  for (const [clave, texto] of lista){
+    const b = document.createElement("button");
+    b.className = "chip" + (chipActivo===clave ? " activo" : "");
+    b.textContent = texto;
+    b.onclick = ()=> ponerChip(clave);
+    z.appendChild(b);
+  }
+}
+function ponerChip(clave){
+  chipActivo = clave;
+  busqueda = ""; $("#buscador").value = ""; $("#bLimpiar").style.display = "none";
+  renderChips(); renderInicio();
+  scrollTo({top:0});
+}
+function renderInicio(){
+  const m = $("#inicio"); m.innerHTML = "";
+  if (!videos.length) return;   // la pantalla de estado ya está puesta
+
+  let lista = videos;
+  if (busqueda){
+    const q = sinAcentos(busqueda);
+    lista = videos.filter(v => sinAcentos(v.titulo + " " + v.col + " " + v.nombre).includes(q));
+    m.appendChild(seccion(lista.length ? `Resultados para “${busqueda}”` : `Nada con “${busqueda}”`, ordenarRecientes(lista)));
+    return;
+  }
+  if (chipActivo === "vistos"){
+    m.appendChild(seccion("Vistos", videos.filter(v=>esVisto(v.id))));
+    return;
+  }
+  if (chipActivo !== "todo"){
+    const col = colecciones.find(c=>c.nombre===chipActivo);
+    const items = col ? col.items : ordenarRecientes(videos.filter(v=>v.col===chipActivo));
+    m.appendChild(seccion(chipActivo, items));
+    return;
+  }
+  const sigue = continuarViendo();
+  if (sigue.length) m.appendChild(seccion("Continuar viendo", sigue.slice(0,12), {fila:true}));
+  const sueltas = ordenarRecientes(videos.filter(v=>v.col==="Películas"));
+  if (sueltas.length) m.appendChild(seccion("Películas", sueltas, {chip:"Películas"}));
+  for (const c of colecciones) m.appendChild(seccion(c.nombre, c.items, {fila:true, chip:c.nombre}));
+  const series = videos.filter(v=>v.col==="Series");
+  if (series.length) m.appendChild(seccion("Series", series, {chip:"Series"}));
+}
+function ordenarRecientes(lista){
+  return [...lista].sort((a,b)=> (b.m||0)-(a.m||0) || a.titulo.localeCompare(b.titulo,"es"));
+}
+
+function pantallaSinServidor(){
+  $("#inicio").innerHTML = `
+    <div class="pantalla">
+      <div class="emoji">📺</div>
+      <h2>No encuentro el servidor de casa</h2>
+      <p>OndaVideo reproduce las películas guardadas en tu PC. Para eso, el PC tiene que estar encendido con el servidor en marcha.</p>
+      <div class="pasos">
+        <b>En el PC:</b> doble clic en <b>VER PELICULAS.bat</b> (o INICIAR SERVIDOR.bat) en Documents\\AudioPlayer.<br>
+        <b>En el teléfono:</b> además, estar en la misma WiFi que el PC.
+      </div>
+      <div class="campoServidor">
+        <input id="dirServidor" placeholder="Dirección, p. ej. 192.168.1.50:8080" value="${esc(ajustes.servidor||"")}">
+        <button class="botonAzul" id="bConectar">Conectar</button>
+      </div>
+      <button class="botonGris" id="bReintentar">↻ Volver a buscar</button>
+    </div>`;
+  $("#bConectar").onclick = async ()=>{
+    ajustes.servidor = normalizarBase($("#dirServidor").value); guardarAjustes();
+    $("#bConectar").textContent = "…";
+    if (!await conectar(true)) $("#bConectar").textContent = "Conectar";
+  };
+  $("#dirServidor").onkeydown = e=>{ if (e.key==="Enter") $("#bConectar").click(); };
+  $("#bReintentar").onclick = ()=> conectar(true);
+}
+
+/* ---------- Buscador ---------- */
+let buscaTimer = 0;
+$("#buscador").oninput = ()=>{
+  clearTimeout(buscaTimer);
+  $("#bLimpiar").style.display = $("#buscador").value ? "" : "none";
+  buscaTimer = setTimeout(()=>{
+    busqueda = $("#buscador").value.trim();
+    renderInicio();
+  }, 160);
+};
+$("#buscador").onkeydown = e=>{ if (e.key==="Enter") $("#buscador").blur(); if (e.key==="Escape"){ $("#bLimpiar").click(); } };
+$("#bLimpiar").onclick = ()=>{ $("#buscador").value=""; busqueda=""; $("#bLimpiar").style.display="none"; renderInicio(); };
+$("#bBuscarMovil").onclick = ()=>{
+  document.body.classList.add("buscando");
+  $("#bCerrarBusqueda").style.display = "";
+  $("#buscador").focus();
+};
+$("#bCerrarBusqueda").onclick = ()=>{
+  document.body.classList.remove("buscando");
+  $("#bCerrarBusqueda").style.display = "none";
+  $("#bLimpiar").click();
+};
+$("#bInicio").onclick = ()=>{ if (location.hash) location.hash = ""; else { ponerChip("todo"); } };
+
+/* ================================================================
+   Reproductor
+   ================================================================ */
+const vid = $("#reproductor");
+const controles = $("#controles");
+let listaReproduccion = [];      // contexto de "a continuación"
+let ocultarTimer = 0;
+let arrastrando = false;
+let velocidad = 1;
+let pistasCC = [];               // [{etiqueta, lang, track}]
+let ccElegido = -1;
+let avisoAudioHecho = false;
+let intervaloGuardar = 0;
+
+vid.volume = ajustes.vol; vid.muted = !!ajustes.silencio;
+$("#vol").value = ajustes.vol;
+
+function abrirVideo(id){
+  const v = porId.get(id);
+  if (!v){ if (indice) toast("Ese vídeo ya no está en la biblioteca", true); return; }
+  if (!actual) scrollGuardado = scrollY;
+  cerrarMenus();
+  actual = v;
+  avisoAudioHecho = false;
+  document.body.classList.add("viendo");
+  $("#verVista").classList.remove("oculto");
+  $("#verVista").scrollTop = 0;
+
+  // Vídeo y textos
+  vid.src = urlMedia(v.c, v.r);
+  vid.playbackRate = velocidad;
+  $("#verTitulo").textContent = v.titulo + (v.serie ? " — " + v.serie : "");
+  $("#tituloFs").textContent = v.titulo;
+  const partes = [v.col, v.anio, v.calidad, fmtTam(v.t), v.dur ? fmtDur(v.dur) : ""].filter(Boolean);
+  $("#verMeta").textContent = partes.join(" · ");
+  document.title = v.titulo + " — OndaVideo";
+  $("#capaAviso").classList.add("oculto");
+  $("#chipReanudar").classList.add("oculto");
+
+  montarAcciones(v);
+  montarSubtitulos(v);
+  montarSiguiente(v);
+  montarMediaSession(v);
+
+  // Reanudar donde ibas
+  const p = progresoDe(v.id);
+  vid.onloadedmetadata = ()=>{
+    if (!v.dur){ v.dur = vid.duration; }
+    $("#tTotal").textContent = fmtDur(vid.duration);
+    const meta = [v.col, v.anio, v.calidad, fmtTam(v.t), fmtDur(vid.duration)].filter(Boolean);
+    $("#verMeta").textContent = meta.join(" · ");
+    if (p && !p.f && p.t > 45 && p.t < vid.duration * .95){
+      vid.currentTime = p.t;
+      const chip = $("#chipReanudar");
+      chip.innerHTML = `↩ Sigues en ${fmtDur(p.t)} <button id="bDesdeCero">Empezar de cero</button>`;
+      chip.classList.remove("oculto");
+      $("#bDesdeCero").onclick = ()=>{ vid.currentTime = 0; chip.classList.add("oculto"); };
+      setTimeout(()=> chip.classList.add("oculto"), 7000);
+    }
+  };
+  vid.play().catch(()=>{ pintarPlay(); mostrarControles(); });
+  mostrarControles();
+  clearInterval(intervaloGuardar);
+  intervaloGuardar = setInterval(()=>{ if (actual && !vid.paused && vid.duration) anotarProgreso(actual, vid.currentTime, vid.duration); }, 5000);
+}
+function cerrarVideo(){
+  if (!actual) return;
+  if (vid.duration) anotarProgreso(actual, vid.currentTime, vid.duration);
+  clearInterval(intervaloGuardar);
+  try{ vid.pause(); }catch(e){}
+  vid.removeAttribute("src"); vid.load();
+  quitarPistas();
+  actual = null;
+  document.body.classList.remove("viendo");
+  $("#verVista").classList.add("oculto");
+  document.title = "OndaVideo";
+  if (document.fullscreenElement) document.exitFullscreen().catch(()=>{});
+  renderInicio();                       // refresca barras de progreso y "continuar viendo"
+  requestAnimationFrame(()=> scrollTo({top:scrollGuardado}));
+}
+
+function montarAcciones(v){
+  const z = $("#verAcciones"); z.innerHTML = "";
+  const auto = document.createElement("button");
+  auto.className = "accion" + (ajustes.autoplay ? " encendida" : "");
+  auto.innerHTML = `<svg viewBox="0 0 24 24"><path d="M4 18l8.5-6L4 6v12zm9-12v12l8.5-6L13 6z"/></svg> Autoplay`;
+  auto.title = "Al terminar, pasar al siguiente";
+  auto.onclick = ()=>{ ajustes.autoplay = !ajustes.autoplay; guardarAjustes(); auto.classList.toggle("encendida", ajustes.autoplay); };
+  z.appendChild(auto);
+
+  const des = document.createElement("a");
+  des.className = "accion";
+  des.href = urlMedia(v.c, v.r); des.download = v.nombre;
+  des.innerHTML = `<svg viewBox="0 0 24 24"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg> Descargar`;
+  z.appendChild(des);
+
+  if (document.pictureInPictureEnabled){
+    const pip = document.createElement("button");
+    pip.className = "accion";
+    pip.innerHTML = `<svg viewBox="0 0 24 24"><path d="M19 11h-8v6h8v-6zm4 8V4.98C23 3.88 22.1 3 21 3H3c-1.1 0-2 .88-2 1.98V19c0 1.1.9 2 2 2h18c1.1 0 2-.9 2-2zm-2 .02H3V4.97h18v14.05z"/></svg> Ventana flotante`;
+    pip.onclick = ()=> alternarPip();
+    z.appendChild(pip);
+  }
+}
+
+function montarSiguiente(v){
+  // El resto de su colección primero (en orden), después lo demás reciente
+  const col = colecciones.find(c=>c.nombre===v.col);
+  let lista;
+  if (col){
+    const i = col.items.indexOf(v);
+    lista = col.items.slice(i+1).concat(col.items.slice(0,i));
+  } else {
+    lista = ordenarRecientes(videos.filter(x=>x.col===v.col && x!==v));
+  }
+  const otros = ordenarRecientes(videos.filter(x=>!lista.includes(x) && x!==v)).slice(0,6);
+  listaReproduccion = lista.concat(otros);
+
+  const z = $("#verSiguiente");
+  z.innerHTML = "<h3>A continuación</h3>";
+  for (const s of listaReproduccion.slice(0,14)){
+    const el = document.createElement("div");
+    el.className = "itemSig";
+    const barra = fraccion(s.id), visto = esVisto(s.id);
+    el.innerHTML = `
+      <div class="miniatura" data-mini="${esc(s.id)}">
+        <div class="letras">${esc(s.titulo.slice(0,8))}</div>
+        <span class="dur">${s.dur ? fmtDur(s.dur) : ""}</span>
+        ${(barra>0.005||visto) ? `<div class="barra"><i style="width:${visto?100:(barra*100).toFixed(1)}%"></i></div>` : ""}
+      </div>
+      <div><div class="st">${esc(s.titulo)}${s.serie ? " — " + esc(s.serie) : ""}</div>
+      <div class="sm">${esc(s.col)}${s.anio ? " · " + s.anio : ""}${visto ? " · ✓ Visto" : ""}</div></div>`;
+    el.onclick = ()=>{ location.hash = "#/v/" + encodeURIComponent(s.id); };
+    observador.observe(el.querySelector(".miniatura"));
+    z.appendChild(el);
+  }
+}
+
+/* ---------- Subtítulos ---------- */
+function quitarPistas(){
+  for (const p of pistasCC){ if (p.url) URL.revokeObjectURL(p.url); if (p.el) p.el.remove(); }
+  pistasCC = []; ccElegido = -1;
+  pintarCC();
+}
+function decodificarTexto(buf){
+  try{ return new TextDecoder("utf-8", {fatal:true}).decode(buf); }
+  catch(e){ return new TextDecoder("windows-1252").decode(buf); }
+}
+function srtAVtt(texto){
+  texto = texto.replace(/^﻿/,"").replace(/\r/g,"");
+  const bloques = texto.split(/\n{2,}/).map(b=>{
+    const lineas = b.split("\n").filter(l=>l.trim()!=="");
+    if (!lineas.length) return "";
+    if (/^\d+$/.test(lineas[0].trim())) lineas.shift();
+    if (!lineas.length || !lineas[0].includes("-->")) return "";
+    lineas[0] = lineas[0]
+      .replace(/(\d{1,2}:\d{2}:\d{2}),(\d{1,3})/g, "$1.$2")
+      .replace(/(^|\s)(\d{1,2}:\d{2}),(\d{1,3})/g, "$1$2.$3");
+    return lineas.join("\n");
+  }).filter(Boolean);
+  return "WEBVTT\n\n" + bloques.join("\n\n");
+}
+async function montarSubtitulos(v){
+  quitarPistas();
+  for (const s of v.subs){
+    try{
+      const r = await fetch(urlMedia(s.c, s.r));
+      if (!r.ok) continue;
+      const texto = decodificarTexto(await r.arrayBuffer());
+      const vtt = /\.vtt$/i.test(s.r) ? texto : srtAVtt(texto);
+      const url = URL.createObjectURL(new Blob([vtt], {type:"text/vtt"}));
+      const el = document.createElement("track");
+      el.kind = "subtitles"; el.label = s.etiqueta; el.srclang = s.lang; el.src = url;
+      vid.appendChild(el);
+      pistasCC.push({etiqueta:s.etiqueta, lang:s.lang, el, url});
+    }catch(e){}
+  }
+  // Arranca con el idioma que elegiste la última vez
+  if (ajustes.subs){
+    const i = pistasCC.findIndex(p=>p.lang===ajustes.subs);
+    if (i >= 0) elegirCC(i, true);
+  }
+  pintarCC();
+}
+function elegirCC(i, silencioso){
+  ccElegido = i;
+  [...vid.textTracks].forEach((t,k)=> t.mode = (k===i ? "showing" : "disabled"));
+  if (!silencioso){
+    ajustes.subs = i >= 0 ? pistasCC[i].lang : "";
+    guardarAjustes();
+  }
+  pintarCC();
+}
+function pintarCC(){
+  $("#bCC").classList.toggle("ccActivo", ccElegido >= 0);
+  $("#bCC").style.opacity = pistasCC.length ? 1 : .35;
+}
+function menuCCAbrir(){
+  const m = $("#menuCC");
+  if (!pistasCC.length){ toast("Este vídeo no trae subtítulos aparte"); return; }
+  m.innerHTML = "<h4>Subtítulos</h4>";
+  const nada = document.createElement("button");
+  nada.textContent = "Desactivados";
+  nada.className = ccElegido<0 ? "elegido" : "";
+  nada.onclick = ()=>{ elegirCC(-1); cerrarMenus(); };
+  m.appendChild(nada);
+  pistasCC.forEach((p,i)=>{
+    const b = document.createElement("button");
+    b.textContent = p.etiqueta;
+    b.className = i===ccElegido ? "elegido" : "";
+    b.onclick = ()=>{ elegirCC(i); cerrarMenus(); };
+    m.appendChild(b);
+  });
+  m.classList.remove("oculto");
+}
+function menuVelocidadAbrir(){
+  const m = $("#menuVelocidad");
+  m.innerHTML = "<h4>Velocidad</h4>";
+  for (const x of [0.25,0.5,0.75,1,1.25,1.5,1.75,2]){
+    const b = document.createElement("button");
+    b.textContent = x===1 ? "Normal" : x+"×";
+    b.className = x===velocidad ? "elegido" : "";
+    b.onclick = ()=>{ velocidad = x; vid.playbackRate = x; $("#bVelocidad").textContent = x===1?"1×":x+"×"; cerrarMenus(); };
+    m.appendChild(b);
+  }
+  m.classList.remove("oculto");
+}
+function cerrarMenus(){ $("#menuCC").classList.add("oculto"); $("#menuVelocidad").classList.add("oculto"); }
+
+/* ---------- Controles ---------- */
+function pintarPlay(){
+  const pausado = vid.paused;
+  const dPlay = "M8 5v14l11-7z", dPausa = "M6 19h4V5H6v14zm8-14v14h4V5h-4z";
+  $("#icoPlay").firstElementChild.setAttribute("d", pausado ? dPlay : dPausa);
+  $("#icoPlayCentro").firstElementChild.setAttribute("d", pausado ? dPlay : dPausa);
+}
+function alternarPlay(){ if (vid.paused) vid.play().catch(()=>{}); else vid.pause(); }
+function mostrarControles(){
+  controles.classList.remove("escondidos");
+  clearTimeout(ocultarTimer);
+  if (!vid.paused) ocultarTimer = setTimeout(()=>{ if (!arrastrando){ controles.classList.add("escondidos"); cerrarMenus(); } }, 3000);
+}
+vid.onplay = ()=>{ pintarPlay(); mostrarControles(); };
+vid.onpause = ()=>{ pintarPlay(); mostrarControles(); if (actual && vid.duration) anotarProgreso(actual, vid.currentTime, vid.duration); };
+vid.ontimeupdate = ()=>{
+  if (!vid.duration) return;
+  $("#tAhora").textContent = fmtDur(vid.currentTime);
+  if (!arrastrando){
+    $("#cProg").style.width = (vid.currentTime/vid.duration*100) + "%";
+    $("#cBola").style.left = (vid.currentTime/vid.duration*100) + "%";
+  }
+  // ¿Imagen sin sonido? El códec de audio (AC3/DTS) no está en el navegador
+  if (!avisoAudioHecho && vid.currentTime > 4 && !vid.paused && !vid.muted &&
+      typeof vid.webkitAudioDecodedByteCount === "number" && vid.webkitAudioDecodedByteCount === 0){
+    avisoAudioHecho = true;
+    toast("Se ve pero no se oye: el audio de este archivo (AC3/DTS) no lo trae el navegador. Está en la hoja de ruta.", true);
+  }
+};
+vid.onprogress = ()=>{
+  try{
+    if (vid.buffered.length && vid.duration)
+      $("#cBuf").style.width = (vid.buffered.end(vid.buffered.length-1)/vid.duration*100) + "%";
+  }catch(e){}
+};
+vid.onended = ()=>{
+  if (actual) { anotarProgreso(actual, vid.duration, vid.duration); }
+  pintarPlay();
+  if (ajustes.autoplay && listaReproduccion.length) capaSiguiente();
+  else capaVolverAVer();
+};
+vid.onerror = ()=>{
+  if (!actual || !vid.currentSrc) return;
+  const ext = actual.nombre.split(".").pop().toLowerCase();
+  let porque = "El navegador no puede leer este archivo.";
+  if (ext === "avi" || ext === "wmv" || ext === "mpg" || ext === "mpeg")
+    porque = "Los ." + ext.toUpperCase() + " usan códecs antiguos que ningún navegador trae. La solución (convertirlo con ffmpeg) está en la hoja de ruta.";
+  else if (actual.hevc)
+    porque = "Este vídeo es HEVC (x265) y este aparato no tiene decodificador por hardware. En otro dispositivo puede ir bien; la conversión automática está en la hoja de ruta.";
+  capaError(porque);
+};
+
+$("#bPlay").onclick = alternarPlay;
+$("#bPlayCentro").onclick = alternarPlay;
+$("#bGiraIzq").onclick = ()=> saltar(-10);
+$("#bGiraDer").onclick = ()=> saltar(10);
+$("#bAtras").onclick = ()=> history.length > 1 ? history.back() : (location.hash = "");
+$("#bCC").onclick = e=>{ e.stopPropagation(); const ya = !$("#menuCC").classList.contains("oculto"); cerrarMenus(); if (!ya) menuCCAbrir(); };
+$("#bVelocidad").onclick = e=>{ e.stopPropagation(); const ya = !$("#menuVelocidad").classList.contains("oculto"); cerrarMenus(); if (!ya) menuVelocidadAbrir(); };
+$("#bPip").onclick = ()=> alternarPip();
+$("#bPantalla").onclick = alternarPantalla;
+$("#bSilencio").onclick = ()=>{ vid.muted = !vid.muted; };
+$("#vol").oninput = ()=>{ vid.volume = +$("#vol").value; vid.muted = false; };
+vid.onvolumechange = ()=>{
+  ajustes.vol = vid.volume; ajustes.silencio = vid.muted; guardarAjustes();
+  const d = vid.muted || vid.volume===0
+    ? "M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51C20.63 14.91 21 13.5 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3 3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4 9.91 6.09 12 8.18V4z"
+    : "M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z";
+  $("#icoVol").firstElementChild.setAttribute("d", d);
+  $("#vol").value = vid.muted ? 0 : vid.volume;
+};
+function saltar(seg){
+  if (!vid.duration) return;
+  vid.currentTime = Math.max(0, Math.min(vid.duration, vid.currentTime + seg));
+  mostrarControles();
+}
+function alternarPip(){
+  if (document.pictureInPictureElement) document.exitPictureInPicture().catch(()=>{});
+  else vid.requestPictureInPicture().catch(()=> toast("Este navegador no permite la ventana flotante", true));
+}
+function alternarPantalla(){
+  const caja = $("#lienzo");
+  if (document.fullscreenElement){ document.exitFullscreen().catch(()=>{}); }
+  else {
+    (caja.requestFullscreen ? caja.requestFullscreen() : Promise.reject()).then(()=>{
+      if (esTactil && screen.orientation && screen.orientation.lock) screen.orientation.lock("landscape").catch(()=>{});
+    }).catch(()=>{});
+  }
+}
+document.onfullscreenchange = ()=>{
+  const fs = !!document.fullscreenElement;
+  $("#lienzo").classList.toggle("pantallaCompleta", fs);
+  $("#icoPantalla").firstElementChild.setAttribute("d", fs
+    ? "M5 16h3v3h2v-5H5v2zm3-8H5v2h5V5H8v3zm6 11h2v-3h3v-2h-5v5zm2-11V5h-2v5h5V8h-3z"
+    : "M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z");
+  if (!fs && screen.orientation && screen.orientation.unlock) try{ screen.orientation.unlock(); }catch(e){}
+};
+
+/* Barra de progreso: clic y arrastre, con globo de tiempo */
+const zonaBarra = $("#zonaBarra");
+function posBarra(ev){
+  const r = zonaBarra.getBoundingClientRect();
+  const x = (ev.touches ? ev.touches[0].clientX : ev.clientX) - r.left;
+  return Math.max(0, Math.min(1, x / r.width));
+}
+zonaBarra.onpointerdown = ev=>{
+  if (!vid.duration) return;
+  arrastrando = true;
+  zonaBarra.classList.add("arrastrando");
+  zonaBarra.setPointerCapture(ev.pointerId);
+  moverBarra(ev);
+};
+zonaBarra.onpointermove = ev=>{ if (arrastrando) moverBarra(ev); };
+zonaBarra.onpointerup = ev=>{
+  if (!arrastrando) return;
+  arrastrando = false;
+  zonaBarra.classList.remove("arrastrando");
+  vid.currentTime = posBarra(ev) * vid.duration;
+  mostrarControles();
+};
+function moverBarra(ev){
+  const f = posBarra(ev);
+  $("#cProg").style.width = (f*100)+"%";
+  $("#cBola").style.left = (f*100)+"%";
+  $("#cGlobo").style.left = (f*100)+"%";
+  $("#cGlobo").textContent = fmtDur(f * vid.duration);
+}
+
+/* Toques sobre el vídeo: mostrar/ocultar, doble toque ±10 s */
+let toqueTimer = 0, ultimoToque = 0, acumulado = 0, ultimoLado = "";
+$("#lienzo").addEventListener("pointerdown", ev=>{
+  if (ev.target.closest("button,.cAbajo,.menuFlotante,.capaAviso,#chipReanudar,input")) return;
+  const ahora = Date.now();
+  const r = $("#lienzo").getBoundingClientRect();
+  const lado = (ev.clientX - r.left) < r.width/2 ? "izq" : "der";
+  if (ahora - ultimoToque < 320 && lado === ultimoLado){
+    clearTimeout(toqueTimer);
+    acumulado += 10;
+    const onda = lado==="izq" ? $("#ondaIzq") : $("#ondaDer");
+    onda.querySelector("span").textContent = acumulado + " s";
+    onda.classList.remove("activa"); void onda.offsetWidth; onda.classList.add("activa");
+    saltar(lado==="izq" ? -10 : 10);
+    ultimoToque = ahora;
+    return;
+  }
+  ultimoToque = ahora; ultimoLado = lado; acumulado = 10;
+  clearTimeout(toqueTimer);
+  toqueTimer = setTimeout(()=>{
+    if (!$("#menuCC").classList.contains("oculto") || !$("#menuVelocidad").classList.contains("oculto")){ cerrarMenus(); return; }
+    if (esTactil){
+      if (controles.classList.contains("escondidos")) mostrarControles();
+      else { controles.classList.add("escondidos"); }
+    } else alternarPlay();
+  }, 330);
+});
+$("#lienzo").addEventListener("mousemove", ()=>{ if (!esTactil) mostrarControles(); });
+$("#lienzo").addEventListener("dblclick", ev=>{
+  if (esTactil || ev.target.closest("button,.cAbajo")) return;
+  alternarPantalla();
+});
+
+/* Capas de fin de vídeo */
+function capaSiguiente(){
+  const s = listaReproduccion[0];
+  if (!s) return capaVolverAVer();
+  const capa = $("#capaAviso");
+  capa.innerHTML = `
+    <p>A continuación</p>
+    <h3>${esc(s.titulo)}${s.serie ? " — " + esc(s.serie) : ""}</h3>
+    <div class="anillo" id="anilloSig" title="Reproducir ya">
+      <svg class="aro" viewBox="0 0 64 64"><circle class="fondoAro" cx="32" cy="32" r="30"/><circle class="frenteAro" id="aroFrente" cx="32" cy="32" r="30"/></svg>
+      <svg class="icoPlay" viewBox="0 0 24 24" fill="#fff"><path d="M8 5v14l11-7z"/></svg>
+    </div>
+    <button class="botonGris" id="bCancelaSig">Cancelar</button>`;
+  capa.classList.remove("oculto");
+  let quedan = 5;
+  const aro = $("#aroFrente");
+  aro.style.strokeDashoffset = 189;
+  const reloj = setInterval(()=>{
+    quedan -= .1;
+    aro.style.strokeDashoffset = Math.max(0, 189 * quedan/5);
+    if (quedan <= 0){ clearInterval(reloj); ir(); }
+  }, 100);
+  const ir = ()=>{ clearInterval(reloj); capa.classList.add("oculto"); location.hash = "#/v/" + encodeURIComponent(s.id); };
+  $("#anilloSig").onclick = ir;
+  $("#bCancelaSig").onclick = ()=>{ clearInterval(reloj); capaVolverAVer(); };
+}
+function capaVolverAVer(){
+  const capa = $("#capaAviso");
+  capa.innerHTML = `
+    <div class="anillo" id="bOtraVez" title="Volver a ver">
+      <svg class="icoPlay" viewBox="0 0 24 24" fill="#fff"><path d="M12 5V1L7 6l5 5V7c3.31 0 6 2.69 6 6s-2.69 6-6 6-6-2.69-6-6H4c0 4.42 3.58 8 8 8s8-3.58 8-8-3.58-8-8-8z"/></svg>
+    </div>
+    <p>Volver a ver</p>`;
+  capa.classList.remove("oculto");
+  $("#bOtraVez").onclick = ()=>{ capa.classList.add("oculto"); vid.currentTime = 0; vid.play().catch(()=>{}); };
+}
+function capaError(texto){
+  const capa = $("#capaAviso");
+  capa.innerHTML = `
+    <div class="emoji" style="font-size:40px">🎞️</div>
+    <h3>Este formato se resiste</h3>
+    <p>${esc(texto)}</p>
+    <a class="botonGris" href="${actual ? urlMedia(actual.c, actual.r) : "#"}" download>⬇ Descargar el archivo y verlo con VLC</a>`;
+  capa.classList.remove("oculto");
+}
+
+/* Media Session: controles en la pantalla de bloqueo */
+function montarMediaSession(v){
+  if (!("mediaSession" in navigator)) return;
+  const arte = [];
+  miniLeer(v.id).then(m=>{
+    if (m && m.img) arte.push({src:m.img, sizes:"400x225", type:"image/jpeg"});
+    navigator.mediaSession.metadata = new MediaMetadata({ title:v.titulo, artist:"OndaVideo · " + v.col, artwork:arte });
+  });
+  navigator.mediaSession.setActionHandler("play", ()=> vid.play());
+  navigator.mediaSession.setActionHandler("pause", ()=> vid.pause());
+  navigator.mediaSession.setActionHandler("seekbackward", ()=> saltar(-10));
+  navigator.mediaSession.setActionHandler("seekforward", ()=> saltar(10));
+  navigator.mediaSession.setActionHandler("seekto", d=>{ if (d.seekTime != null) vid.currentTime = d.seekTime; });
+  navigator.mediaSession.setActionHandler("nexttrack", listaReproduccion.length ? ()=>{ location.hash = "#/v/" + encodeURIComponent(listaReproduccion[0].id); } : null);
+}
+
+/* Teclado */
+document.addEventListener("keydown", e=>{
+  if (e.target.matches("input,textarea")) return;
+  if (!actual){
+    if (e.key === "/"){ e.preventDefault(); $("#buscador").focus(); }
+    return;
+  }
+  const k = e.key.toLowerCase();
+  if (k === " " || k === "k"){ e.preventDefault(); alternarPlay(); }
+  else if (e.key === "ArrowLeft") saltar(-5);
+  else if (e.key === "ArrowRight") saltar(5);
+  else if (k === "j") saltar(-10);
+  else if (k === "l") saltar(10);
+  else if (e.key === "ArrowUp"){ e.preventDefault(); vid.volume = Math.min(1, vid.volume + .05); vid.muted = false; }
+  else if (e.key === "ArrowDown"){ e.preventDefault(); vid.volume = Math.max(0, vid.volume - .05); }
+  else if (k === "f") alternarPantalla();
+  else if (k === "m") vid.muted = !vid.muted;
+  else if (k === "i") alternarPip();
+  else if (k === "c"){ if (ccElegido >= 0) elegirCC(-1); else if (pistasCC.length) elegirCC(0); }
+  else if (k === "<" || k === ","){ cambiarVelocidad(-1); }
+  else if (k === ">" || k === "."){ cambiarVelocidad(1); }
+  else if (/^[0-9]$/.test(k) && vid.duration){ vid.currentTime = vid.duration * (+k)/10; }
+  else if (e.key === "Escape" && !document.fullscreenElement){ history.back(); }
+  if (["arrowleft","arrowright","j","l"," ","k"].includes(k)) mostrarControles();
+});
+function cambiarVelocidad(dir){
+  const lista = [0.25,0.5,0.75,1,1.25,1.5,1.75,2];
+  const i = Math.max(0, Math.min(lista.length-1, lista.indexOf(velocidad) + dir));
+  velocidad = lista[i]; vid.playbackRate = velocidad;
+  $("#bVelocidad").textContent = velocidad===1 ? "1×" : velocidad+"×";
+  toast("Velocidad: " + (velocidad===1?"normal":velocidad+"×"));
+}
+
+/* Guardar el progreso también al salir o cambiar de pestaña */
+document.addEventListener("visibilitychange", ()=>{
+  if (document.hidden && actual && vid.duration){
+    anotarProgreso(actual, vid.currentTime, vid.duration);
+    clearTimeout(progresoTimer);
+    try{ localStorage.setItem("ondavideo.progreso", JSON.stringify(progreso)); }catch(e){}
+  }
+});
+
+/* ---------- Ajustes ---------- */
+$("#bAjustes").onclick = abrirAjustes;
+$("#fondoOscuro").onclick = cerrarAjustes;
+function abrirAjustes(){
+  const p = $("#panelAjustes");
+  const nVideos = videos.length;
+  const total = videos.reduce((a,v)=>a+v.t, 0);
+  const carpetas = (indice && indice.carpetas || []).map(c=>c.nombre).join(", ");
+  p.innerHTML = `
+    <h2>⚙ Ajustes <button class="bIcono" id="bCerrarAjustes"><svg viewBox="0 0 24 24" width="20" height="20"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg></button></h2>
+    <section>
+      <h3>Servidor de casa</h3>
+      <div class="campoServidor">
+        <input id="ajDir" placeholder="192.168.1.50:8080" value="${esc(ajustes.servidor||"")}">
+        <button class="botonAzul" id="ajConectar">Conectar</button>
+      </div>
+      <div id="estadoServidor">${base
+        ? `✅ Conectado a <b>${esc(base)}</b><br><b>${nVideos}</b> vídeos · ${fmtTam(total)} · Carpetas: ${esc(carpetas||"—")}`
+        : "❌ Sin conexión ahora mismo"}</div>
+      <div class="linea"><button class="botonGris" id="ajRefrescar">🔄 Buscar vídeos nuevos</button>
+      <span class="mut">relee las carpetas del PC</span></div>
+    </section>
+    <section>
+      <h3>Reproducción</h3>
+      <div class="linea">Autoplay: pasar al siguiente al terminar <span class="interruptor ${ajustes.autoplay?"si":""}" id="ajAutoplay"></span></div>
+    </section>
+    <section>
+      <h3>Datos guardados en este aparato</h3>
+      <div class="linea"><button class="botonGris" id="ajMinis">🧹 Regenerar miniaturas</button></div>
+      <div class="linea"><button class="botonGris" id="ajHistorial">Borrar historial y posiciones</button></div>
+      <div class="linea mut">El historial de "continuar viendo" vive en cada aparato, no en el servidor.</div>
+    </section>
+    <section>
+      <h3>Acerca de</h3>
+      <div class="linea mut">OndaVideo v1 — hermano de OndaAmp. Tus vídeos nunca salen de tu red.</div>
+    </section>`;
+  p.classList.remove("oculto");
+  $("#fondoOscuro").classList.remove("oculto");
+  $("#bCerrarAjustes").onclick = cerrarAjustes;
+  $("#ajConectar").onclick = async ()=>{
+    ajustes.servidor = normalizarBase($("#ajDir").value); guardarAjustes();
+    $("#ajConectar").textContent = "…";
+    await conectar(true);
+    cerrarAjustes(); abrirAjustes();
+  };
+  $("#ajRefrescar").onclick = async ()=>{
+    $("#ajRefrescar").textContent = "🔄 Buscando…";
+    await cargarIndice(true);
+    toast(`Biblioteca al día: ${videos.length} vídeos`);
+    cerrarAjustes();
+  };
+  $("#ajAutoplay").onclick = ()=>{
+    ajustes.autoplay = !ajustes.autoplay; guardarAjustes();
+    $("#ajAutoplay").classList.toggle("si", ajustes.autoplay);
+  };
+  $("#ajMinis").onclick = async ()=>{
+    await miniBorrarTodo();
+    videos.forEach(v=>{ v._miniPedida = false; });
+    toast("Miniaturas borradas: se irán regenerando");
+    cerrarAjustes(); renderInicio();
+  };
+  $("#ajHistorial").onclick = ()=>{
+    if (!confirm("¿Borrar el historial de reproducción de este aparato?")) return;
+    for (const k in progreso) delete progreso[k];
+    guardarProgresoDisco();
+    toast("Historial borrado");
+    cerrarAjustes(); renderInicio();
+  };
+}
+function cerrarAjustes(){ $("#panelAjustes").classList.add("oculto"); $("#fondoOscuro").classList.add("oculto"); }
+
+/* ---------- Rutas ---------- */
+function renderRuta(){
+  const h = location.hash;
+  if (h.startsWith("#/v/")){
+    if (!videos.length) return;          // aún sin índice: se reintenta al cargar
+    abrirVideo(decodeURIComponent(h.slice(4)));
+  } else {
+    cerrarVideo();
+  }
+}
+addEventListener("hashchange", renderRuta);
+
+/* ---------- Arranque ---------- */
+(async function(){
+  await abrirBD();
+  $("#inicio").innerHTML = `<div class="pantalla"><div class="emoji">🎬</div><p>Buscando el servidor de casa…</p></div>`;
+  await conectar(false);
+  if ("serviceWorker" in navigator && location.protocol === "https:"){
+    navigator.serviceWorker.register("sw.js").catch(()=>{});
+  }
+})();
+</script>
+</body>
+</html>

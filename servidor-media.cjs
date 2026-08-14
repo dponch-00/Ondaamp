@@ -1,6 +1,6 @@
-/* Servidor de casa para OndaAmp.
+/* Servidor de casa para OndaAmp y OndaVideo.
    Publica en tu red local las carpetas que elijas —música y vídeo— y, de paso,
-   la propia app. Sin dependencias: solo Node.
+   las propias apps: la música en / y el cine en /video/. Sin dependencias: solo Node.
 
      Doble clic en "INICIAR SERVIDOR.bat"   (o: node servidor-media.cjs)
 
@@ -14,6 +14,8 @@
      el camino que funciona hoy en cualquier navegador.
    · La música y el vídeo  →  /api/indice y /media/<id-carpeta>/<ruta>, con
      CORS abierto por si se usa la app instalada desde https.
+   · OndaVideo  →  /video/ sirve la pantalla de cine. Su HTML canónico vive en
+     la carpeta madre (Documents\AudioPlayer\OndaVideo.html).
    · El panel  →  SOLO responde al propio PC (localhost). Desde el móvil se ve
      la biblioteca, no el panel; nadie en la WiFi puede añadir carpetas.
 
@@ -28,9 +30,10 @@ const PUERTO = Number(process.env.PORT || 8080);
 const APP    = __dirname;
 const CONFIG_RUTA = path.join(APP, "servidor-config.json");
 const AUDIO  = /\.(flac|mp3|wav|ogg|oga|opus|m4a|aac|weba|webm|wma)$/i;
-/* El esqueleto de OndaVideo: los vídeos se indexan desde ya, aunque la app de
-   música los ignore. Cuando exista la pantalla de vídeo, el servidor no cambia. */
+/* Aquella promesa se cumplió: OndaVideo ya existe y vive en /video/. Los
+   subtítulos sueltos también viajan en el índice para que el cine los ofrezca. */
 const VIDEO  = /\.(mp4|m4v|mkv|mov|avi|wmv|mpg|mpeg|ts)$/i;
+const SUBS   = /\.(srt|vtt)$/i;
 
 /* El panel puede tocar la configuración, así que sus órdenes llevan un token
    que solo conoce la página servida en localhost. Sin él, cualquier web
@@ -50,6 +53,7 @@ const TIPOS = {
   ".mp4":"video/mp4", ".m4v":"video/mp4", ".mkv":"video/x-matroska",
   ".mov":"video/quicktime", ".avi":"video/x-msvideo", ".wmv":"video/x-ms-wmv",
   ".mpg":"video/mpeg", ".mpeg":"video/mpeg", ".ts":"video/mp2t",
+  ".srt":"application/x-subrip", ".vtt":"text/vtt; charset=utf-8",
 };
 const tipoDe = p => TIPOS[path.extname(p).toLowerCase()] || "application/octet-stream";
 
@@ -127,7 +131,7 @@ function cargarConfig(){
    con el id de su carpeta: la URL es /media/<id>/<ruta-dentro-de-la-carpeta>. */
 let indice = null;
 
-function recorrer(dir, base, audio, video, prof){
+function recorrer(dir, base, audio, video, subs, prof){
   if (prof > 12) return;                       // freno ante enlaces circulares
   let entradas;
   try{ entradas = fs.readdirSync(dir, {withFileTypes:true}); }catch(e){ return; }
@@ -135,28 +139,33 @@ function recorrer(dir, base, audio, video, prof){
     if (e.name.startsWith(".") || e.name.startsWith("$") || e.name === "__MACOSX") continue;
     const abs = path.join(dir, e.name);
     const rel = base ? base + "/" + e.name : e.name;
-    if (e.isDirectory()){ recorrer(abs, rel, audio, video, prof+1); continue; }
-    const esAudio = AUDIO.test(e.name), esVideo = !esAudio && VIDEO.test(e.name);
-    if (!esAudio && !esVideo) continue;
-    let t = 0;
-    try{ t = fs.statSync(abs).size; }catch(e2){ continue; }
-    (esAudio ? audio : video).push({ r: rel, t });
+    if (e.isDirectory()){ recorrer(abs, rel, audio, video, subs, prof+1); continue; }
+    const esAudio = AUDIO.test(e.name), esVideo = !esAudio && VIDEO.test(e.name),
+          esSub   = !esAudio && !esVideo && SUBS.test(e.name);
+    if (!esAudio && !esVideo && !esSub) continue;
+    let st;
+    try{ st = fs.statSync(abs); }catch(e2){ continue; }
+    if (esAudio) audio.push({ r: rel, t: st.size });
+    /* La fecha viaja con cada vídeo: OndaVideo ordena por "añadido hace poco" */
+    else if (esVideo) video.push({ r: rel, t: st.size, m: Math.round(st.mtimeMs) });
+    else subs.push({ r: rel });
   }
 }
 function construirIndice(){
-  const pistas = [], videos = [];
+  const pistas = [], videos = [], subtitulos = [];
   for (const c of config.carpetas){
-    const a = [], v = [];
-    recorrer(c.ruta, "", a, v, 0);
+    const a = [], v = [], s = [];
+    recorrer(c.ruta, "", a, v, s, 0);
     const orden = (x,y) => x.r.localeCompare(y.r, "es", {numeric:true});
-    a.sort(orden); v.sort(orden);
+    a.sort(orden); v.sort(orden); s.sort(orden);
     a.forEach(p => pistas.push({ c: c.id, r: p.r, t: p.t }));
-    v.forEach(p => videos.push({ c: c.id, r: p.r, t: p.t }));
+    v.forEach(p => videos.push({ c: c.id, r: p.r, t: p.t, m: p.m }));
+    s.forEach(p => subtitulos.push({ c: c.id, r: p.r }));
   }
   indice = {
     generado: Date.now(),
     carpetas: config.carpetas.map(c => ({ id: c.id, nombre: c.nombre })),
-    pistas, videos,
+    pistas, videos, subs: subtitulos,
   };
   return indice;
 }
@@ -176,7 +185,7 @@ function conteos(){
 function dentroDe(raiz, rel){
   const abs = path.join(raiz, rel);
   if (abs !== raiz && !abs.startsWith(raiz + path.sep)) return {prohibido:true};
-  if (!AUDIO.test(abs) && !VIDEO.test(abs)) return {noExiste:true};
+  if (!AUDIO.test(abs) && !VIDEO.test(abs) && !SUBS.test(abs)) return {noExiste:true};
   return {abs};
 }
 function resolverMedia(rutaUrl){
@@ -295,6 +304,7 @@ function paginaPanel(){
    ${svgQR(destino, 240)}
    <div class="dir">${destino}</div>
    <p class="mut">Apunta con la cámara normal del móvil.<br>Tenéis que estar en la misma WiFi.</p>
+   <p class="mut">La música vive ahí mismo; el cine, en<br><span class="dir" style="font-size:13px">${destino}/video/</span></p>
   </section>
   <section class="tarjeta" style="flex:1 1 400px">
    <h2>Carpetas compartidas</h2>
@@ -415,6 +425,31 @@ http.createServer((req,res)=>{
     return;
   }
 
+  /* — OndaVideo: la pantalla de cine, por el mismo puerto — */
+  if (ruta === "/video"){
+    res.writeHead(302, {Location: "/video/"});
+    res.end();
+    return;
+  }
+  if (ruta === "/video/" || ruta === "/video/index.html"){
+    /* El HTML canónico vive en la carpeta madre; video/index.html es la copia
+       que se sube a GitHub Pages. Se sirve la que exista, con preferencia local. */
+    const candidatos = [path.join(APP, "..", "OndaVideo.html"),
+                        path.join(APP, "video", "index.html")];
+    const html = candidatos.find(p => { try{ return fs.existsSync(p); }catch(e){ return false; } });
+    if (!html){
+      res.writeHead(404, {"Content-Type": TIPOS[".txt"]});
+      res.end("Falta OndaVideo.html en Documents\\AudioPlayer (o pwa\\video\\index.html).");
+      return;
+    }
+    fs.readFile(html, (err, datos)=>{
+      if (err){ res.writeHead(404).end("No pude leer OndaVideo.html"); return; }
+      res.writeHead(200, {"Content-Type": TIPOS[".html"], "Cache-Control":"no-cache"});
+      res.end(req.method === "HEAD" ? undefined : datos);
+    });
+    return;
+  }
+
   /* — Panel y su API: solo el propio PC, sin CORS — */
   if (ruta === "/panel" || ruta === "/carpetas" || ruta === "/qr"){
     if (!esLocal(req)){
@@ -490,9 +525,12 @@ http.createServer((req,res)=>{
   Object.values(os.networkInterfaces()).forEach(l=> (l||[]).forEach(i=>{
     if (i.family === "IPv4" && !i.internal) ips.push(i.address);
   }));
-  console.log(`\n  OndaAmp servido en:`);
+  console.log(`\n  OndaAmp (la música):`);
   console.log(`    En este PC:      http://localhost:${PUERTO}   (panel: /panel)`);
   ips.forEach(ip=> console.log(`    En tu teléfono:  http://${ip}:${PUERTO}   (misma WiFi)`));
+  console.log(`\n  OndaVideo (el cine):`);
+  console.log(`    En este PC:      http://localhost:${PUERTO}/video/`);
+  ips.forEach(ip=> console.log(`    En tu teléfono:  http://${ip}:${PUERTO}/video/   (misma WiFi)`));
 
   if (ips.length){
     const destino = `http://${ips[0]}:${PUERTO}`;
