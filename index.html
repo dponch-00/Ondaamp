@@ -6510,7 +6510,7 @@ if ("mediaSession" in navigator){
    Una app instalada vive en el teléfono, así que las novedades no llegan solas.
    Se compara la versión incrustada con la publicada en version.json (que el
    service worker nunca cachea) y, si difieren, se ofrece actualizar. */
-const APP_VERSION = "2.13";
+const APP_VERSION = "2.14";
 let verRemotaDatos = null;
 
 async function buscarActualizacion(silencioso){
@@ -7265,7 +7265,7 @@ async function conectarServidor(base, silencioso){
     return false;
   }
   if (!datos || !Array.isArray(datos.pistas) || !datos.pistas.length){
-    if (!silencioso) toast("El servidor respondió, pero no encontró música", true);
+    if (!silencioso) toast("El servidor respondió, pero no comparte música todavía. Añádela en el panel del PC.", true);
     return false;
   }
   servidorBase = base;
@@ -7280,21 +7280,28 @@ async function conectarServidor(base, silencioso){
   }
   state.cur = -1;
 
+  // Con varias carpetas compartidas, cada pista viaja con el id de la suya y
+  // la URL es /media/<id>/<ruta>. Un índice viejo sin id sigue funcionando.
+  const nombreCarpeta = new Map((datos.carpetas || []).map(x => [String(x.id), x.nombre]));
   for (const p of datos.pistas){
     const partes = p.r.split("/");
     const nombre = partes[partes.length-1];
-    const carpeta = partes.slice(0,-1).join("/");
+    const sub = partes.slice(0,-1).join("/");
     const raiz = partes[0] || "";
+    const rutaMedia = (p.c !== undefined ? p.c + "/" : "") + encodeURI(p.r);
+    const url = base + "/media/" + rutaMedia;
+    const casa = p.c !== undefined ? (nombreCarpeta.get(String(p.c)) || "") : "";
     state.list.push({
       id: nextId++, remoto: true,
-      file: new ArchivoRemoto(base + "/media/" + encodeURI(p.r), p.t, nombre),
-      url: base + "/media/" + encodeURI(p.r),
+      file: new ArchivoRemoto(url, p.t, nombre),
+      url,
       name: nombre,
       title: tituloDeArchivo(nombre),
       artist: artistaDeCarpeta(raiz), albumArtist: "",
       album: albumDeCarpeta(partes.length > 2 ? partes[partes.length-2] : raiz),
       year:"", track: pistaDeArchivo(nombre), disc:0,
-      folder: carpeta, dur:0, sr:0, bits:0, picUrl:"", bad:false, metaReady:false,
+      folder: casa ? (sub ? casa + "/" + sub : casa) : sub,
+      dur:0, sr:0, bits:0, picUrl:"", bad:false, metaReady:false,
       relPath: p.r, rootIdx:-1, pendiente:false, pic:null, artKey:"", opfsName:"",
       tam: p.t,
     });

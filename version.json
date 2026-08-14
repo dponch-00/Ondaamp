@@ -1,4 +1,5 @@
 {
-  "version": "2.13",
-  "fecha": "2026-08-06"
+  "version": "2.14",
+  "fecha": "2026-08-13",
+  "notas": "El servidor de casa estrena panel: al arrancarlo se abre una página donde eliges con clics qué carpetas compartir, con el QR del móvil al lado. Cada carpeta muestra cuántas pistas y vídeos tiene — los vídeos quedan listos para el futuro OndaVideo."
 }

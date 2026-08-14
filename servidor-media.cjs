@@ -1,29 +1,41 @@
 /* Servidor de casa para OndaAmp.
-   Publica en tu red local la carpeta donde guardas la música y, de paso, la
-   propia app. Sin dependencias: solo Node.
+   Publica en tu red local las carpetas que elijas —música y vídeo— y, de paso,
+   la propia app. Sin dependencias: solo Node.
 
-     node servidor-media.cjs
-     node servidor-media.cjs "D:\\Otra carpeta"     (o la variable MUSICA)
+     Doble clic en "INICIAR SERVIDOR.bat"   (o: node servidor-media.cjs)
 
-   Sirve dos cosas por el mismo puerto, y eso es deliberado:
+   Al arrancar abre el PANEL (http://localhost:8080/panel): ahí se eligen con
+   clics las carpetas compartidas y está el código QR para conectar el móvil.
+
+   Sirve todo por el mismo puerto, y eso es deliberado:
 
    · La app  →  abriendo http://<ip-del-pc>:8080 en el móvil, la página y la
      música comparten origen. Sin contenido mixto, sin CORS, sin permisos: es
      el camino que funciona hoy en cualquier navegador.
-   · La música  →  /api/indice y /media/..., con cabeceras CORS abiertas por si
-     prefieres usar la app instalada desde https y tu Chrome permite el acceso
-     a la red local.
+   · La música y el vídeo  →  /api/indice y /media/<id-carpeta>/<ruta>, con
+     CORS abierto por si se usa la app instalada desde https.
+   · El panel  →  SOLO responde al propio PC (localhost). Desde el móvil se ve
+     la biblioteca, no el panel; nadie en la WiFi puede añadir carpetas.
 
    No sale de tu red: escucha en la LAN y solo lee. Nada se sube a ningún sitio. */
-const http = require("http");
-const fs   = require("fs");
-const path = require("path");
-const os   = require("os");
+const http   = require("http");
+const fs     = require("fs");
+const path   = require("path");
+const os     = require("os");
+const crypto = require("crypto");
 
-const PUERTO  = Number(process.env.PORT || 8080);
-const APP     = __dirname;
-const MUSICA  = path.resolve(process.argv[2] || process.env.MUSICA || "F:\\Flac Music");
-const AUDIO   = /\.(flac|mp3|wav|ogg|oga|opus|m4a|aac|weba|webm|wma)$/i;
+const PUERTO = Number(process.env.PORT || 8080);
+const APP    = __dirname;
+const CONFIG_RUTA = path.join(APP, "servidor-config.json");
+const AUDIO  = /\.(flac|mp3|wav|ogg|oga|opus|m4a|aac|weba|webm|wma)$/i;
+/* El esqueleto de OndaVideo: los vídeos se indexan desde ya, aunque la app de
+   música los ignore. Cuando exista la pantalla de vídeo, el servidor no cambia. */
+const VIDEO  = /\.(mp4|m4v|mkv|mov|avi|wmv|mpg|mpeg|ts)$/i;
+
+/* El panel puede tocar la configuración, así que sus órdenes llevan un token
+   que solo conoce la página servida en localhost. Sin él, cualquier web
+   abierta en el navegador del PC podría añadir o quitar carpetas a ciegas. */
+const TOKEN = crypto.randomBytes(16).toString("hex");
 
 const TIPOS = {
   ".html":"text/html; charset=utf-8", ".js":"text/javascript; charset=utf-8",
@@ -35,63 +47,155 @@ const TIPOS = {
   ".ogg":"audio/ogg", ".oga":"audio/ogg", ".opus":"audio/ogg",
   ".m4a":"audio/mp4", ".aac":"audio/aac", ".weba":"audio/webm",
   ".webm":"audio/webm", ".wma":"audio/x-ms-wma",
+  ".mp4":"video/mp4", ".m4v":"video/mp4", ".mkv":"video/x-matroska",
+  ".mov":"video/quicktime", ".avi":"video/x-msvideo", ".wmv":"video/x-ms-wmv",
+  ".mpg":"video/mpeg", ".mpeg":"video/mpeg", ".ts":"video/mp2t",
 };
 const tipoDe = p => TIPOS[path.extname(p).toLowerCase()] || "application/octet-stream";
 
-/* Sin esto el audio que llega de otro origen entra "manchado" y
-   createMediaElementSource devuelve silencio: se oiría nada con el EQ puesto. */
 function cors(res){
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Headers", "Range, Content-Type");
   res.setHeader("Access-Control-Expose-Headers", "Content-Length, Content-Range, Accept-Ranges");
   res.setHeader("Access-Control-Allow-Private-Network", "true");
 }
+function esLocal(req){
+  const a = req.socket.remoteAddress || "";
+  return a === "127.0.0.1" || a === "::1" || a === "::ffff:127.0.0.1";
+}
+function json(res, codigo, datos){
+  res.writeHead(codigo, {"Content-Type":TIPOS[".json"], "Cache-Control":"no-cache"});
+  res.end(JSON.stringify(datos));
+}
+
+/* ---------- Configuración: qué carpetas se comparten ---------- */
+let config = null;   // { proximoId, carpetas: [{id, nombre, ruta}] }
+
+const igualRuta = (a,b) => path.resolve(a).toLowerCase() === path.resolve(b).toLowerCase();
+function nombreDeRuta(ruta){
+  const base = path.basename(ruta) || (/^[A-Za-z]:/.test(ruta) ? ruta.slice(0,2) : "Carpeta");
+  let n = base, i = 2;
+  while (config.carpetas.some(c => c.nombre === n)) n = `${base} (${i++})`;
+  return n;
+}
+function guardarConfig(){
+  try{ fs.writeFileSync(CONFIG_RUTA, JSON.stringify(config, null, 2)); }catch(e){}
+}
+function agregarCarpeta(rutaCruda){
+  // Una ruta vacía se resolvería a la carpeta del propio servidor: fuera
+  if (!rutaCruda || !String(rutaCruda).trim()) return {error:"Falta la ruta"};
+  let ruta;
+  try{ ruta = path.resolve(String(rutaCruda).trim()); }catch(e){ return {error:"Ruta no válida"}; }
+  let st; try{ st = fs.statSync(ruta); }catch(e){ return {error:"No existe esa carpeta"}; }
+  if (!st.isDirectory()) return {error:"Eso no es una carpeta"};
+  if (config.carpetas.some(c => igualRuta(c.ruta, ruta))) return {error:"Esa carpeta ya está compartida"};
+  const c = { id: config.proximoId++, nombre: nombreDeRuta(ruta), ruta };
+  config.carpetas.push(c);
+  guardarConfig();
+  construirIndice();
+  return {ok:true, carpeta:c};
+}
+function quitarCarpeta(id){
+  const i = config.carpetas.findIndex(c => c.id === id);
+  if (i < 0) return {error:"No encuentro esa carpeta"};
+  config.carpetas.splice(i,1);
+  guardarConfig();
+  construirIndice();
+  return {ok:true};
+}
+function cargarConfig(){
+  try{ config = JSON.parse(fs.readFileSync(CONFIG_RUTA, "utf8")); }catch(e){ config = null; }
+  if (!config || !Array.isArray(config.carpetas) || !Number.isInteger(config.proximoId)){
+    config = { proximoId: 1, carpetas: [] };
+  }
+  // La carpeta pasada como argumento (o la clásica de siempre) entra sola
+  const extra = process.argv[2] || process.env.MUSICA || (config.carpetas.length ? null : "F:\\Flac Music");
+  if (extra){
+    try{
+      const ruta = path.resolve(extra);
+      if (fs.existsSync(ruta) && !config.carpetas.some(c => igualRuta(c.ruta, ruta))){
+        config.carpetas.push({ id: config.proximoId++, nombre: nombreDeRuta(ruta), ruta });
+        guardarConfig();
+      }
+    }catch(e){}
+  }
+}
 
 /* ---------- Índice ----------
    Se recorre una vez y se guarda en memoria: una biblioteca de miles de FLAC
-   tarda en recorrerse y no cambia entre canción y canción. /api/indice?refrescar=1
-   la vuelve a leer. */
-let indice = null, indiceCuando = 0;
+   tarda en recorrerse y no cambia entre canción y canción. Cada pista viaja
+   con el id de su carpeta: la URL es /media/<id>/<ruta-dentro-de-la-carpeta>. */
+let indice = null;
 
-function recorrer(dir, base, salida, prof){
+function recorrer(dir, base, audio, video, prof){
   if (prof > 12) return;                       // freno ante enlaces circulares
   let entradas;
   try{ entradas = fs.readdirSync(dir, {withFileTypes:true}); }catch(e){ return; }
   for (const e of entradas){
-    if (e.name.startsWith(".") || e.name === "__MACOSX") continue;
+    if (e.name.startsWith(".") || e.name.startsWith("$") || e.name === "__MACOSX") continue;
     const abs = path.join(dir, e.name);
     const rel = base ? base + "/" + e.name : e.name;
-    if (e.isDirectory()){ recorrer(abs, rel, salida, prof+1); continue; }
-    if (!AUDIO.test(e.name)) continue;
+    if (e.isDirectory()){ recorrer(abs, rel, audio, video, prof+1); continue; }
+    const esAudio = AUDIO.test(e.name), esVideo = !esAudio && VIDEO.test(e.name);
+    if (!esAudio && !esVideo) continue;
     let t = 0;
-    try{ t = fs.statSync(abs).size; }catch(e){ continue; }
-    salida.push({ r: rel, t });
+    try{ t = fs.statSync(abs).size; }catch(e2){ continue; }
+    (esAudio ? audio : video).push({ r: rel, t });
   }
 }
 function construirIndice(){
-  const pistas = [];
-  recorrer(MUSICA, "", pistas, 0);
-  pistas.sort((a,b)=> a.r.localeCompare(b.r, "es", {numeric:true}));
-  indice = { raiz: path.basename(MUSICA), generado: Date.now(), pistas };
-  indiceCuando = Date.now();
+  const pistas = [], videos = [];
+  for (const c of config.carpetas){
+    const a = [], v = [];
+    recorrer(c.ruta, "", a, v, 0);
+    const orden = (x,y) => x.r.localeCompare(y.r, "es", {numeric:true});
+    a.sort(orden); v.sort(orden);
+    a.forEach(p => pistas.push({ c: c.id, r: p.r, t: p.t }));
+    v.forEach(p => videos.push({ c: c.id, r: p.r, t: p.t }));
+  }
+  indice = {
+    generado: Date.now(),
+    carpetas: config.carpetas.map(c => ({ id: c.id, nombre: c.nombre })),
+    pistas, videos,
+  };
   return indice;
 }
-
-/* Traduce una ruta de la URL a un archivo real dentro de la carpeta de música,
-   rechazando cualquier intento de salirse de ella con "..".
-   Se distingue el intento de escaparse (403, que sí es un "no puedes") de
-   pedir algo que no es una pista (404, que es un "aquí no hay nada"). */
-function resolverMedia(rutaUrl){
-  const limpia = path.normalize(rutaUrl).replace(/^([/\\])+/, "");
-  const abs = path.join(MUSICA, limpia);
-  if (abs !== MUSICA && !abs.startsWith(MUSICA + path.sep)) return {prohibido:true};
-  if (!AUDIO.test(abs)) return {noExiste:true};
-  return {abs};
+function conteos(){
+  const por = {};
+  config.carpetas.forEach(c => por[c.id] = { pistas: 0, videos: 0 });
+  if (indice){
+    indice.pistas.forEach(p => { if (por[p.c]) por[p.c].pistas++; });
+    indice.videos.forEach(p => { if (por[p.c]) por[p.c].videos++; });
+  }
+  return por;
 }
 
-/* Envío con soporte de rangos. Es lo que permite arrastrar la barra de
-   progreso: sin esto el navegador tendría que descargar el FLAC entero antes
-   de poder saltar a la mitad. */
+/* Traduce /media/<id>/<ruta> a un archivo real dentro de SU carpeta, sin dejar
+   escapar un ".." . Una URL vieja sin id (la app instalada de antes) se busca
+   en todas las carpetas: así nada se rompe al actualizar el servidor. */
+function dentroDe(raiz, rel){
+  const abs = path.join(raiz, rel);
+  if (abs !== raiz && !abs.startsWith(raiz + path.sep)) return {prohibido:true};
+  if (!AUDIO.test(abs) && !VIDEO.test(abs)) return {noExiste:true};
+  return {abs};
+}
+function resolverMedia(rutaUrl){
+  const limpia = path.normalize(rutaUrl).replace(/^([/\\])+/, "");
+  const seg = limpia.split(path.sep);
+  const id = parseInt(seg[0], 10);
+  const carpeta = config.carpetas.find(c => c.id === id);
+  if (carpeta && String(id) === seg[0]) return dentroDe(carpeta.ruta, seg.slice(1).join(path.sep));
+  let vioProhibido = false;
+  for (const c of config.carpetas){
+    const r = dentroDe(c.ruta, limpia);
+    if (r.prohibido){ vioProhibido = true; continue; }
+    if (r.abs && fs.existsSync(r.abs)) return r;
+  }
+  return vioProhibido ? {prohibido:true} : {noExiste:true};
+}
+
+/* Envío con soporte de rangos: es lo que permite arrastrar la barra sin
+   descargar el archivo entero. Vale igual para un FLAC que para un MP4. */
 function enviarArchivo(req, res, abs){
   let st;
   try{ st = fs.statSync(abs); }catch(e){ res.writeHead(404).end("No encontrado"); return; }
@@ -103,7 +207,7 @@ function enviarArchivo(req, res, abs){
   if (m){
     let ini = m[1] === "" ? null : parseInt(m[1], 10);
     let fin = m[2] === "" ? null : parseInt(m[2], 10);
-    if (ini === null){                       // "bytes=-500": los últimos 500
+    if (ini === null){
       const n = fin === null ? 0 : fin;
       ini = Math.max(0, total - n); fin = total - 1;
     } else if (fin === null || fin >= total) fin = total - 1;
@@ -130,93 +234,266 @@ function enviarArchivo(req, res, abs){
   fs.createReadStream(abs).on("error",()=>res.end()).pipe(res);
 }
 
+/* ---------- El panel ---------- */
+function ipLocal(){
+  const i = Object.values(os.networkInterfaces()).flat()
+    .find(x => x && x.family === "IPv4" && !x.internal);
+  return i ? i.address : null;
+}
+function svgQR(destino, lado){
+  try{
+    const m = require("./_qr.cjs").generar(destino);
+    const L = m.length, q = 4, T = L + q*2;
+    let celdas = "";
+    for (let y=0;y<L;y++) for (let x=0;x<L;x++)
+      if (m[y][x]) celdas += `<rect x="${x+q}" y="${y+q}" width="1" height="1"/>`;
+    return `<svg viewBox="0 0 ${T} ${T}" width="${lado}" height="${lado}" shape-rendering="crispEdges"
+             xmlns="http://www.w3.org/2000/svg"><rect width="${T}" height="${T}" fill="#fff"/>
+             <g fill="#000">${celdas}</g></svg>`;
+  }catch(e){ return `<p>No pude dibujar el código: ${e.message}</p>`; }
+}
+function paginaPanel(){
+  const destino = `http://${ipLocal() || "localhost"}:${PUERTO}`;
+  return `<!doctype html><html lang="es"><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>OndaAmp · Servidor de casa</title>
+<style>
+ body{margin:0;background:#0f1216;color:#e6edf5;font:15px/1.5 system-ui,"Segoe UI",sans-serif}
+ main{max-width:980px;margin:0 auto;padding:26px 18px;display:grid;gap:20px}
+ h1{font-size:20px;margin:0}
+ h2{font-size:12.5px;letter-spacing:.14em;color:#8fa0b3;margin:0 0 12px;text-transform:uppercase}
+ .mut{color:#8fa0b3;font-size:13px}
+ .fila{display:flex;gap:20px;flex-wrap:wrap;align-items:flex-start}
+ .tarjeta{background:#171c23;border:1px solid #2a3340;border-radius:14px;padding:18px}
+ .qr{display:grid;justify-items:center;gap:10px;text-align:center}
+ .dir{font:600 15px Consolas,monospace;color:#38e08c}
+ ul{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+ li{display:flex;gap:12px;align-items:center;background:#1d242e;border:1px solid #2a3340;border-radius:10px;padding:10px 12px}
+ li b{font-size:14px}
+ .ruta{color:#8fa0b3;font-size:12px;word-break:break-all}
+ .datos{margin-left:auto;white-space:nowrap;color:#8fa0b3;font-size:12.5px}
+ button{cursor:pointer;border:1px solid #2a3340;background:#1d242e;color:#e6edf5;border-radius:9px;padding:8px 12px;font:600 13px system-ui}
+ button:hover{border-color:#38e08c}
+ button:disabled{opacity:.4;cursor:default}
+ .peligro:hover{border-color:#ff6b6b;color:#ff6b6b}
+ .primario{background:#123524;border-color:#1f7a4f;color:#9dffb0}
+ #explorador{margin-top:12px;border-top:1px solid #2a3340;padding-top:12px;display:grid;gap:10px}
+ #miga{font:600 13px Consolas,monospace;color:#9dffb0;word-break:break-all}
+ #subcarpetas{max-height:300px;overflow:auto}
+ #subcarpetas li{cursor:pointer}
+ #subcarpetas li:hover{border-color:#38e08c}
+</style>
+<main>
+ <header>
+  <h1>🏠 OndaAmp · Servidor de casa</h1>
+  <p class="mut">Deja abierta la ventana negra del servidor. Este panel solo existe
+  en este PC: el móvil ve la música, nunca el panel.</p>
+ </header>
+ <div class="fila">
+  <section class="tarjeta qr" style="flex:0 1 300px">
+   <h2>Conectar el móvil</h2>
+   ${svgQR(destino, 240)}
+   <div class="dir">${destino}</div>
+   <p class="mut">Apunta con la cámara normal del móvil.<br>Tenéis que estar en la misma WiFi.</p>
+  </section>
+  <section class="tarjeta" style="flex:1 1 400px">
+   <h2>Carpetas compartidas</h2>
+   <ul id="lista"></ul>
+   <p class="mut" id="vacio" hidden>Todavía no compartes ninguna carpeta.</p>
+   <p style="margin:12px 0 0"><button class="primario" id="bAbrir">＋ Compartir otra carpeta</button></p>
+   <div id="explorador" hidden>
+     <div id="miga"></div>
+     <ul id="subcarpetas"></ul>
+     <div style="display:flex;gap:8px;flex-wrap:wrap">
+       <button id="bSubir">⬆ Subir</button>
+       <button class="primario" id="bCompartir">✓ Compartir esta carpeta</button>
+       <button id="bCerrarExp">Cancelar</button>
+     </div>
+   </div>
+  </section>
+ </div>
+</main>
+<script>
+const TOKEN=${JSON.stringify(TOKEN)};
+const $=id=>document.getElementById(id);
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+async function j(u){
+  const r=await fetch(u,{cache:"no-store"});
+  const d=await r.json().catch(()=>({}));
+  if(!r.ok||d.error) throw new Error(d.error||("HTTP "+r.status));
+  return d;
+}
+async function pintar(){
+  const d=await j("/api/carpetas");
+  const ul=$("lista"); ul.innerHTML="";
+  $("vacio").hidden=!!d.carpetas.length;
+  for(const c of d.carpetas){
+    const li=document.createElement("li");
+    li.innerHTML='<div><b>📁 '+esc(c.nombre)+'</b><div class="ruta">'+esc(c.ruta)+'</div></div>'
+      +'<span class="datos">'+c.pistas+' pistas · '+c.videos+' vídeos</span>'
+      +'<button class="peligro">Quitar</button>';
+    li.querySelector("button").onclick=async()=>{
+      if(!confirm("¿Dejar de compartir «"+c.nombre+"»?\\nNo se borra nada del disco.")) return;
+      try{ await j("/api/carpetas/quitar?token="+TOKEN+"&id="+c.id); }catch(e){ alert(e.message); }
+      pintar();
+    };
+    ul.appendChild(li);
+  }
+}
+let rutaActual=null, rutaPadre=null;
+async function explorar(ruta){
+  let d;
+  try{ d=await j("/api/explorar"+(ruta?("?ruta="+encodeURIComponent(ruta)):"")); }
+  catch(e){ alert(e.message); return; }
+  rutaActual=d.ruta||null; rutaPadre=d.padre||null;
+  $("explorador").hidden=false;
+  $("miga").textContent=rutaActual||"Elige un disco:";
+  $("bCompartir").disabled=!rutaActual;
+  $("bSubir").disabled=!rutaActual;
+  const ul=$("subcarpetas"); ul.innerHTML="";
+  for(const s of d.carpetas){
+    const li=document.createElement("li");
+    li.textContent="📁 "+s.nombre;
+    li.onclick=()=>explorar(s.ruta);
+    ul.appendChild(li);
+  }
+  if(!d.carpetas.length){
+    const li=document.createElement("li");
+    li.textContent="(sin subcarpetas)"; li.style.cursor="default"; li.className="mut";
+    ul.appendChild(li);
+  }
+}
+$("bAbrir").onclick=()=>explorar(null);
+$("bSubir").onclick=()=>explorar(rutaPadre);       // sin padre → lista de discos
+$("bCerrarExp").onclick=()=>{ $("explorador").hidden=true; };
+$("bCompartir").onclick=async()=>{
+  try{ await j("/api/carpetas/agregar?token="+TOKEN+"&ruta="+encodeURIComponent(rutaActual)); }
+  catch(e){ alert(e.message); return; }
+  $("explorador").hidden=true;
+  pintar();
+};
+pintar().catch(e=>alert(e.message));
+</script>`;
+}
+function unidades(){
+  const out = [];
+  for (let i=65;i<=90;i++){
+    const d = String.fromCharCode(i) + ":\\";
+    try{ if (fs.existsSync(d)) out.push({ nombre: d, ruta: d }); }catch(e){}
+  }
+  return out;
+}
+
+/* ---------- El servidor ---------- */
 http.createServer((req,res)=>{
-  cors(res);
-  if (req.method === "OPTIONS"){ res.writeHead(204).end(); return; }
+  if (req.method === "OPTIONS"){ cors(res); res.writeHead(204).end(); return; }
   if (req.method !== "GET" && req.method !== "HEAD"){ res.writeHead(405).end(); return; }
 
   const url = new URL(req.url, "http://localhost");
   const ruta = decodeURIComponent(url.pathname);
 
+  /* — API pública, con CORS: es lo que usa la app — */
   if (ruta === "/api/indice"){
+    cors(res);
     if (!indice || url.searchParams.get("refrescar")) construirIndice();
-    const cuerpo = JSON.stringify(indice);
-    res.writeHead(200, {"Content-Type":TIPOS[".json"], "Cache-Control":"no-cache"});
-    res.end(req.method === "HEAD" ? undefined : cuerpo);
-    return;
-  }
-  /* Página con el código a pantalla completa. Los bloques del QR de la
-     terminal dependen de la fuente y la codificación de la consola; esto se ve
-     nítido siempre. Se abre en el PC y se escanea desde el móvil. */
-  if (ruta === "/qr"){
-    const ip = (Object.values(os.networkInterfaces()).flat()
-                 .find(i=> i && i.family === "IPv4" && !i.internal) || {}).address;
-    const destino = `http://${ip || "localhost"}:${PUERTO}`;
-    let svg = "";
-    try{
-      const m = require("./_qr.cjs").generar(destino);
-      const L = m.length, q = 4, T = L + q*2;
-      let celdas = "";
-      for (let y=0;y<L;y++) for (let x=0;x<L;x++)
-        if (m[y][x]) celdas += `<rect x="${x+q}" y="${y+q}" width="1" height="1"/>`;
-      svg = `<svg viewBox="0 0 ${T} ${T}" width="320" height="320" shape-rendering="crispEdges"
-              xmlns="http://www.w3.org/2000/svg"><rect width="${T}" height="${T}" fill="#fff"/>
-              <g fill="#000">${celdas}</g></svg>`;
-    }catch(e){ svg = `<p>No pude dibujar el código: ${e.message}</p>`; }
-    res.writeHead(200, {"Content-Type":TIPOS[".html"], "Cache-Control":"no-cache"});
-    res.end(`<!doctype html><meta charset="utf-8"><title>OndaAmp · conectar el móvil</title>
-      <body style="margin:0;min-height:100vh;display:grid;place-items:center;gap:18px;
-                   background:#0f1216;color:#e6edf5;font:16px system-ui,sans-serif;text-align:center">
-      <div><h1 style="font-size:19px;font-weight:600;margin-bottom:14px">Apunta la cámara del móvil</h1>
-      ${svg}
-      <p style="margin-top:14px;font:15px Consolas,monospace;color:#38e08c">${destino}</p>
-      <p style="margin-top:6px;font-size:13px;color:#8fa0b3;max-width:34ch">
-        Tenéis que estar en la misma WiFi. Si no conecta, falta la regla del
-        cortafuegos que indica la terminal.</p></div></body>`);
+    json(res, 200, indice);
     return;
   }
   if (ruta === "/api/salud"){
-    res.writeHead(200, {"Content-Type":TIPOS[".json"]});
-    res.end(JSON.stringify({ok:true, app:"OndaAmp", raiz:path.basename(MUSICA),
-                            pistas: indice ? indice.pistas.length : null}));
+    cors(res);
+    json(res, 200, {ok:true, app:"OndaAmp", carpetas:config.carpetas.length,
+                    pistas: indice ? indice.pistas.length : null,
+                    videos: indice ? indice.videos.length : null});
     return;
   }
   if (ruta.startsWith("/media/")){
+    cors(res);
     const r = resolverMedia(ruta.slice(7));
     if (r.prohibido){ res.writeHead(403).end("Prohibido"); return; }
-    if (r.noExiste){ res.writeHead(404).end("No encontrado"); return; }
+    if (r.noExiste || !r.abs){ res.writeHead(404).end("No encontrado"); return; }
     enviarArchivo(req, res, r.abs);
     return;
   }
 
-  // Todo lo demás: los archivos de la propia app
+  /* — Panel y su API: solo el propio PC, sin CORS — */
+  if (ruta === "/panel" || ruta === "/carpetas" || ruta === "/qr"){
+    if (!esLocal(req)){
+      res.writeHead(403, {"Content-Type":TIPOS[".txt"]});
+      res.end("El panel solo se abre en el propio PC. En este dispositivo, abre la direccion sin /panel: veras la musica.");
+      return;
+    }
+    res.writeHead(200, {"Content-Type":TIPOS[".html"], "Cache-Control":"no-cache"});
+    res.end(req.method === "HEAD" ? undefined : paginaPanel());
+    return;
+  }
+  if (ruta === "/api/explorar" || ruta === "/api/carpetas" ||
+      ruta === "/api/carpetas/agregar" || ruta === "/api/carpetas/quitar"){
+    if (!esLocal(req)){ json(res, 403, {error:"Solo desde el propio PC"}); return; }
+
+    if (ruta === "/api/carpetas"){
+      if (!indice) construirIndice();
+      const n = conteos();
+      json(res, 200, {carpetas: config.carpetas.map(c =>
+        ({id:c.id, nombre:c.nombre, ruta:c.ruta,
+          pistas:n[c.id].pistas, videos:n[c.id].videos}))});
+      return;
+    }
+    if (ruta === "/api/explorar"){
+      const pedida = url.searchParams.get("ruta");
+      if (!pedida){ json(res, 200, {ruta:null, padre:null, carpetas:unidades()}); return; }
+      let abs;
+      try{ abs = path.resolve(pedida); }catch(e){ json(res, 400, {error:"Ruta no válida"}); return; }
+      let entradas;
+      try{ entradas = fs.readdirSync(abs, {withFileTypes:true}); }
+      catch(e){ json(res, 400, {error:"No puedo abrir esa carpeta"}); return; }
+      const sub = entradas
+        .filter(e => e.isDirectory() && !e.name.startsWith(".") && !e.name.startsWith("$")
+                     && e.name.toLowerCase() !== "system volume information")
+        .map(e => ({nombre:e.name, ruta:path.join(abs, e.name)}))
+        .sort((a,b)=> a.nombre.localeCompare(b.nombre, "es", {numeric:true}));
+      const esRaiz = path.parse(abs).root === abs;
+      json(res, 200, {ruta:abs, padre: esRaiz ? null : path.dirname(abs), carpetas:sub});
+      return;
+    }
+    // Las dos órdenes que cambian cosas exigen además el token del panel
+    if (url.searchParams.get("token") !== TOKEN){ json(res, 403, {error:"Petición no autorizada"}); return; }
+    if (ruta === "/api/carpetas/agregar"){
+      const r = agregarCarpeta(url.searchParams.get("ruta") || "");
+      json(res, r.error ? 400 : 200, r);
+      return;
+    }
+    const r = quitarCarpeta(parseInt(url.searchParams.get("id"), 10));
+    json(res, r.error ? 400 : 200, r);
+    return;
+  }
+
+  /* — Todo lo demás: los archivos de la propia app — */
   const rel = ruta === "/" ? "index.html" : path.normalize(ruta).replace(/^([/\\])+/, "");
   const abs = path.join(APP, rel);
   if (abs !== APP && !abs.startsWith(APP + path.sep)){ res.writeHead(403).end("Prohibido"); return; }
   fs.readFile(abs, (err, datos)=>{
-    if (err){ res.writeHead(404, {"Content-Type":"text/plain; charset=utf-8"}).end("No encontrado"); return; }
+    if (err){ res.writeHead(404, {"Content-Type":TIPOS[".txt"]}).end("No encontrado"); return; }
     res.writeHead(200, {"Content-Type": tipoDe(abs), "Cache-Control":"no-cache"});
     res.end(req.method === "HEAD" ? undefined : datos);
   });
 }).listen(PUERTO, ()=>{
-  if (!fs.existsSync(MUSICA)){
-    console.log(`\n  AVISO: no encuentro la carpeta de música:\n    ${MUSICA}`);
-    console.log(`  Pásala como argumento:  node servidor-media.cjs "D:\\Mi musica"\n`);
-  } else {
-    const t0 = Date.now();
-    construirIndice();
-    console.log(`\n  Biblioteca: ${MUSICA}`);
-    console.log(`  ${indice.pistas.length} pistas indexadas en ${Date.now()-t0} ms`);
-  }
+  cargarConfig();
+  const t0 = Date.now();
+  construirIndice();
+  const n = conteos();
+  console.log(`\n  Carpetas compartidas (${Date.now()-t0} ms de índice):`);
+  if (!config.carpetas.length) console.log(`    (ninguna todavía: añádelas en el panel)`);
+  config.carpetas.forEach(c =>
+    console.log(`    📁 ${c.nombre}  ·  ${n[c.id].pistas} pistas · ${n[c.id].videos} vídeos`));
+
   const ips = [];
   Object.values(os.networkInterfaces()).forEach(l=> (l||[]).forEach(i=>{
     if (i.family === "IPv4" && !i.internal) ips.push(i.address);
   }));
   console.log(`\n  OndaAmp servido en:`);
-  console.log(`    En este PC:      http://localhost:${PUERTO}`);
+  console.log(`    En este PC:      http://localhost:${PUERTO}   (panel: /panel)`);
   ips.forEach(ip=> console.log(`    En tu teléfono:  http://${ip}:${PUERTO}   (misma WiFi)`));
 
-  // Para no teclear nada en el móvil: se apunta la cámara y listo
   if (ips.length){
     const destino = `http://${ips[0]}:${PUERTO}`;
     try{
@@ -228,18 +505,12 @@ http.createServer((req,res)=>{
       console.log(`\n  (no pude dibujar el código QR: ${e.message})`);
     }
   }
-  console.log(`\n  Copia la dirección tal cual: cada red usa un rango distinto.`);
-  // El fallo número uno al estrenar esto: responde en el PC pero no en el
-  // teléfono. Windows bloquea las conexiones entrantes mientras no exista una
-  // regla, y no avisa de nada; parece que el servidor no funciona.
+
   if (process.platform === "win32"){
     console.log(`\n  ── Cortafuegos ──────────────────────────────────────────`);
     console.log(`  La primera vez, Windows abre una ventana preguntando si`);
     console.log(`  permite el acceso a Node.js. Marca "Redes privadas" y pulsa`);
     console.log(`  PERMITIR ACCESO. Con eso queda hecho para siempre.`);
-    console.log(`\n  Ojo: esa ventana solo aparece si arrancas el servidor desde`);
-    console.log(`  una terminal visible. Si lo lanzas en segundo plano, Windows`);
-    console.log(`  bloquea en silencio y el móvil no conecta sin decir por qué.`);
     console.log(`\n  Si ya no aparece, créala a mano en PowerShell COMO`);
     console.log(`  ADMINISTRADOR (botón derecho en Inicio → Terminal (Admin)):`);
     console.log(`    New-NetFirewallRule -DisplayName "OndaAmp" -Direction Inbound \``);
@@ -248,8 +519,8 @@ http.createServer((req,res)=>{
   }
   console.log(`\n  Ctrl+C para detener. Deja esta ventana abierta.\n`);
 
-  // Se abre solo la página del QR: es lo primero que hace falta ver
+  // El panel es lo primero que hace falta ver: se abre solo
   if (process.platform === "win32" && !process.env.SIN_ABRIR){
-    require("child_process").exec(`start "" "http://localhost:${PUERTO}/qr"`, ()=>{});
+    require("child_process").exec(`start "" "http://localhost:${PUERTO}/panel"`, ()=>{});
   }
 });

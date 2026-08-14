@@ -9,3 +9,5 @@ node_modules/
 Thumbs.db
 desktop.ini
 .DS_Store
+# Configuracion local del servidor de casa (rutas de este PC)
+servidor-config.json

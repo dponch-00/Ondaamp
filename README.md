@@ -26,11 +26,14 @@ de esta carpeta:
 node servidor-media.cjs
 ```
 
-Lee `F:\Flac Music` por omisión; para otra carpeta, pásala como argumento
-(`node servidor-media.cjs "D:\Mi musica"`). Al arrancar te dice la dirección.
+Al arrancar abre su **panel** (`http://localhost:8080/panel`): ahí eliges con
+clics qué carpetas compartir, ves cuántas pistas y vídeos tiene cada una, y
+tienes el QR para el móvil. La lista se guarda en `servidor-config.json` (local
+de cada PC, fuera del repositorio). Los vídeos quedan indexados desde ya: son el
+esqueleto del futuro OndaVideo, aunque la app de música aún no los muestre. El
+panel solo responde al propio PC: desde el móvil se ve la biblioteca, no el panel.
 
-Al arrancar dibuja además un **código QR** con su dirección, y lo publica en
-`/qr` como página (más nítida que la de la terminal). Hay dos formas de usarlo:
+El QR del panel conecta el móvil de dos maneras:
 
 - **Desde la app instalada**: pulsa 🏠 y se abre el escáner. Apuntas al código
   del PC y se conecta sola. Necesita cámara, así que solo funciona en la app
