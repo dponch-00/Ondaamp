@@ -2600,6 +2600,231 @@ body{
 }
 .esc-nota.malo{color:#ff9b9b;}
 .esc-pie{display:flex; justify-content:center; padding-bottom:10px; background:rgba(0,0,0,.8);}
+
+/* Dentro de Skynet, el botón de casa ocupa siempre la esquina superior
+   izquierda. Fuera de la puerta conserva su lugar y función de escáner. */
+body.skynet-mode #bServidor.skynet-home{
+  position:fixed; z-index:85;
+  left:max(10px,env(safe-area-inset-left,0px));
+  top:max(10px,env(safe-area-inset-top,0px));
+  width:42px; height:42px; padding:0; margin:0;
+  display:flex; align-items:center; justify-content:center;
+  border-radius:12px; border:1px solid color-mix(in srgb,var(--acc) 34%,var(--line));
+  color:var(--txt); background:color-mix(in srgb,var(--panel) 90%,transparent);
+  box-shadow:0 8px 24px rgba(0,0,0,.35); backdrop-filter:blur(14px);
+}
+body.skynet-mode #bServidor.skynet-home:focus-visible{outline:3px solid var(--acc); outline-offset:3px;}
+body.skynet-mode #bRed{display:flex !important; white-space:nowrap;}
+@media (max-width:760px){
+  body.skynet-mode #plPanel > .section-head{padding-left:62px; min-height:54px;}
+}
+@media (min-width:761px){
+  body.skynet-mode #deckPanel .titlebar{padding-left:58px; min-height:54px;}
+}
+
+/* ================================================================
+   ONDAAMP MOVIL 2.0
+   Una composicion nueva solo para telefono. Conserva las variables de cada
+   skin, pero convierte la biblioteca, el minirreproductor y las hojas en una
+   interfaz tactil mas limpia. Escritorio no entra en este bloque.
+   ================================================================ */
+@media (max-width:760px){
+  html body{
+    background:
+      radial-gradient(120% 70% at 100% -10%,color-mix(in srgb,var(--acc) 14%,transparent),transparent 55%),
+      var(--bg);
+    color:var(--txt);
+  }
+  .app{background:transparent; isolation:isolate;}
+
+  /* Barra superior: marca al centro, casa y ajustes en los extremos. */
+  #plPanel > .section-head{
+    flex:0 0 66px; min-height:66px; padding:10px 62px !important;
+    justify-content:center; position:relative; top:auto;
+    background:color-mix(in srgb,var(--panel) 88%,transparent);
+    border-bottom:1px solid color-mix(in srgb,var(--line) 78%,transparent);
+    -webkit-backdrop-filter:blur(18px); backdrop-filter:blur(18px);
+  }
+  #plPanel > .section-head h2{
+    min-width:0; text-align:center; font-size:0; color:var(--txt);
+  }
+  #plPanel > .section-head h2::before{
+    content:"ONDAAMP"; display:block;
+    font-size:15px; line-height:1.1; letter-spacing:.22em; font-weight:750;
+  }
+  #plPanel > .section-head h2::after{
+    content:"TU MÚSICA"; display:block; margin-top:4px;
+    font-size:9px; line-height:1; letter-spacing:.18em; color:var(--mut); font-weight:600;
+  }
+  body.skynet-mode #bServidor.skynet-home{
+    top:max(12px,env(safe-area-inset-top,0px)); left:max(12px,env(safe-area-inset-left,0px));
+    width:42px; height:42px; border-radius:14px; box-shadow:none;
+    background:color-mix(in srgb,var(--panel2) 88%,transparent);
+  }
+  .pl-tools .solo-movil[data-abrir="ajustes"]{
+    display:flex; position:fixed; z-index:86;
+    top:max(12px,env(safe-area-inset-top,0px)); right:max(12px,env(safe-area-inset-right,0px));
+    width:42px; height:42px; padding:0; justify-content:center;
+    border-radius:14px; box-shadow:none;
+    background:color-mix(in srgb,var(--panel2) 88%,transparent);
+  }
+
+  /* Herramientas en cuatro franjas: buscar, fuentes, vistas y utilidades. */
+  .pl-tools{
+    flex:none; display:grid; grid-template-columns:repeat(6,minmax(0,1fr));
+    gap:8px; padding:12px 12px 10px;
+    background:color-mix(in srgb,var(--bg) 92%,var(--panel));
+    border-bottom:1px solid color-mix(in srgb,var(--line) 70%,transparent);
+  }
+  .pl-tools .find{
+    order:1; grid-column:1 / -1; width:100%; min-width:0; height:46px;
+    padding:0 15px; border-radius:14px; font-size:15px;
+    background:color-mix(in srgb,var(--panel2) 76%,var(--bg));
+  }
+  .pl-tools #bAddFiles,.pl-tools #bAddDir,.pl-tools #bRed{
+    order:2; min-width:0; min-height:44px; padding:7px 8px;
+    justify-content:center; border-radius:13px; font-size:12px;
+  }
+  .pl-tools #bAddFiles{grid-column:1 / 4;}
+  .pl-tools #bAddDir{grid-column:4 / 7;}
+  body.skynet-mode .pl-tools #bAddFiles{grid-column:1 / 3;}
+  body.skynet-mode .pl-tools #bAddDir{grid-column:3 / 5;}
+  body.skynet-mode .pl-tools #bRed{grid-column:5 / 7;}
+  .pl-tools #bAddFiles .hide-narrow,
+  .pl-tools #bAddDir .hide-narrow,
+  .pl-tools #bRed .hide-narrow{display:inline;}
+  .pl-tools .views{
+    order:3; grid-column:1 / -1; width:100%; display:grid;
+    grid-template-columns:repeat(4,minmax(0,1fr)); border-radius:13px;
+    background:color-mix(in srgb,var(--panel) 72%,var(--bg));
+  }
+  .pl-tools .views button{
+    min-width:0; height:42px; padding:0 3px; font-size:11px;
+    overflow:hidden; text-overflow:ellipsis;
+  }
+  .pl-tools #bFold,.pl-tools #bIrActual,.pl-tools #bClear{
+    order:4; min-height:42px; justify-content:center; border-radius:12px;
+  }
+  .pl-tools #bFold{grid-column:1 / 3;}
+  .pl-tools #bIrActual{grid-column:3 / 5;}
+  .pl-tools #bClear{grid-column:5 / 7;}
+  .pl-tools #bFold .lbl-fold{display:inline;}
+
+  /* Biblioteca: grupos como tarjetas y pistas con ritmo tactil. */
+  .pl-scroll{
+    background:transparent; padding:6px 8px calc(102px + env(safe-area-inset-bottom,0px));
+    overscroll-behavior:contain; scrollbar-width:none;
+  }
+  .pl-scroll::-webkit-scrollbar{display:none;}
+  .pl-list{display:flex; flex-direction:column; gap:2px;}
+  .grp{
+    top:0; z-index:3; margin:6px 0 2px; padding:10px 9px;
+    grid-template-columns:18px 44px minmax(0,1fr) auto;
+    gap:9px; min-height:64px; border:1px solid var(--line); border-radius:15px;
+    background:color-mix(in srgb,var(--panel2) 92%,var(--bg));
+    box-shadow:0 8px 24px rgba(0,0,0,.16);
+  }
+  .grp .gart{width:44px; height:44px; border-radius:11px;}
+  .grp .g1{font-size:14px; line-height:1.25;}
+  .grp .g2{margin-top:3px; font-size:11px;}
+  .grp .gbtns{opacity:1; grid-column:4; grid-row:1;}
+  .grp .gbtns button{width:40px; height:40px; border-radius:12px;}
+  .grp .gmeta{grid-column:3 / 5; grid-row:2; display:none;}
+  .pl-list li,.pl-list li.ingrp{
+    min-height:58px; margin:0; padding:8px 8px;
+    grid-template-columns:30px minmax(0,1fr) 38px;
+    gap:9px; border:0; border-radius:12px;
+  }
+  .pl-list li.ingrp{padding-left:12px;}
+  .pl-list li:active{background:color-mix(in srgb,var(--acc) 12%,transparent);}
+  .pl-list li.cur{background:color-mix(in srgb,var(--acc) 13%,transparent);}
+  .pl-list li .idx{font-size:11px; text-align:center;}
+  .pl-list li .t1{font-size:14px; line-height:1.3;}
+  .pl-list li .t2{margin-top:2px; font-size:11.5px;}
+  .pl-list li .t3{font-size:10px;}
+  .pl-list li .dur{display:none;}
+  .pl-list li .rm{width:38px; height:38px; padding:0; opacity:.35; font-size:15px;}
+  .pl-empty{padding:46px 24px; gap:10px; line-height:1.5;}
+  .pl-stats{padding:9px 14px; gap:10px; justify-content:center; border-top:0;}
+
+  /* Minirreproductor flotante: una tarjeta, no una segunda barra del sistema. */
+  #miniPlayer{
+    left:10px; right:10px; bottom:max(10px,env(safe-area-inset-bottom,0px));
+    border:1px solid color-mix(in srgb,var(--line) 86%,var(--acc)); border-radius:18px;
+    overflow:hidden; padding:0; box-shadow:0 16px 42px rgba(0,0,0,.52);
+    background:color-mix(in srgb,var(--panel) 90%,transparent);
+    -webkit-backdrop-filter:blur(22px) saturate(125%); backdrop-filter:blur(22px) saturate(125%);
+  }
+  .mini-prog{height:3px;}
+  .mini-cuerpo{min-height:70px; gap:12px; padding:9px 10px;}
+  .mini-art{width:50px; height:50px; border-radius:13px;}
+  .mini-t1{font-size:14px;}
+  .mini-t2{font-size:11.5px; margin-top:2px;}
+  .mini-btn{width:48px; height:48px; background:color-mix(in srgb,var(--acc) 15%,transparent);}
+  #toasts{bottom:96px;}
+  .toast{max-width:calc(100vw - 28px); border-radius:14px; padding:11px 14px;}
+
+  /* Reproduciendo: portada protagonista y controles ordenados por frecuencia. */
+  #deckPanel{
+    background:
+      radial-gradient(100% 50% at 50% 5%,color-mix(in srgb,var(--acc) 18%,transparent),transparent 70%),
+      var(--bg);
+  }
+  .sheet-cab{
+    min-height:64px; padding:10px 12px; background:transparent;
+    border-bottom-color:color-mix(in srgb,var(--line) 55%,transparent);
+  }
+  .sheet-cerrar,.sheet-extra{width:44px; height:44px; background:color-mix(in srgb,var(--panel) 60%,transparent);}
+  #deckPanel .deck-body{justify-content:flex-start; padding:18px 20px 28px; gap:18px;}
+  #deckPanel .display{gap:18px;}
+  #deckPanel .cover{
+    width:min(68vw,34vh,286px); height:min(68vw,34vh,286px);
+    border-radius:22px; box-shadow:0 24px 54px rgba(0,0,0,.5);
+  }
+  #deckPanel .lcd{gap:8px;}
+  #deckPanel .lcd-title{font-size:20px; line-height:1.3; text-wrap:balance;}
+  #deckPanel .lcd-row{gap:10px;}
+  #deckPanel .lcd-time{font-size:13px; letter-spacing:.06em;}
+  #deckPanel #lcdInfo{font-size:10px;}
+  #deckPanel #lcdState{font-size:10px;}
+  #deckPanel .grid-vis{padding:7px; border:1px solid var(--line); border-radius:14px; background:color-mix(in srgb,var(--panel) 65%,transparent);}
+  #deckPanel canvas#vis{height:42px;}
+  #deckPanel .seek-row{gap:8px;}
+  #deckPanel .seek-row .t{min-width:38px; font-size:11px;}
+  #deckPanel .tbtns{gap:10px;}
+  #deckPanel .tbtns .btn{width:56px; height:56px; border-radius:18px;}
+  #deckPanel .btn.play-main{width:68px; height:68px; border-radius:22px; box-shadow:0 10px 28px color-mix(in srgb,var(--acc) 25%,transparent);}
+  #deckPanel .mode-group{width:100%; display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:8px;}
+  #deckPanel .mode-group .btn,#deckPanel .enlace-sel{width:100%; min-width:0; height:44px;}
+  #deckPanel .vol-group{padding:10px 12px; border:1px solid var(--line); border-radius:14px; background:color-mix(in srgb,var(--panel) 55%,transparent);}
+
+  /* Ajustes: tarjetas separadas que siguen los colores del skin elegido. */
+  #sheetAjustes{background:var(--bg); padding-bottom:28px;}
+  #sheetAjustes > .sheet-cab{margin-bottom:4px;}
+  #sheetAjustes .panel{
+    margin:8px 12px 0; border:1px solid var(--line); border-radius:18px;
+    background:linear-gradient(160deg,var(--panel2),var(--panel));
+    box-shadow:0 10px 28px rgba(0,0,0,.16); overflow:hidden;
+  }
+  #sheetAjustes .section-head{min-height:52px; padding:13px 15px;}
+  #sheetAjustes .section-head h2{font-size:11px; letter-spacing:.15em;}
+  #sheetAjustes .eq-body,#sheetAjustes .fx-body,#sheetAjustes .am-body,#sheetAjustes .ap-body,#sheetAjustes .ver-body{padding:14px;}
+}
+@media (max-width:350px){
+  .pl-tools{padding-left:8px; padding-right:8px; gap:6px;}
+  .pl-tools #bAddFiles,.pl-tools #bAddDir,.pl-tools #bRed{font-size:11px; padding-left:4px; padding-right:4px;}
+  #deckPanel .deck-body{padding-left:14px; padding-right:14px;}
+  #deckPanel .tbtns{gap:6px;}
+  #deckPanel .tbtns .btn{width:52px; height:52px;}
+}
+@media (max-width:760px) and (max-height:620px){
+  #deckPanel .cover{width:min(45vw,27vh,170px); height:min(45vw,27vh,170px);}
+  #deckPanel .deck-body{gap:10px; padding-top:10px;}
+  #deckPanel .grid-vis{display:none;}
+}
+@media (max-width:760px) and (prefers-reduced-motion:reduce){
+  #deckPanel,#sheetAjustes{transition:none;}
+}
 </style>
 </head>
 <body data-skin="ondaamp">
@@ -2615,7 +2840,7 @@ body{
     </div>
     <div class="titlebar">
       <span class="dots"><i></i><i></i><i></i></span>
-      <b>ONDAAMP</b><span class="hide-narrow" style="opacity:.6">· reproductor local hi-fi</span>
+      <b>ONDAAMP</b><span class="hide-narrow" id="modoTitulo" style="opacity:.6">· reproductor local hi-fi</span>
       <span class="spacer"></span>
       <label class="skin-picker" title="Cambiar la apariencia del reproductor">
         <span>SKIN</span>
@@ -2926,6 +3151,7 @@ body{
       <div class="pl-tools">
         <button class="btn" id="bAddFiles">➕ <span class="hide-narrow">Archivos</span></button>
         <button class="btn" id="bAddDir">📁 <span class="hide-narrow">Carpeta</span></button>
+        <button class="btn" id="bRed" style="display:none" title="Volver a leer Flac Music desde la PC">↻ <span class="hide-narrow">Flac Music</span></button>
         <div class="views" id="views">
           <button data-v="lista" title="Lista simple, en orden">☰ Lista</button>
           <button data-v="album" title="Agrupar por álbum">💿 Álbum</button>
@@ -2950,9 +3176,9 @@ body{
       </div>
       <div class="pl-empty" id="plEmpty">
         <div class="big">🎵</div>
-        <div><b>Arrastra aquí tu música</b> (archivos, carpetas o un <b>.zip</b>)</div>
-        <div>o usa los botones <b>➕</b> / <b>📁</b> · MP3, FLAC, WAV, OGG, M4A, OPUS…</div>
-        <div style="font-size:11px;opacity:.8">¿Te compartieron un álbum por Drive? Descárgalo y suelta el <b>.zip</b> tal cual.</div>
+        <div id="plEmptyTitle"><b>Arrastra aquí tu música</b> (archivos, carpetas o un <b>.zip</b>)</div>
+        <div id="plEmptyHint">o usa los botones <b>➕</b> / <b>📁</b> · MP3, FLAC, WAV, OGG, M4A, OPUS…</div>
+        <div id="plEmptyNote" style="font-size:11px;opacity:.8">¿Te compartieron un álbum por Drive? Descárgalo y suelta el <b>.zip</b> tal cual.</div>
       </div>
       <div class="pl-stats" id="plStats" style="display:none"></div>
     </div>
@@ -2960,7 +3186,7 @@ body{
 
   <footer>
     <kbd>Espacio</kbd> reproducir/pausa · <kbd>←</kbd><kbd>→</kbd> saltar 5 s · <kbd>↑</kbd><kbd>↓</kbd> volumen · <kbd>N</kbd> siguiente · <kbd>P</kbd> anterior · <kbd>M</kbd> silencio<br>
-    OndaAmp v2.0 · procesamiento float32 · funciona 100 % local, tu música nunca sale de tu PC
+    <span id="footerMode">OndaAmp · procesamiento float32 · tu música nunca sale de tu PC</span>
   </footer>
 
   <!-- Mini-reproductor: solo en móvil, siempre visible sobre la biblioteca.
@@ -3013,6 +3239,8 @@ body{
 "use strict";
 /* ================= Estado ================= */
 const $ = id => document.getElementById(id);
+const EN_SKYNET = location.pathname.startsWith("/musica");
+const BIBLIOTECA_SKYNET = "Flac Music";
 const state = {
   list: [],           // pistas
   cur: -1,
@@ -5534,7 +5762,7 @@ function setDisplay(it){
     $("tCur").textContent = "0:00"; $("tTot").textContent = "0:00";
     $("seek").value = 0; paintRange($("seek"));
     cov.innerHTML = "♫";
-    document.title = "OndaAmp — Reproductor local Hi-Fi";
+    document.title = EN_SKYNET ? "OndaAmp — Música de la casa" : "OndaAmp — Reproductor local Hi-Fi";
     updatePlayUI();
     return;
   }
@@ -6319,6 +6547,7 @@ $("bDemo").addEventListener("click", ()=>{ demo ? stopDemo() : startDemo(); });
 // devuelven handles, que son los que permiten recuperar la lista en otra sesión.
 $("bAddFiles").addEventListener("click", elegirArchivos);
 $("bAddDir").addEventListener("click", elegirCarpeta);
+$("bRed").addEventListener("click", refrescarBibliotecaSkynet);
 $("fileIn").addEventListener("change", e=>{
   const fs = e.target.files;
   e.target.value = "";
@@ -6510,7 +6739,7 @@ if ("mediaSession" in navigator){
    Una app instalada vive en el teléfono, así que las novedades no llegan solas.
    Se compara la versión incrustada con la publicada en version.json (que el
    service worker nunca cachea) y, si difieren, se ofrece actualizar. */
-const APP_VERSION = "2.14";
+const APP_VERSION = "2.18";
 let verRemotaDatos = null;
 
 async function buscarActualizacion(silencioso){
@@ -6566,8 +6795,10 @@ async function aplicarActualizacion(){
         if (reg.waiting) reg.waiting.postMessage({tipo:"saltar-espera"});
       }
     }
+    // Solo las cachés de esta app: dentro del Puente, las demás apps de la
+    // casa comparten origen y borrarlas todas las dejaría sin modo sin conexión.
     const nombres = await caches.keys();
-    await Promise.all(nombres.map(n=> caches.delete(n)));
+    await Promise.all(nombres.filter(n=> n.startsWith("ondaamp")).map(n=> caches.delete(n)));
   }catch(e){}
   // Recarga forzada al final: a partir de aquí todo se pide de nuevo a la red.
   location.reload();
@@ -7251,17 +7482,31 @@ async function buscarServidorPropio(){
   }catch(e){ return false; }
 }
 
-async function conectarServidor(base, silencioso){
+async function conectarServidor(base, silencioso, refrescar=false){
   base = normalizarBase(base);
   if (!base) return false;
   let datos;
   try{
-    const r = await fetch(base + "/api/indice", {cache:"no-store"});
-    if (!r.ok) throw new Error("HTTP " + r.status);
-    datos = await r.json();
+    if (refrescar){
+      const rr = await fetch(base + "/api/refrescar", {cache:"no-store"});
+      let confirmado = false;
+      if (rr.ok && (rr.headers.get("content-type") || "").includes("application/json")){
+        const estado = await rr.json();
+        confirmado = !!(estado && estado.ok);
+      }
+      if (!confirmado){
+        // Compatibilidad mientras el servidor anterior sigue encendido.
+        const viejo = await fetch(base + "/api/indice?refrescar=1", {cache:"no-store"});
+        if (!viejo.ok) throw new Error("HTTP " + viejo.status);
+        datos = await viejo.json();
+      }
+    }
+    const r = datos ? null : await fetch(base + "/api/indice", {cache:"no-store"});
+    if (r && !r.ok) throw new Error("HTTP " + r.status);
+    if (r) datos = await r.json();
   }catch(e){
     // Se enseña la dirección ya corregida: si el fallo fue un dedazo, se ve
-    if (!silencioso) toast(`No responde ${base}. ¿Está encendido el servidor y estáis en la misma WiFi?`, true);
+    if (!silencioso) toast("No pude actualizar Flac Music. Conservé la biblioteca que ya estaba cargada.", true);
     return false;
   }
   if (!datos || !Array.isArray(datos.pistas) || !datos.pistas.length){
@@ -7271,7 +7516,22 @@ async function conectarServidor(base, silencioso){
   servidorBase = base;
   state.servidor = base;
 
-  // Fuera las remotas anteriores; las locales del usuario no se tocan
+  const nombreCarpeta = new Map((datos.carpetas || []).map(x => [String(x.id), x.nombre]));
+  const carpetasPermitidas = new Set(
+    [...nombreCarpeta].filter(([, nombre]) => nombre === BIBLIOTECA_SKYNET).map(([id]) => id)
+  );
+  const pistasServidor = EN_SKYNET
+    ? datos.pistas.filter(p => carpetasPermitidas.has(String(p.c)))
+    : datos.pistas;
+  if (EN_SKYNET && !pistasServidor.length){
+    if (!silencioso) toast(`No encuentro música en ${BIBLIOTECA_SKYNET}. Revísala desde la PC.`, true);
+    return false;
+  }
+
+  const pistaActual = state.list[state.cur];
+  const rutaActual = pistaActual && pistaActual.remoto ? pistaActual.relPath : "";
+  // Se reemplaza solo la parte que vino del servidor; los archivos locales
+  // elegidos en este dispositivo siempre se conservan.
   for (let i = state.list.length - 1; i >= 0; i--){
     if (state.list[i].remoto){
       if (state.list[i].picUrl) URL.revokeObjectURL(state.list[i].picUrl);
@@ -7282,13 +7542,13 @@ async function conectarServidor(base, silencioso){
 
   // Con varias carpetas compartidas, cada pista viaja con el id de la suya y
   // la URL es /media/<id>/<ruta>. Un índice viejo sin id sigue funcionando.
-  const nombreCarpeta = new Map((datos.carpetas || []).map(x => [String(x.id), x.nombre]));
-  for (const p of datos.pistas){
+  for (const p of pistasServidor){
     const partes = p.r.split("/");
     const nombre = partes[partes.length-1];
     const sub = partes.slice(0,-1).join("/");
     const raiz = partes[0] || "";
-    const rutaMedia = (p.c !== undefined ? p.c + "/" : "") + encodeURI(p.r);
+    const rutaMedia = ((p.c !== undefined ? p.c + "/" : "") + encodeURI(p.r))
+      .replace(/#/g,"%23").replace(/\?/g,"%3F");
     const url = base + "/media/" + rutaMedia;
     const casa = p.c !== undefined ? (nombreCarpeta.get(String(p.c)) || "") : "";
     state.list.push({
@@ -7306,11 +7566,29 @@ async function conectarServidor(base, silencioso){
       tam: p.t,
     });
   }
+  if (pistaActual && !pistaActual.remoto) state.cur = state.list.findIndex(x => x.id === pistaActual.id);
+  else if (rutaActual) state.cur = state.list.findIndex(x => x.remoto && x.relPath === rutaActual);
   if (state.view === "lista"){ state.view = "carpeta"; reflectViews(); }
   renderList(); updateStats(); actualizarRestaurar();
-  toast(`${datos.pistas.length} pistas desde el servidor de casa`);
+  toast(`${pistasServidor.length} pistas desde ${EN_SKYNET ? BIBLIOTECA_SKYNET : "el servidor de casa"}`);
   leerEtiquetasRemotas();
   return true;
+}
+
+async function refrescarBibliotecaSkynet(){
+  const boton = $("bRed");
+  const basePagina = location.origin + location.pathname.replace(/[^/]*$/, "").replace(/\/$/, "");
+  boton.disabled = true;
+  boton.textContent = "Leyendo…";
+  try{
+    // Dentro de Skynet la base correcta siempre es /musica. No se reutiliza
+    // una direccion antigua guardada (por ejemplo https://casa:8899), porque
+    // esa es la puerta del portal y no el prefijo del servidor multimedia.
+    await conectarServidor(basePagina, false, true);
+  } finally {
+    boton.disabled = false;
+    boton.textContent = "↻ Flac Music";
+  }
 }
 
 /* Etiquetas de las remotas: solo la primera pista de cada carpeta, y de cuatro
@@ -7494,17 +7772,44 @@ renderList();
 updatePlayUI();
 loadImportedSkins();
 cargarUltimaCarpeta();  // para que el explorador abra donde guardas la música
-cargarBiblioteca();   // recupera la lista de la sesión anterior
+cargarBiblioteca();     // recupera la lista de la sesión anterior
 
 /* Escanear si el navegador puede; si no, escribir la direccion */
-$("bServidor").addEventListener("click", abrirEscaner);
+/* El 🏠 cambia de oficio según dónde viva la app. Dentro de Skynet ya no hay
+   nada que escanear (la música viene del mismo sitio que la página): el botón
+   pasa a ser la vuelta a la pantalla principal de la casa. Suelta, sigue
+   siendo el escáner del servidor de siempre. */
+if (EN_SKYNET){
+  const b = $("bServidor");
+  document.body.classList.add("skynet-mode");
+  $("bRed").setAttribute("aria-label", "Volver a leer la biblioteca Flac Music desde la PC");
+  $("plEmptyTitle").textContent = "Agrega música de este dispositivo o carga Flac Music.";
+  $("plEmptyHint").textContent = "Archivos y Carpeta son locales; Flac Music viene de la PC.";
+  $("plEmptyNote").textContent = "Todo se reproduce dentro de la red de casa.";
+  $("modoTitulo").textContent = "· música local y de la casa";
+  $("footerMode").textContent = "OndaAmp · local y por la red · tu música no sale de casa";
+  document.title = "OndaAmp — Música de la casa";
+  b.classList.add("skynet-home");
+  document.body.appendChild(b);
+  b.title = "Volver a Skynet, la pantalla principal de la casa";
+  b.setAttribute("aria-label", "Volver a Skynet");
+  b.addEventListener("click", ()=>{ location.href = "/"; });
+} else {
+  $("bServidor").addEventListener("click", abrirEscaner);
+}
 $("bEscCerrar").addEventListener("click", cerrarEscaner);
 $("bEscTeclado").addEventListener("click", ()=>{ cerrarEscaner(); pedirServidor(); });
 /* Si la propia app la sirve el servidor de casa, se conecta sola: abrir
    http://<ip-del-pc>:8080 en el móvil basta. Si no, se reintenta la última
    dirección usada, en silencio para no molestar cuando no estás en casa. */
 (async function(){
-  if (await buscarServidorPropio()){ await conectarServidor(location.origin, true); return; }
+  /* La base es la CARPETA de esta página, no el origen pelado: dentro del
+     Puente la app vive en https://casa:8899/musica/ y usar location.origin
+     mandaría todas las peticiones a la raíz del portal. Servida suelta en
+     http://ip:8080/ la carpeta es "/" y sale exactamente lo de siempre. */
+  const base = location.origin + location.pathname.replace(/[^/]*$/, "").replace(/\/$/, "");
+  if (EN_SKYNET){ await conectarServidor(base, true); return; }
+  if (await buscarServidorPropio()){ await conectarServidor(base, true); return; }
   if (state.servidor) await conectarServidor(state.servidor, true);
 })();
 

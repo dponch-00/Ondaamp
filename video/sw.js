@@ -2,7 +2,7 @@
    Guarda en caché el "esqueleto" de la app (HTML, iconos, manifiesto) para que
    abra sin internet. Las películas NUNCA pasan por aquí: llegan en directo del
    servidor de casa (/media/…) y no se guardan en el teléfono. */
-const VERSION = "ondavideo-v1.1";
+const VERSION = "ondavideo-v1.2.1";
 const ESENCIALES = [
   "./",
   "./index.html",

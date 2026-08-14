@@ -27,6 +27,10 @@ const os     = require("os");
 const crypto = require("crypto");
 
 const PUERTO = Number(process.env.PORT || 8080);
+/* Cuando lo arranca Puente (el hub de la casa), este servidor deja de dar la
+   cara a la red: escucha solo en 127.0.0.1 y la familia entra por la puerta
+   única, con contraseña. Suelto, sigue funcionando como siempre. */
+const PUENTE = process.env.PUENTE_CHILD === "1";
 const APP    = __dirname;
 const CONFIG_RUTA = path.join(APP, "servidor-config.json");
 const AUDIO  = /\.(flac|mp3|wav|ogg|oga|opus|m4a|aac|weba|webm|wma)$/i;
@@ -64,6 +68,10 @@ function cors(res){
   res.setHeader("Access-Control-Allow-Private-Network", "true");
 }
 function esLocal(req){
+  /* Detrás de un proxy TODAS las peticiones llegan desde 127.0.0.1, así que
+     mirar la IP dejaría el panel abierto a toda la casa. Puente marca lo que
+     reenvía con X-Puente: si viene de ahí, no es local por definición. */
+  if (req.headers["x-puente"] || req.headers["x-forwarded-for"]) return false;
   const a = req.socket.remoteAddress || "";
   return a === "127.0.0.1" || a === "::1" || a === "::ffff:127.0.0.1";
 }
@@ -400,13 +408,31 @@ http.createServer((req,res)=>{
   if (req.method !== "GET" && req.method !== "HEAD"){ res.writeHead(405).end(); return; }
 
   const url = new URL(req.url, "http://localhost");
-  const ruta = decodeURIComponent(url.pathname);
+  let ruta = decodeURIComponent(url.pathname);
+
+  /* Detrás de Puente, OndaVideo llega con su prefijo puesto (/video/api/...,
+     /video/media/...) porque la pantalla de cine ya vive en /video/. El índice
+     y los archivos son los MISMOS para música y cine, así que aquí se le quita
+     ese prefijo y todo sigue por el camino de siempre. */
+  if (ruta.startsWith("/video/api/") || ruta.startsWith("/video/media/")){
+    ruta = ruta.slice(6);
+  }
 
   /* — API pública, con CORS: es lo que usa la app — */
   if (ruta === "/api/indice"){
     cors(res);
     if (!indice || url.searchParams.get("refrescar")) construirIndice();
     json(res, 200, indice);
+    return;
+  }
+  /* La recarga se separa de la descarga del indice. En algunos moviles, hacer
+     ambas cosas en una unica respuesta grande a traves de Skynet terminaba en
+     un error de red aunque el escaneo hubiese finalizado correctamente. */
+  if (ruta === "/api/refrescar"){
+    cors(res);
+    construirIndice();
+    json(res, 200, {ok:true, generado:indice.generado,
+                    pistas:indice.pistas.length, videos:indice.videos.length});
     return;
   }
   if (ruta === "/api/salud"){
@@ -506,12 +532,22 @@ http.createServer((req,res)=>{
   const rel = ruta === "/" ? "index.html" : path.normalize(ruta).replace(/^([/\\])+/, "");
   const abs = path.join(APP, rel);
   if (abs !== APP && !abs.startsWith(APP + path.sep)){ res.writeHead(403).end("Prohibido"); return; }
+  /* La carpeta de la app también guarda cosas que no son de la app: la
+     configuración lleva las rutas de tu disco, y .git el historial entero.
+     Nada de eso debe poder pedirse desde un navegador de la casa. */
+  if (/(^|[/\\])\.git([/\\]|$)/i.test(rel) || /\.(cjs|json)$/i.test(rel)){
+    const permitidos = ["manifest.webmanifest", "version.json"];
+    if (!permitidos.includes(path.basename(rel).toLowerCase())){
+      res.writeHead(404, {"Content-Type":TIPOS[".txt"]}).end("No encontrado");
+      return;
+    }
+  }
   fs.readFile(abs, (err, datos)=>{
     if (err){ res.writeHead(404, {"Content-Type":TIPOS[".txt"]}).end("No encontrado"); return; }
     res.writeHead(200, {"Content-Type": tipoDe(abs), "Cache-Control":"no-cache"});
     res.end(req.method === "HEAD" ? undefined : datos);
   });
-}).listen(PUERTO, ()=>{
+}).listen(PUERTO, PUENTE ? "127.0.0.1" : undefined, ()=>{
   cargarConfig();
   const t0 = Date.now();
   construirIndice();

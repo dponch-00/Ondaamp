@@ -13,12 +13,21 @@
   --fondo:#0f0f0f; --capa:#212121; --capa2:#2b2b2b; --borde:#303030;
   --texto:#f1f1f1; --texto2:#aaaaaa; --rojo:#ff3d3d; --rojoVivo:#f00;
   --chipBg:#272727; --chipTxt:#f1f1f1;
-  --altoBarra:56px; --altoChips:52px;
+  --altoBarra:calc(56px + env(safe-area-inset-top, 0px)); --altoChips:52px;
 }
 *{box-sizing:border-box; -webkit-tap-highlight-color:transparent}
 html,body{margin:0; padding:0; background:var(--fondo); color:var(--texto);
-  font:400 14px/1.45 Roboto,"Segoe UI",system-ui,-apple-system,sans-serif;
-  overscroll-behavior-y:contain}
+  font:400 14px/1.45 Roboto,"Segoe UI",system-ui,-apple-system,sans-serif}
+/* `overflow:hidden` en body corta el gesto vertical en algunos Safari/iOS.
+   `clip` evita el desborde lateral sin crear otro contenedor de scroll. */
+html{overflow-x:clip}
+body{min-width:0}
+@media (pointer:fine){
+  html{scrollbar-color:#555 var(--fondo)}
+  ::-webkit-scrollbar{width:10px; height:10px}
+  ::-webkit-scrollbar-track{background:var(--fondo)}
+  ::-webkit-scrollbar-thumb{background:#555; border:2px solid var(--fondo); border-radius:999px}
+}
 button{font:inherit; color:inherit; background:none; border:0; cursor:pointer; padding:0}
 input{font:inherit}
 a{color:inherit; text-decoration:none}
@@ -26,8 +35,9 @@ svg{display:block; fill:currentColor}
 .oculto{display:none !important}
 
 /* ---------- Barra superior ---------- */
-header{position:sticky; top:0; z-index:40; height:var(--altoBarra); background:var(--fondo);
-  display:flex; align-items:center; gap:8px; padding:0 12px}
+header{position:sticky; top:0; z-index:40; height:var(--altoBarra); background:rgba(15,15,15,.96);
+  backdrop-filter:blur(14px); display:flex; align-items:center; gap:8px;
+  padding:env(safe-area-inset-top, 0px) max(12px,env(safe-area-inset-right, 0px)) 0 max(12px,env(safe-area-inset-left, 0px))}
 .logo{display:flex; align-items:center; gap:7px; font-weight:700; font-size:19px;
   letter-spacing:-.4px; user-select:none; cursor:pointer; flex:0 0 auto}
 .logo svg{width:30px; height:30px}
@@ -45,6 +55,7 @@ header{position:sticky; top:0; z-index:40; height:var(--altoBarra); background:v
 .bIcono{width:40px; height:40px; border-radius:50%; display:flex; align-items:center;
   justify-content:center; flex:0 0 auto}
 .bIcono:hover{background:var(--capa)}
+.bIcono:focus-visible,.chip:focus-visible,.accion:focus-visible,.tarjeta:focus-visible{outline:2px solid #3ea6ff; outline-offset:2px}
 .bIcono svg{width:22px; height:22px}
 #bBuscarMovil{display:none}
 /* Botón de instalar: solo aparece si el navegador de verdad puede instalarla */
@@ -70,30 +81,39 @@ header{position:sticky; top:0; z-index:40; height:var(--altoBarra); background:v
 
 /* ---------- Chips ---------- */
 #chips{position:sticky; top:var(--altoBarra); z-index:39; background:var(--fondo);
-  display:flex; gap:8px; padding:8px 12px 12px; overflow-x:auto; scrollbar-width:none}
+  display:flex; gap:8px; max-width:100vw; padding:8px 12px 12px; overflow-x:auto; scrollbar-width:none;
+  -webkit-overflow-scrolling:touch}
 #chips::-webkit-scrollbar{display:none}
 .chip{flex:0 0 auto; background:var(--chipBg); color:var(--chipTxt); border-radius:8px;
-  padding:6px 12px; font-size:14px; font-weight:500; white-space:nowrap}
+  min-height:38px; padding:7px 13px; font-size:14px; font-weight:500; white-space:nowrap}
 .chip.activo{background:#f1f1f1; color:#0f0f0f}
 
 /* ---------- Portada ---------- */
-main{padding:4px 0 40px; max-width:2000px; margin:0 auto}
+main{padding:4px 0 max(40px,env(safe-area-inset-bottom, 0px)); max-width:2000px; min-width:0; width:100%; margin:0 auto}
 .seccion{margin:0 0 24px}
 .seccion h2{font-size:17px; font-weight:700; margin:10px 16px 12px; display:flex; align-items:center; gap:10px}
 .seccion h2 .verTodo{margin-left:auto; font-size:13px; font-weight:500; color:#3ea6ff; padding:4px 8px; border-radius:8px}
 .seccion h2 .verTodo:hover{background:rgba(62,166,255,.15)}
-.fila{display:flex; gap:12px; overflow-x:auto; padding:0 16px 6px; scroll-snap-type:x proximity; scrollbar-width:thin}
+.fila{display:flex; gap:12px; max-width:100vw; overflow-x:auto; padding:0 16px 6px;
+  scroll-snap-type:x proximity; scrollbar-width:thin; -webkit-overflow-scrolling:touch}
 .fila .tarjeta{flex:0 0 280px; scroll-snap-align:start}
 .rejilla{display:grid; grid-template-columns:repeat(auto-fill,minmax(300px,1fr)); gap:20px 16px; padding:0 16px}
 @media (max-width:640px){
-  .rejilla{grid-template-columns:1fr; gap:20px; padding:0}
-  .rejilla .tarjeta .miniatura{border-radius:0}
-  .rejilla .tarjeta .datos{padding:0 12px}
-  .fila .tarjeta{flex-basis:240px}
+  header{gap:4px; padding-left:max(8px,env(safe-area-inset-left, 0px)); padding-right:max(8px,env(safe-area-inset-right, 0px))}
+  .logo{font-size:17px; gap:5px}
+  .logo svg{width:27px; height:27px}
+  .logo small{display:none}
+  #bInstalar span{display:none}
+  #bInstalar{padding:8px 11px}
+  .rejilla{grid-template-columns:minmax(0,1fr); gap:22px; padding:0 12px}
+  .rejilla .tarjeta .miniatura{border-radius:11px}
+  .rejilla .tarjeta .datos{padding:0}
+  .fila{padding-left:12px; padding-right:12px}
+  .fila .tarjeta{flex-basis:min(78vw,280px)}
 }
 
 /* Tarjeta de vídeo */
-.tarjeta{cursor:pointer; user-select:none}
+.tarjeta{cursor:pointer; min-width:0; user-select:none}
 .miniatura{position:relative; aspect-ratio:16/9; border-radius:12px; overflow:hidden;
   background:linear-gradient(135deg,#1c2733,#101318)}
 .miniatura img{width:100%; height:100%; object-fit:cover; display:block}
@@ -109,11 +129,13 @@ main{padding:4px 0 40px; max-width:2000px; margin:0 auto}
 .miniatura .noCompat{position:absolute; left:6px; top:6px; background:rgba(0,0,0,.75); color:#ffd47f;
   font-size:11px; padding:2px 6px; border-radius:4px}
 .tarjeta .datos{display:flex; gap:10px; margin-top:10px}
+.tarjeta .datos>div:last-child{min-width:0}
 .avatar{flex:0 0 34px; width:34px; height:34px; border-radius:50%; display:flex; align-items:center;
   justify-content:center; font-size:14px; font-weight:700; color:#fff}
 .tarjeta .titulo{font-size:15px; font-weight:500; line-height:1.35; max-height:2.7em; overflow:hidden;
   display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical}
-.tarjeta .meta{color:var(--texto2); font-size:13px; margin-top:3px}
+.tarjeta .meta{color:var(--texto2); font-size:13px; margin-top:3px; overflow:hidden;
+  text-overflow:ellipsis; white-space:nowrap}
 .tarjeta .meta .sello{border:1px solid var(--texto2); border-radius:3px; font-size:10.5px; padding:0 3px; margin-right:4px; vertical-align:1px}
 
 /* ---------- Pantallas de estado ---------- */
@@ -135,7 +157,8 @@ main{padding:4px 0 40px; max-width:2000px; margin:0 auto}
 .botonGris:hover{background:var(--capa2)}
 
 /* ---------- Vista de reproducción ---------- */
-#verVista{position:fixed; inset:0; z-index:50; background:var(--fondo); overflow-y:auto; overscroll-behavior:contain}
+#verVista{position:fixed; inset:0; z-index:50; background:var(--fondo); overflow-y:auto;
+  overscroll-behavior-y:contain; -webkit-overflow-scrolling:touch; touch-action:pan-y}
 body.viendo{overflow:hidden}
 .lienzo{position:sticky; top:0; z-index:10; background:#000; width:100%; aspect-ratio:16/9;
   max-height:min(56.25vw,78vh); display:flex; align-items:center; justify-content:center; overflow:hidden}
@@ -143,7 +166,7 @@ body.viendo{overflow:hidden}
 .lienzo.pantallaCompleta{max-height:none}
 
 /* Contenido bajo el vídeo */
-#verContenido{padding:14px 16px 40px}
+#verContenido{padding:14px 16px max(40px,env(safe-area-inset-bottom, 0px))}
 #verTitulo{font-size:18px; font-weight:700; line-height:1.35; margin:0}
 #verMeta{color:var(--texto2); font-size:13.5px; margin:6px 0 12px}
 #verAcciones{display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-bottom:18px}
@@ -265,7 +288,15 @@ body.viendo{overflow:hidden}
 /* ---------- Panel de ajustes ---------- */
 #fondoOscuro{position:fixed; inset:0; z-index:70; background:rgba(0,0,0,.5)}
 #panelAjustes{position:fixed; z-index:71; background:#1c1c1c; overflow-y:auto;
-  inset:auto 0 0 0; max-height:82vh; border-radius:16px 16px 0 0; padding:8px 20px 28px}
+  inset:auto 0 0 0; max-height:82vh; border-radius:16px 16px 0 0;
+  padding:8px 20px max(28px,calc(14px + env(safe-area-inset-bottom, 0px)))}
+
+@media (max-width:520px){
+  #verAcciones{display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:6px}
+  #verAcciones .accion{justify-content:center; min-width:0; padding:8px 6px; font-size:12px}
+  #verAcciones .accion svg{width:17px; height:17px}
+  .itemSig .miniatura{flex-basis:145px; width:145px}
+}
 @media (min-width:700px){
   #panelAjustes{inset:0 0 0 auto; width:400px; max-height:none; border-radius:16px 0 0 16px; padding-top:14px}
 }
@@ -298,6 +329,9 @@ body.viendo{overflow:hidden}
 <body>
 
 <header>
+  <button class="bIcono oculto" id="bSkynet" title="Volver a Skynet, la pantalla principal de la casa" aria-label="Volver a Skynet">
+    <svg viewBox="0 0 24 24"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg>
+  </button>
   <div class="logo" id="bInicio" title="Portada">
     <svg viewBox="0 0 24 24"><rect x="1" y="4" width="22" height="16" rx="5" fill="#ff3d3d"/><path d="M10 8.4v7.2l6.2-3.6z" fill="#fff"/></svg>
     OndaVideo<small>de casa</small>
@@ -521,7 +555,14 @@ async function conectar(mostrarError){
   const candidatos = [];
   const param = new URLSearchParams(location.search).get("servidor");
   if (param) candidatos.push(normalizarBase(param));
-  if (location.protocol.startsWith("http")) candidatos.push(location.origin);
+  /* La CARPETA de esta página, no el origen pelado: dentro del Puente el cine
+     vive en https://casa:8899/video/ y usar location.origin mandaría todo a la
+     raíz del portal. Servido suelto en http://ip:8080/video/ da lo mismo que
+     antes, así que el candidato de siempre sigue valiendo. */
+  if (location.protocol.startsWith("http")){
+    candidatos.push(location.origin + location.pathname.replace(/[^/]*$/, "").replace(/\/$/, ""));
+    candidatos.push(location.origin);
+  }
   if (ajustes.servidor) candidatos.push(normalizarBase(ajustes.servidor));
   candidatos.push("http://localhost:8080");
   for (const b of [...new Set(candidatos)].filter(Boolean)){
@@ -899,9 +940,37 @@ function ordenarRecientes(lista){
    navegador lo corta antes de intentarlo. Conviene decirlo, en vez de echarle
    la culpa al servidor, que es lo que parece desde dentro. */
 const appEnHttps = ()=> location.protocol === "https:";
+/* Dentro del Puente la app y las películas vienen del MISMO sitio seguro, así
+   que el aviso de contenido mixto no aplica: si aquí falla algo es que el hub
+   no está en marcha, no que el navegador esté bloqueando nada. */
+const dentroDelPuente = ()=> /^\/video(\/|$)/.test(location.pathname);
+
+/* Botón de vuelta a Skynet: solo aparece dentro de la puerta única. Servida
+   suelta (127.0.0.1:8080, para depurar) la raíz sería OndaAmp, no la casa,
+   así que ahí se queda oculto. */
+if (dentroDelPuente() && location.port !== "8080"){
+  const b = document.getElementById("bSkynet");
+  if (b){
+    b.classList.remove("oculto");
+    b.addEventListener("click", ()=>{ location.href = "/"; });
+  }
+}
 
 function pantallaSinServidor(){
-  const bloqueoHttps = appEnHttps();
+  const bloqueoHttps = appEnHttps() && !dentroDelPuente();
+  if (dentroDelPuente()){
+    $("#inicio").innerHTML = `
+      <div class="pantalla">
+        <div class="emoji">📺</div>
+        <h2>El cine no está disponible ahora mismo</h2>
+        <p>Las películas las sirve el PC de casa. Si acabas de encender Puente, espera unos segundos y vuelve a intentarlo.</p>
+        <div class="pasos"><b>En el PC:</b> doble clic en <b>Iniciar Puente.bat</b>.</div>
+        <div class="campoServidor"><button class="botonAzul" id="bReintentar">Reintentar</button></div>
+      </div>`;
+    const b = $("#bReintentar");
+    if (b) b.addEventListener("click", ()=> conectar(true));
+    return;
+  }
   $("#inicio").innerHTML = `
     <div class="pantalla">
       <div class="emoji">📺</div>
@@ -1060,7 +1129,8 @@ function montarAcciones(v){
   if (document.pictureInPictureEnabled){
     const pip = document.createElement("button");
     pip.className = "accion";
-    pip.innerHTML = `<svg viewBox="0 0 24 24"><path d="M19 11h-8v6h8v-6zm4 8V4.98C23 3.88 22.1 3 21 3H3c-1.1 0-2 .88-2 1.98V19c0 1.1.9 2 2 2h18c1.1 0 2-.9 2-2zm-2 .02H3V4.97h18v14.05z"/></svg> Ventana flotante`;
+    pip.innerHTML = `<svg viewBox="0 0 24 24"><path d="M19 11h-8v6h8v-6zm4 8V4.98C23 3.88 22.1 3 21 3H3c-1.1 0-2 .88-2 1.98V19c0 1.1.9 2 2 2h18c1.1 0 2-.9 2-2zm-2 .02H3V4.97h18v14.05z"/></svg> Flotante`;
+    pip.title = "Abrir el vídeo en una ventana flotante";
     pip.onclick = ()=> alternarPip();
     z.appendChild(pip);
   }
@@ -1502,7 +1572,7 @@ function abrirAjustes(){
     </section>
     <section>
       <h3>Acerca de</h3>
-      <div class="linea mut">OndaVideo v1 — hermano de OndaAmp. Tus vídeos nunca salen de tu red.</div>
+      <div class="linea mut">OndaVideo v1.2.1 — hermano de OndaAmp. Tus vídeos nunca salen de tu red.</div>
     </section>`;
   p.classList.remove("oculto");
   $("#fondoOscuro").classList.remove("oculto");

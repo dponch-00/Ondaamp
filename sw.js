@@ -2,7 +2,7 @@
    Guarda en caché el "esqueleto" de la app (HTML, iconos, manifiesto) para que
    abra sin internet. La música NUNCA pasa por aquí: vive en OPFS, el almacén
    privado del navegador, y se lee directamente. */
-const VERSION = "ondaamp-v2.14";
+const VERSION = "ondaamp-v2.18";
 const ESENCIALES = [
   "./",
   "./index.html",
@@ -29,8 +29,13 @@ self.addEventListener("message", e=>{
 
 self.addEventListener("activate", e=>{
   e.waitUntil((async ()=>{
+    // Solo se limpian las cachés PROPIAS de versiones anteriores. El almacén de
+    // cachés es por origen, no por app: dentro del Puente, borrar todo lo que
+    // no sea nuestro dejaría sin modo sin conexión a OndaVideo, Estudio y las
+    // demás apps de la casa.
     const nombres = await caches.keys();
-    await Promise.all(nombres.filter(n=> n !== VERSION).map(n=> caches.delete(n)));
+    const mias = n => n === VERSION || n.startsWith("ondaamp");
+    await Promise.all(nombres.filter(n=> mias(n) && n !== VERSION).map(n=> caches.delete(n)));
     await self.clients.claim();
   })());
 });
@@ -40,6 +45,12 @@ self.addEventListener("fetch", e=>{
   if (req.method !== "GET") return;
   const url = new URL(req.url);
   if (url.origin !== self.location.origin) return;   // nada externo
+
+  // La música y el índice van SIEMPRE en directo. Dentro del Puente comparten
+  // origen con la app, así que sin esta línea acabarían en la caché: canciones
+  // enteras guardadas dos veces, y el índice congelado al añadir carpetas.
+  // Además rompería el salto dentro de una pista, que necesita Range.
+  if (url.pathname.includes("/media/") || url.pathname.includes("/api/")) return;
 
   // version.json NUNCA se guarda en caché: es justo el archivo que sirve para
   // detectar si hay una versión nueva, así que debe leerse siempre de la red.
