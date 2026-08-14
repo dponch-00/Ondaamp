@@ -47,6 +47,12 @@ header{position:sticky; top:0; z-index:40; height:var(--altoBarra); background:v
 .bIcono:hover{background:var(--capa)}
 .bIcono svg{width:22px; height:22px}
 #bBuscarMovil{display:none}
+/* Botón de instalar: solo aparece si el navegador de verdad puede instalarla */
+#bInstalar{display:flex; align-items:center; gap:6px; flex:0 0 auto; background:var(--rojo);
+  color:#fff; font-weight:600; font-size:13.5px; border-radius:999px; padding:8px 14px; white-space:nowrap}
+#bInstalar svg{width:17px; height:17px}
+#bInstalar:active{transform:scale(.97)}
+@media (max-width:400px){ #bInstalar span{display:none} #bInstalar{padding:8px 11px} }
 #estadoPunto{width:8px; height:8px; border-radius:50%; background:#666; position:absolute;
   right:6px; top:6px; border:2px solid var(--fondo)}
 #bAjustes{position:relative}
@@ -305,6 +311,9 @@ body.viendo{overflow:hidden}
     </div>
   </div>
   <button class="bIcono" id="bBuscarMovil" title="Buscar"><svg viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg></button>
+  <button id="bInstalar" class="oculto" title="Instalar OndaVideo en este aparato">
+    <svg viewBox="0 0 24 24"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg> <span>Instalar</span>
+  </button>
   <button class="bIcono" id="bAjustes" title="Ajustes">
     <svg viewBox="0 0 24 24"><path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/></svg>
     <span id="estadoPunto"></span>
@@ -886,16 +895,33 @@ function ordenarRecientes(lista){
   return [...lista].sort((a,b)=> (b.m||0)-(a.m||0) || a.titulo.localeCompare(b.titulo,"es"));
 }
 
+/* Una app servida por https NO puede pedir datos a un http de tu casa: el
+   navegador lo corta antes de intentarlo. Conviene decirlo, en vez de echarle
+   la culpa al servidor, que es lo que parece desde dentro. */
+const appEnHttps = ()=> location.protocol === "https:";
+
 function pantallaSinServidor(){
+  const bloqueoHttps = appEnHttps();
   $("#inicio").innerHTML = `
     <div class="pantalla">
       <div class="emoji">📺</div>
-      <h2>No encuentro el servidor de casa</h2>
-      <p>OndaVideo reproduce las películas guardadas en tu PC. Para eso, el PC tiene que estar encendido con el servidor en marcha.</p>
-      <div class="pasos">
-        <b>En el PC:</b> doble clic en <b>VER PELICULAS.bat</b> (o INICIAR SERVIDOR.bat) en Documents\\AudioPlayer.<br>
-        <b>En el teléfono:</b> además, estar en la misma WiFi que el PC.
-      </div>
+      <h2>${bloqueoHttps ? "Esta versión no puede ver tus películas" : "No encuentro el servidor de casa"}</h2>
+      ${bloqueoHttps ? `
+        <p>Estás en la versión instalable, que vive en internet (https). Tu servidor de casa va por http, y el navegador <b>no deja</b> que una página segura pida datos a una dirección que no lo es.</p>
+        <div class="pasos">
+          <b>La forma que sí funciona:</b> abre en el navegador la dirección de tu PC,
+          <b>http://&lt;ip-del-pc&gt;:8080/video/</b> — ahí las películas y la página vienen
+          del mismo sitio y no hay nada que permitir.<br><br>
+          La dirección exacta aparece en la <b>ventana negra del servidor</b>, en el PC.
+        </div>
+        <p class="mut" style="font-size:12.5px">Puedes intentarlo igualmente abajo: si tu navegador pregunta si permite el acceso a la red local, acepta y funcionará.</p>
+      ` : `
+        <p>OndaVideo reproduce las películas guardadas en tu PC. Para eso, el PC tiene que estar encendido con el servidor en marcha.</p>
+        <div class="pasos">
+          <b>En el PC:</b> doble clic en <b>VER PELICULAS.bat</b> (o INICIAR SERVIDOR.bat) en Documents\\AudioPlayer.<br>
+          <b>En el teléfono:</b> además, estar en la misma WiFi que el PC.
+        </div>
+      `}
       <div class="campoServidor">
         <input id="dirServidor" placeholder="Dirección, p. ej. 192.168.1.50:8080" value="${esc(ajustes.servidor||"")}">
         <button class="botonAzul" id="bConectar">Conectar</button>
@@ -1447,7 +1473,9 @@ function abrirAjustes(){
       </div>
       <div id="estadoServidor">${base
         ? `✅ Conectado a <b>${esc(base)}</b><br><b>${nVideos}</b> vídeos · ${fmtTam(total)} · Carpetas: ${esc(carpetas||"—")}`
-        : "❌ Sin conexión ahora mismo"}</div>
+        : appEnHttps()
+          ? `❌ Sin conexión. Esta versión va por <b>https</b> y el navegador le prohíbe llamar a tu servidor de casa, que va por http.<br>Abre <b>http://&lt;ip-del-pc&gt;:8080/video/</b> y funcionará.`
+          : "❌ Sin conexión ahora mismo"}</div>
       <div class="linea"><button class="botonGris" id="ajRefrescar">🔄 Buscar vídeos nuevos</button>
       <span class="mut">relee las carpetas del PC</span></div>
     </section>
@@ -1462,12 +1490,24 @@ function abrirAjustes(){
       <div class="linea mut">El historial de "continuar viendo" vive en cada aparato, no en el servidor.</div>
     </section>
     <section>
+      <h3>Instalar en este aparato</h3>
+      ${yaInstalada()
+        ? `<div class="linea mut">✅ Ya la estás usando instalada.</div>`
+        : promptInstalar
+          ? `<div class="linea"><button class="botonAzul" id="ajInstalar">⬇ Instalar OndaVideo</button></div>
+             <div class="linea mut">Le queda su propio icono, sin barra del navegador.</div>`
+          : `<div class="linea mut">${appEnHttps()
+              ? "Tu navegador aún no ofrece instalarla. Prueba con el menú ⋮ → <b>Instalar aplicación</b> (o <b>Añadir a pantalla de inicio</b>)."
+              : "Esta dirección es http, y solo se pueden instalar apps servidas por https. Con el menú ⋮ → <b>Añadir a pantalla de inicio</b> te queda igualmente el icono."}</div>`}
+    </section>
+    <section>
       <h3>Acerca de</h3>
       <div class="linea mut">OndaVideo v1 — hermano de OndaAmp. Tus vídeos nunca salen de tu red.</div>
     </section>`;
   p.classList.remove("oculto");
   $("#fondoOscuro").classList.remove("oculto");
   $("#bCerrarAjustes").onclick = cerrarAjustes;
+  if ($("#ajInstalar")) $("#ajInstalar").onclick = ()=>{ cerrarAjustes(); instalarApp(); };
   $("#ajConectar").onclick = async ()=>{
     ajustes.servidor = normalizarBase($("#ajDir").value); guardarAjustes();
     $("#ajConectar").textContent = "…";
@@ -1499,6 +1539,40 @@ function abrirAjustes(){
   };
 }
 function cerrarAjustes(){ $("#panelAjustes").classList.add("oculto"); $("#fondoOscuro").classList.add("oculto"); }
+
+/* ---------- Instalar la app ----------
+   Chrome esconde "Instalar aplicación" en su menú ⋮ y no siempre se llama
+   igual, así que la app ofrece su propio botón. El navegador solo entrega el
+   evento si de verdad se puede instalar: si no llega, el botón no aparece y
+   no prometemos algo que no va a pasar. */
+let promptInstalar = null;
+const yaInstalada = ()=> matchMedia("(display-mode: standalone)").matches ||
+                         matchMedia("(display-mode: fullscreen)").matches ||
+                         navigator.standalone === true;
+
+addEventListener("beforeinstallprompt", e=>{
+  e.preventDefault();                 // sin esto Chrome enseña su propia barra
+  promptInstalar = e;
+  if (!yaInstalada()) $("#bInstalar").classList.remove("oculto");
+});
+addEventListener("appinstalled", ()=>{
+  promptInstalar = null;
+  $("#bInstalar").classList.add("oculto");
+  toast("¡Instalada! Búscala como OndaVideo entre tus apps.");
+});
+$("#bInstalar").onclick = instalarApp;
+
+async function instalarApp(){
+  if (!promptInstalar) return;
+  promptInstalar.prompt();
+  const r = await promptInstalar.userChoice.catch(()=>({outcome:"dismissed"}));
+  if (r.outcome === "accepted"){
+    promptInstalar = null;
+    $("#bInstalar").classList.add("oculto");
+  } else {
+    toast("Instalación cancelada. El botón sigue ahí cuando quieras.");
+  }
+}
 
 /* ---------- Rutas ---------- */
 function renderRuta(){
