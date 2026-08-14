@@ -233,10 +233,18 @@ http.createServer((req,res)=>{
   // teléfono. Windows bloquea las conexiones entrantes mientras no exista una
   // regla, y no avisa de nada; parece que el servidor no funciona.
   if (process.platform === "win32"){
-    console.log(`\n  Si el móvil no conecta, es el cortafuegos de Windows.`);
-    console.log(`  Una vez, en PowerShell COMO ADMINISTRADOR:`);
-    console.log(`    New-NetFirewallRule -DisplayName "OndaAmp servidor de casa" \``);
-    console.log(`      -Direction Inbound -Protocol TCP -LocalPort ${PUERTO} -Action Allow -Profile Private`);
+    console.log(`\n  ── Cortafuegos ──────────────────────────────────────────`);
+    console.log(`  La primera vez, Windows abre una ventana preguntando si`);
+    console.log(`  permite el acceso a Node.js. Marca "Redes privadas" y pulsa`);
+    console.log(`  PERMITIR ACCESO. Con eso queda hecho para siempre.`);
+    console.log(`\n  Ojo: esa ventana solo aparece si arrancas el servidor desde`);
+    console.log(`  una terminal visible. Si lo lanzas en segundo plano, Windows`);
+    console.log(`  bloquea en silencio y el móvil no conecta sin decir por qué.`);
+    console.log(`\n  Si ya no aparece, créala a mano en PowerShell COMO`);
+    console.log(`  ADMINISTRADOR (botón derecho en Inicio → Terminal (Admin)):`);
+    console.log(`    New-NetFirewallRule -DisplayName "OndaAmp" -Direction Inbound \``);
+    console.log(`      -Protocol TCP -LocalPort ${PUERTO} -Action Allow -Profile Private`);
+    console.log(`  ─────────────────────────────────────────────────────────`);
   }
   console.log(`\n  Ctrl+C para detener.\n`);
 });

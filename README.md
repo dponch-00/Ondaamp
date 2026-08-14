@@ -43,12 +43,23 @@ Al arrancar dibuja además un **código QR** con su dirección, y lo publica en
 > acceso a la red local (Chrome 142 lo pide como permiso). Si no funciona, usa
 > la segunda forma.
 
-⚠️ **Windows bloquea las conexiones entrantes** mientras no exista una regla, y
-no avisa: el servidor responde en el propio PC pero el móvil no llega. Una vez,
-en PowerShell **como administrador**:
+### El cortafuegos de Windows
+
+La primera vez que arranques el servidor, Windows abrirá una ventana
+preguntando si permite el acceso a Node.js. Marca **Redes privadas** y pulsa
+**Permitir acceso**: con eso queda hecho para siempre.
+
+> **Arráncalo desde una terminal visible.** Esa ventana no aparece si lanzas el
+> servidor en segundo plano o con la consola oculta: Windows bloquea en
+> silencio, el servidor responde en el propio PC pero el móvil no llega, y nada
+> indica por qué.
+
+Si la ventana ya no sale (porque se cerró en su día), crea la regla a mano en
+PowerShell **como administrador** — botón derecho en Inicio → *Terminal
+(Administrador)*. Una terminal normal da `Acceso denegado`:
 
 ```powershell
-New-NetFirewallRule -DisplayName "OndaAmp servidor de casa" -Direction Inbound -Protocol TCP -LocalPort 8080 -Action Allow -Profile Private
+New-NetFirewallRule -DisplayName "OndaAmp" -Direction Inbound -Protocol TCP -LocalPort 8080 -Action Allow -Profile Private
 ```
 
 Los archivos se sirven **con soporte de rangos**, así que puedes arrastrar la
