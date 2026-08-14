@@ -29,12 +29,27 @@ node servidor-media.cjs
 Lee `F:\Flac Music` por omisión; para otra carpeta, pásala como argumento
 (`node servidor-media.cjs "D:\Mi musica"`). Al arrancar te dice la dirección.
 
-En el móvil, **abre esa dirección en Chrome** (algo como `http://192.168.1.10:8080`)
-y la biblioteca aparece sola: el servidor sirve la app y la música por el mismo
-puerto, así que comparten origen y no hay nada que configurar. También puedes
-escribir la dirección desde la app instalada con el botón 🏠, aunque eso depende
-de que tu navegador permita el acceso a la red local (Chrome 142 lo pide como
-permiso; si no funciona, usa la dirección directa).
+Al arrancar dibuja además un **código QR** con su dirección, y lo publica en
+`/qr` como página (más nítida que la de la terminal). Hay dos formas de usarlo:
+
+- **Desde la app instalada**: pulsa 🏠 y se abre el escáner. Apuntas al código
+  del PC y se conecta sola. Necesita cámara, así que solo funciona en la app
+  instalada (https); si tu navegador no trae lector de QR, cae al teclado.
+- **Con la cámara del móvil**: escaneas el código y el navegador abre la app
+  servida por el PC. Así la página y la música comparten origen y no hay nada
+  que configurar — es el camino más seguro.
+
+> Si usas la app instalada, reproducir depende de que tu navegador permita el
+> acceso a la red local (Chrome 142 lo pide como permiso). Si no funciona, usa
+> la segunda forma.
+
+⚠️ **Windows bloquea las conexiones entrantes** mientras no exista una regla, y
+no avisa: el servidor responde en el propio PC pero el móvil no llega. Una vez,
+en PowerShell **como administrador**:
+
+```powershell
+New-NetFirewallRule -DisplayName "OndaAmp servidor de casa" -Direction Inbound -Protocol TCP -LocalPort 8080 -Action Allow -Profile Private
+```
 
 Los archivos se sirven **con soporte de rangos**, así que puedes arrastrar la
 barra de progreso en un FLAC de 40 MB sin esperar a que se descargue. Las

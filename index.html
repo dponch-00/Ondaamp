@@ -2560,6 +2560,46 @@ body{
   .kar-txt{font-size:19px;}
   .kar-linea.act .kar-txt{font-size:22px;}
 }
+
+/* ---------- Escáner del servidor ---------- */
+#escaner{
+  position:fixed; inset:0; z-index:90;
+  display:flex; flex-direction:column;
+  background:#000; color:#fff;
+}
+#escaner[hidden]{display:none;}
+.esc-cab{
+  display:flex; align-items:center; gap:10px; flex:none;
+  padding:10px 12px; background:rgba(0,0,0,.75);
+}
+.esc-cab .kar-tit{
+  flex:1; min-width:0; text-align:center; font-weight:600; font-size:14px;
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+}
+.esc-marco{position:relative; flex:1; min-height:0; overflow:hidden;}
+#escVideo{width:100%; height:100%; object-fit:cover; display:block;}
+/* Cuadro guía: solo las cuatro esquinas, para no tapar lo que se enfoca */
+.esc-guia{
+  position:absolute; top:50%; left:50%; transform:translate(-50%,-50%);
+  width:min(68vw,300px); aspect-ratio:1; pointer-events:none;
+  background:
+    linear-gradient(var(--acc),var(--acc)) left top   /28px 3px no-repeat,
+    linear-gradient(var(--acc),var(--acc)) left top   /3px 28px no-repeat,
+    linear-gradient(var(--acc),var(--acc)) right top  /28px 3px no-repeat,
+    linear-gradient(var(--acc),var(--acc)) right top  /3px 28px no-repeat,
+    linear-gradient(var(--acc),var(--acc)) left bottom/28px 3px no-repeat,
+    linear-gradient(var(--acc),var(--acc)) left bottom/3px 28px no-repeat,
+    linear-gradient(var(--acc),var(--acc)) right bottom/28px 3px no-repeat,
+    linear-gradient(var(--acc),var(--acc)) right bottom/3px 28px no-repeat;
+  filter:drop-shadow(0 0 8px rgba(0,0,0,.7));
+}
+.esc-nota{
+  flex:none; padding:14px 18px calc(14px + env(safe-area-inset-bottom,0));
+  text-align:center; font-size:13.5px; line-height:1.5;
+  background:rgba(0,0,0,.8); color:#dfe7ef;
+}
+.esc-nota.malo{color:#ff9b9b;}
+.esc-pie{display:flex; justify-content:center; padding-bottom:10px; background:rgba(0,0,0,.8);}
 </style>
 </head>
 <body data-skin="ondaamp">
@@ -2954,6 +2994,18 @@ body{
     <button class="kar-extra" id="bKarBuscar" title="Buscar la letra en internet" aria-label="Buscar letra">🔎</button>
   </div>
   <div class="kar-cuerpo" id="karCuerpo"></div>
+</div>
+<div id="escaner" hidden>
+  <div class="esc-cab">
+    <button class="kar-cerrar" id="bEscCerrar" title="Cerrar el escáner" aria-label="Cerrar el escáner">✕<span class="hide-narrow">Cerrar</span></button>
+    <span class="kar-tit">Escanear el código del PC</span>
+    <button class="kar-extra" id="bEscTeclado" title="Escribir la dirección a mano" aria-label="Escribir la dirección a mano">⌨</button>
+  </div>
+  <div class="esc-marco">
+    <video id="escVideo" playsinline muted></video>
+    <div class="esc-guia"></div>
+  </div>
+  <p class="esc-nota" id="escNota">Apunta al código que muestra el PC.</p>
 </div>
 <div id="toasts"></div>
 
@@ -6458,7 +6510,7 @@ if ("mediaSession" in navigator){
    Una app instalada vive en el teléfono, así que las novedades no llegan solas.
    Se compara la versión incrustada con la publicada en version.json (que el
    service worker nunca cachea) y, si difieren, se ofrece actualizar. */
-const APP_VERSION = "2.12";
+const APP_VERSION = "2.13";
 let verRemotaDatos = null;
 
 async function buscarActualizacion(silencioso){
@@ -7281,6 +7333,93 @@ async function pedirServidor(){
   if (await conectarServidor(r)) save();
 }
 
+
+/* ---------- Escanear el código del servidor ----------
+   Evita teclear la dirección: se apunta al QR que el servidor dibuja en el PC
+   y la app se conecta sola.
+
+   Usa BarcodeDetector, que Chrome de Android trae de serie, así que no hay
+   librería que descargar. Dos requisitos que conviene tener claros porque
+   deciden cuándo aparece el botón:
+
+   · La cámara exige contexto seguro. En la app instalada (https) funciona; si
+     la app la está sirviendo el propio PC por http, el navegador no da cámara
+     —y ahí tampoco hace falta, porque ya estás conectado.
+   · Si el navegador no trae detector, se cae con elegancia al teclado. */
+let escStream = null, escBucle = 0, escDetector = null;
+
+function hayEscaner(){
+  return !!(window.BarcodeDetector && navigator.mediaDevices &&
+            navigator.mediaDevices.getUserMedia && window.isSecureContext);
+}
+function escNota(txt, malo){
+  const n = $("escNota");
+  if (n){ n.textContent = txt; n.classList.toggle("malo", !!malo); }
+}
+async function abrirEscaner(){
+  if (!hayEscaner()){ pedirServidor(); return; }
+  try{
+    const formatos = await BarcodeDetector.getSupportedFormats();
+    if (!formatos.includes("qr_code")){ toast("Tu navegador no lee códigos QR", true); pedirServidor(); return; }
+    escDetector = new BarcodeDetector({formats:["qr_code"]});
+  }catch(e){ pedirServidor(); return; }
+
+  try{
+    // La cámara trasera es la que apunta al monitor
+    escStream = await navigator.mediaDevices.getUserMedia({
+      video:{ facingMode:{ideal:"environment"}, width:{ideal:1280} }, audio:false });
+  }catch(e){
+    toast(e && e.name === "NotAllowedError"
+      ? "Hace falta permiso de cámara para escanear"
+      : "No pude abrir la cámara", true);
+    pedirServidor();
+    return;
+  }
+  const v = $("escVideo");
+  v.srcObject = escStream;
+  try{ await v.play(); }catch(e){}
+  $("escaner").hidden = false;
+  escNota("Apunta al código que muestra el PC.");
+  escMirar();
+}
+function cerrarEscaner(){
+  cancelAnimationFrame(escBucle); escBucle = 0;
+  if (escStream){ escStream.getTracks().forEach(t=> t.stop()); escStream = null; }
+  const v = $("escVideo"); if (v) v.srcObject = null;
+  $("escaner").hidden = true;
+}
+/* Solo se aceptan direcciones http(s) hacia un puerto: es lo que dibuja el
+   servidor. Así un QR cualquiera de la calle no manda la app a ningún sitio. */
+function urlDeServidor(txt){
+  let u;
+  try{ u = new URL(String(txt).trim()); }catch(e){ return null; }
+  if (u.protocol !== "http:" && u.protocol !== "https:") return null;
+  return u.origin;
+}
+let escProbando = false;
+async function escMirar(){
+  if (!escStream) return;
+  const v = $("escVideo");
+  if (!escProbando && v && v.readyState >= 2){
+    try{
+      const marcas = await escDetector.detect(v);
+      const cruda = marcas && marcas.length ? marcas[0].rawValue : null;
+      const base = cruda ? urlDeServidor(cruda) : null;
+      if (cruda && !base) escNota("Ese código no es una dirección de servidor.", true);
+      if (base){
+        escProbando = true;
+        escNota("Conectando con " + base + "…");
+        const ok = await conectarServidor(base, true);
+        if (ok){ save(); cerrarEscaner(); return; }
+        escNota("No respondió " + base + ". ¿Está encendido y en la misma WiFi?", true);
+        // Un respiro antes de reintentar, o se repetiría el aviso sin parar
+        setTimeout(()=>{ escProbando = false; }, 2500);
+      }
+    }catch(e){}
+  }
+  escBucle = requestAnimationFrame(escMirar);
+}
+
 /* ================= Init ================= */
 buildEqUI();
 fillPresetSelect();
@@ -7297,7 +7436,10 @@ loadImportedSkins();
 cargarUltimaCarpeta();  // para que el explorador abra donde guardas la música
 cargarBiblioteca();   // recupera la lista de la sesión anterior
 
-$("bServidor").addEventListener("click", pedirServidor);
+/* Escanear si el navegador puede; si no, escribir la direccion */
+$("bServidor").addEventListener("click", abrirEscaner);
+$("bEscCerrar").addEventListener("click", cerrarEscaner);
+$("bEscTeclado").addEventListener("click", ()=>{ cerrarEscaner(); pedirServidor(); });
 /* Si la propia app la sirve el servidor de casa, se conecta sola: abrir
    http://<ip-del-pc>:8080 en el móvil basta. Si no, se reintenta la última
    dirección usada, en silencio para no molestar cuando no estás en casa. */
