@@ -458,14 +458,22 @@ http.createServer((req,res)=>{
     return;
   }
   if (ruta === "/video/" || ruta === "/video/index.html"){
-    /* El HTML canónico vive en la carpeta madre; video/index.html es la copia
-       que se sube a GitHub Pages. Se sirve la que exista, con preferencia local. */
-    const candidatos = [path.join(APP, "..", "OndaVideo.html"),
-                        path.join(APP, "video", "index.html")];
+    /* El HTML que se mantiene es `video/index.html`: es el que recibe los
+       arreglos, el que lleva el botón de volver a Skynet y el que acompaña al
+       service worker de esta carpeta.
+
+       Antes se prefería `..\OndaVideo.html` (la copia de escritorio, de cuando
+       OndaVideo vivía suelto). Eso era una trampa: bastaba que ese archivo
+       reapareciera —restaurar una rama vieja, una copia de seguridad— para que
+       el cine empezara a servir en silencio una versión anterior, sin botón de
+       casa y sin los arreglos de móvil. Ahora manda el mantenido, y el de la
+       carpeta madre queda solo como respaldo si el otro faltara. */
+    const candidatos = [path.join(APP, "video", "index.html"),
+                        path.join(APP, "..", "OndaVideo.html")];
     const html = candidatos.find(p => { try{ return fs.existsSync(p); }catch(e){ return false; } });
     if (!html){
       res.writeHead(404, {"Content-Type": TIPOS[".txt"]});
-      res.end("Falta OndaVideo.html en Documents\\AudioPlayer (o pwa\\video\\index.html).");
+      res.end("Falta pwa\\video\\index.html en Documents\\AudioPlayer.");
       return;
     }
     fs.readFile(html, (err, datos)=>{

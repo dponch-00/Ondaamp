@@ -9,6 +9,68 @@ cache o version en OndaAmp/OndaVideo debe actualizar este archivo en el mismo
 cambio. No reemplaza los invariantes de `C:\Users\Daniel\Documents\AudioPlayer\AGENTS.md`;
 los complementa con historial y estado verificable.
 
+## 2026-08-14 · Revisión de Claude Code: entrega verificada y una trampa cerrada
+
+**Objetivo pedido por Daniel:** revisar lo entregado por Codex, resolver los
+cabos sueltos del repositorio y dejar constancia aquí.
+
+### La entrega de Codex quedó verificada
+
+26 comprobaciones contra la puerta real `https://127.0.0.1:8899`, todas en
+verde. Lo medido, no lo declarado:
+
+- Los cinco iconos del Home se sirven (`image/png`) y el portal los pinta con
+  el emoji como respaldo.
+- La separación de la recarga cumple su objetivo: `/api/refrescar` devuelve
+  **62 bytes** y `/api/indice` **355 KB** con 2296 pistas. Ese contraste es
+  exactamente el falso «no responde» que se estaba corrigiendo.
+- Versiones sincronizadas: OndaAmp `version.json` = `sw.js` = `APP_VERSION` =
+  2.18; OndaVideo `ondavideo-v1.2.1`.
+- Invariantes respetados: base por carpeta de página, cachés propias, `/media/`
+  y `/api/` en directo, servidor solo en 127.0.0.1, panel bloqueado tras el
+  proxy.
+- Reproducción real: música y película responden `206` a `Range`.
+
+### Trampa cerrada: el HTML de OndaVideo que se elegía primero
+
+**Comportamiento anterior.** `servidor-media.cjs` resolvía `/video/` con este
+orden: `..\OndaVideo.html` primero, `video\index.html` después. Funcionaba solo
+porque el primero no existía.
+
+**El riesgo.** Bastaba que ese archivo reapareciera —restaurar la rama vieja,
+una copia de seguridad, un descuido— para que el cine sirviera **en silencio**
+la versión de escritorio: 1526 líneas frente a 1670, sin `#bSkynet` y sin los
+arreglos de móvil de esta entrega. Nadie habría visto un error; solo una app
+peor.
+
+**Comportamiento nuevo.** Manda `video/index.html`, el que se mantiene y el
+que acompaña al service worker de esa carpeta. `..\OndaVideo.html` queda como
+respaldo si el primero faltara.
+
+**Prueba realizada.** Se colocó a propósito el `OndaVideo.html` viejo en la
+raíz, se reinició Skynet y se pidió `/video/` por la puerta: sirvió **1670
+líneas con `bSkynet` presente**. El señuelo no secuestró el cine. Después se
+retiró.
+
+### La rama `claude/ondavideo-local-player-8525a5`, archivada
+
+Su propio `ONDAVIDEO.md` indicaba copiar `OndaVideo.html` a
+`pwa/video/index.html`: eso ya ocurrió, y desde ahí la app evolucionó hasta
+1.2.1. La rama era el **origen**, no trabajo pendiente, y su documentación
+describe el mundo anterior a Skynet (`http://<ip>:8080/video/`).
+
+Se archivó como etiqueta **`ondavideo-v1-escritorio`** en el repositorio
+`AudioPlayer` y se borró la rama. Nada se pierde: las 1526 líneas se recuperan
+con `git show ondavideo-v1-escritorio:OndaVideo.html`. **No fusionar esa
+etiqueta a master**: volvería a colocar el archivo que el arreglo de arriba
+neutraliza.
+
+### Estado del servicio
+
+Skynet reiniciado y verificado con el cambio dentro. Servicios en marcha.
+
+---
+
 ## Estado actual
 
 Fecha de corte: **2026-08-14**
